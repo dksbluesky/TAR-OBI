@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DK 邏輯交易計算器</title>
+    <!-- 載入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 啟用 PWA 相關設定，讓它看起來像 App -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1f2937">
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/1D4ED8/FFFFFF?text=DK">
+    <link rel="shortcut icon" href="https://placehold.co/64x64/1D4ED8/FFFFFF?text=DK">
+
+    <style>
+        /* 使用 Inter 字體以獲得更好的現代感 */
+        body { font-family: 'Inter', sans-serif; }
+        /* 隱藏原生數字輸入框的上下箭頭 */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="bg-[#0a0a0a] text-white">
+
+    <div id="app" class="min-h-screen pb-10 p-4 sm:p-6 flex justify-center">
+        <!-- 應用程式主容器 -->
+        <div class="max-w-lg w-full space-y-6">
+            
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-xl shadow-lg border border-gray-700/50">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 p-3 rounded-xl shadow-xl shadow-blue-900/40">
+                        <!-- Icon: TradingUp (SVG) -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white w-6 h-6"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-extrabold text-white tracking-wide">DK 交易邏輯計算器</h1>
+                        <p class="text-xs text-gray-400">TAR (成交主動性) 與 OBI (掛單不平衡) 分析</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 輸入區塊 -->
+            <div id="input-section" class="grid grid-cols-2 gap-4">
+                
+                <!-- TAR Inputs (成交) -->
+                <div class="bg-[#121212] p-4 rounded-xl border border-gray-800 shadow-md shadow-black/30 space-y-3">
+                    <div class="flex items-center gap-2 text-yellow-500 mb-4">
+                        <!-- Icon: TrendingUp (SVG) -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                        <span class="text-sm font-bold uppercase tracking-wider">成交量 (TAR) - 主動性</span>
+                    </div>
+                    <!-- 輸入欄位將在此處生成 -->
+                    <div id="ask-prints-container"></div>
+                    <div id="bid-prints-container"></div>
+                </div>
+
+                <!-- OBI Inputs (掛單) -->
+                <div class="bg-[#121212] p-4 rounded-xl border border-gray-800 shadow-md shadow-black/30 space-y-3">
+                    <div class="flex items-center gap-2 text-purple-500 mb-4">
+                        <!-- Icon: Shield (SVG) -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span class="text-sm font-bold uppercase tracking-wider">掛單量 (OBI) - 不平衡</span>
+                    </div>
+                    <!-- 輸入欄位將在此處生成 -->
+                    <div id="bid-qty-container"></div>
+                    <div id="ask-qty-container"></div>
+                </div>
+            </div>
+
+            <!-- 結果區塊 -->
+            <div id="results-area">
+                <!-- 結果將由 JavaScript 注入此處 -->
+            </div>
+            
+             <div class="text-xs text-center text-gray-600 mt-8">
+                <p>請將此頁面加入手機主畫面，以獲得最佳 App 體驗。</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Data Mapping (15-Key 詳細邏輯) - 來自檔案 TAR_OBI_Calculator_FINAL.xlsx - Legend(3).csv
+        const MAP_DETAILED = {
+          "Strong Bid TAR|Bid-heavy OBI": { en: "Very strong buy pressure; breakout or sharp squeeze likely.", zh: "買盤極度強勢；極可能出現突破或軋空噴出。", pb_en: "Can chase long or add; use tight trailing stop above breakout level.", pb_zh: "可順勢追多或加碼；利用移動停損守在突破點之上。" },
+          "Strong Bid TAR|Balanced OBI": { en: "Aggressive buyers in control, but book not yet stretched.", zh: "主動買盤掌控局面，但掛單尚未過度延伸。", pb_en: "Buy pullbacks toward intraday support; trail stop under last swing low.", pb_zh: "拉回至盤中支撐位時做多；停損設在前波低點下方。" },
+          "Strong Bid TAR|Ask-heavy OBI": { en: "Strong buying vs a heavy ask wall (absorption).", zh: "強力買盤對抗厚重賣牆（籌碼吸收中）。", pb_en: "Only buy near strong support; partial size and quick to cut if wall holds.", pb_zh: "僅在強支撐附近小量試單；若賣牆遲遲不破，應快速離場。" },
+          "Bid-biased TAR|Bid-heavy OBI": { en: "Upward tilt; dip buyers and strong book support.", zh: "趨勢向上；低接買盤與掛單支撐強勁。", pb_en: "Buy on mild pullbacks; target VWAP/upper range; can hold with confidence.", pb_zh: "淺回檔即可做多；目標看向 VWAP 或區間上緣；持單信心度高。" },
+          "Bid-biased TAR|Balanced OBI": { en: "Gentle bullish bias; orderly uptrend or grind higher.", zh: "溫和偏多；有序上漲或盤堅。", pb_en: "Light long bias; buy near VWAP/support, avoid chasing highs.", pb_zh: "輕倉偏多操作；在 VWAP 或支撐附近買進，切勿追高。" },
+          "Bid-biased TAR|Ask-heavy OBI": { en: "Buyers active but facing strong overhead supply.", zh: "買方活躍但面臨上方沉重賣壓。", pb_en: "Range trade long near support, take profits quickly into resistance.", pb_zh: "區間操作：支撐做多，接近壓力區迅速獲利了結。" },
+          "Neutral TAR|Bid-heavy OBI": { en: "Quiet tape but strong bids parked below.", zh: "成交清淡但下方有強力買單停泊。", pb_en: "Buy near support/previous low with tight stop; fade breakdown attempts.", pb_zh: "在前低或支撐附近做多（嚴格停損）；若出現假跌破可逆勢做多。" },
+          "Neutral TAR|Balanced OBI": { en: "Sideways/mean-reversion regime.", zh: "橫盤整理/均值回歸狀態。", pb_en: "Range trade around VWAP; avoid breakout trades and oversized positions.", pb_zh: "圍繞 VWAP 區間操作；避免做突破單，部位不宜過大。" },
+          "Neutral TAR|Ask-heavy OBI": { en: "Passive ask pressure; slow drift or range with downward skew.", zh: "被動賣壓；緩跌或區間偏弱。", pb_en: "Scalp short near resistance; avoid aggressive longs until book relaxes.", pb_zh: "壓力區極短線放空；在賣壓減輕前避免積極做多。" },
+          "Ask-biased TAR|Bid-heavy OBI": { en: "Tape leaning down but book still supports on the bid.", zh: "成交偏弱但內盤掛單仍有支撐。", pb_en: "Only tactical longs near strong support; or very small shorts above VWAP.", pb_zh: "僅在強支撐附近嘗試戰術性做多；或在 VWAP 上方極輕倉放空。" },
+          "Ask-biased TAR|Balanced OBI": { en: "Mild selling pressure; slow bleed or choppy downside.", zh: "輕微賣壓；緩步盤跌或震盪向下。", pb_en: "Short bounces toward VWAP/resistance; keep targets modest.", pb_zh: "反彈至 VWAP 或壓力位時做空；獲利目標不宜過大。" },
+          "Ask-biased TAR|Ask-heavy OBI": { en: "Sellers pressing with a heavy ask wall.", zh: "賣方施壓且有厚重賣牆。", pb_en: "Short into pops; add near resistance; respect hard stops above wall.", pb_zh: "逢反彈做空；接近壓力區加碼；突破賣牆嚴格停損。" },
+          "Strong Ask TAR|Bid-heavy OBI": { en: "Aggressive selling into a strong bid base (possible battle/absorption).", zh: "強力賣壓撞擊強勁買盤基底（多空交戰/吸收）。", pb_en: "Wait for resolution; scalp both sides only at clear levels.", pb_zh: "等待方向明確；僅在明確的關鍵價位進行雙向極短線操作。" },
+          "Strong Ask TAR|Balanced OBI": { en: "Downside momentum dominant.", zh: "下跌動能主導。", pb_en: "Favour shorts; sell failed bounces; trail stop above last lower high.", pb_zh: "偏空操作；反彈失敗時放空；移動停損設在前波反彈高點上方。" },
+          "Strong Ask TAR|Ask-heavy OBI": { en: "Capitulation-style sell pressure; trend-down / potential flush.", zh: "投降式賣壓；趨勢向下或可能急殺。", pb_en: "Short rallies; can size up but lock in profits into spikes or key support.", pb_zh: "反彈即空；可放大部位，但急跌或遇關鍵支撐時需鎖定獲利。" }
+        };
+        // Data Mapping (9-Key 核心邏輯) - 來自檔案 TAR_OBI_Calculator_FINAL.xlsx - Mapping_Core_9.csv
+        const MAP_CORE = {
+          "Strong Bullish|Buy-heavy": { en: "Aggressive buyers + stacked bids; trend-up continuation most likely.", zh: "主動買盤 + 買牆偏多，續漲機率高。", pb_en: "Buy pullbacks above VWAP; add on ask-lifts that hold. Stop: below VWAP/last swing. Targets: HOD then +1~2 ticks.", pb_zh: "VWAP上方回檔偏多；遇抬價不回落可加碼。停損：VWAP或前低；目標：當日高、再上1~2檔。" },
+          "Strong Bullish|Balanced": { en: "Buy pressure strong; book neutral — can grind up but whips possible.", zh: "買壓強、簿平衡；偏磨高但易震盪。", pb_en: "Staggered scale‑in on dips above VWAP; avoid chasing. Stop: VWAP‑0.3~0.5%.", pb_zh: "VWAP上方分批承接，避免追價；停損：VWAP下方0.3~0.5%。" },
+          "Strong Bullish|Ask-heavy": { en: "Buy prints lead but asks reload — potential cap unless asks thin out.", zh: "買單主動但賣壓補量，可能壓頂。", pb_en: "Only buy after visible ask de‑queue at key level; quick stop if refills return.", pb_zh: "需見賣檔明顯消化再進；若再度補量立即停損。" },
+          "Neutral|Buy-heavy": { en: "Tape mixed but book supports — mean‑revert up toward VWAP/resistance.", zh: "成交中性、簿偏多；容易回升至VWAP/壓力位。", pb_en: "Fade weak dips into bid walls; take profits at VWAP/prev swing.", pb_zh: "靠買牆回補短多，於VWAP或前波高減碼。" },
+          "Neutral|Balanced": { en: "Two‑way chop; no edge without a catalyst/level.", zh: "雙向震盪；無明顯勝率。", pb_en: "Liquidity scalp only at mapped levels; tight stops.", pb_zh: "僅在關鍵價做流動性短單；嚴格停損。" },
+          "Neutral|Ask-heavy": { en: "Tape mixed but book leans ask — pops likely to fade.", zh: "成交中性、簿偏空；反彈易回落。", pb_en: "Fade pops into ask walls; cover near VWAP/prev swing low.", pb_zh: "靠賣牆逢高放空，回到VWAP或前低回補。" },
+          "Strong Bearish|Buy-heavy": { en: "Sellers hit tape but bids reload — risk of bear trap/bounce.", zh: "賣壓強但買牆補量，易假跌真彈。", pb_en: "Avoid chasing down; wait for failed breakdowns then quick long to VWAP.", pb_zh: "不追空！等破而不下後搶反彈至VWAP。" },
+          "Strong Bearish|Balanced": { en: "Sellers control tape, book neutral. Likely slow bleed lower.", zh: "賣方主控、簿平衡。走勢易緩跌。", pb_en: "Sell rallies towards VWAP; don't short the hole.", pb_zh: "反彈至VWAP附近做空；避免殺低。" },
+          "Strong Bearish|Ask-heavy": { en: "Aggressive selling + heavy asks pushing down. Trend continuation.", zh: "主動賣壓強 + 上方賣牆壓頂。空頭趨勢明確。", pb_en: "Short breakouts/breakdowns; add on bid-failures. Stop above recent lower-high.", pb_zh: "順勢做空；見買單竭盡加碼。停損設在近期反彈高點之上。" }
+        };
+
+        // 預設值 (採用 Input_Calc 的範例數據進行測試)
+        let state = {
+            askPrints: 12570, // 外盤 (主動買入)
+            bidPrints: 17847, // 內盤 (主動賣出)
+            bidQty: 11713,   // 委託買入
+            askQty: 7270,     // 委託賣出
+        };
+        
+        // 輸入框元素的引用
+        const inputFields = [
+            { key: 'askPrints', label: '外盤 (Ask Prints)', isAsk: true, containerId: 'ask-prints-container' },
+            { key: 'bidPrints', label: '內盤 (Bid Prints)', isAsk: false, containerId: 'bid-prints-container' },
+            { key: 'bidQty', label: '委託買入 (Bid Qty)', isAsk: true, containerId: 'bid-qty-container' },
+            { key: 'askQty', label: '委託賣出 (Ask Qty)', isAsk: false, containerId: 'ask-qty-container' },
+        ];
+
+        const resultArea = document.getElementById('results-area');
+
+        // --- 輸入欄位初始化函數 (只運行一次) ---
+        function initInputField(field) {
+            const container = document.getElementById(field.containerId);
+            if (!container) return;
+            
+            // 外盤/買入 (Ask Prints / Bid Qty) -> 綠色
+            // 內盤/賣出 (Bid Prints / Ask Qty) -> 紅色
+            const isBullish = field.key === 'askPrints' || field.key === 'bidQty';
+            const color = isBullish ? 'text-green-400' : 'text-red-400';
+            const focusBorder = isBullish ? 'focus:border-green-600' : 'focus:border-red-600';
+            const labelColor = isBullish ? 'text-green-500' : 'text-red-500';
+
+            // 1. 建立結構
+            container.innerHTML = `
+                <div>
+                    <div class="flex justify-between text-[10px] text-gray-500 uppercase mb-1">
+                        <span class="${labelColor} font-bold">${field.label}</span>
+                        <span id="${field.key}-pct" class="${color} font-mono"></span>
+                    </div>
+                    <input 
+                        type="number" 
+                        id="${field.key}-input" 
+                        value="${state[field.key]}" 
+                        class="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 ${color} font-mono text-base ${focusBorder} focus:ring-1 focus:ring-offset-1 focus:outline-none" 
+                        min="0"
+                    />
+                </div>
+            `;
+            
+            // 2. 綁定事件
+            const inputElement = document.getElementById(`${field.key}-input`);
+            inputElement.addEventListener('input', (e) => {
+                // 更新 state
+                state[field.key] = Number(e.target.value);
+                updateResults(); 
+            });
+        }
+
+        // --- 輸入欄位百分比更新函數 ---
+        function updateInputPercentages(pcts) {
+            if (!pcts) return;
+
+            inputFields.forEach(field => {
+                const pctSpan = document.getElementById(`${field.key}-pct`);
+                let resultPct = null;
+
+                // TAR Ask % 对应 Ask Prints
+                if (field.key === 'askPrints') resultPct = pcts.tarAskPct;
+                // TAR Bid % 对应 Bid Prints
+                else if (field.key === 'bidPrints') resultPct = pcts.tarBidPct;
+                // OBI Bid % 对应 Bid Qty
+                else if (field.key === 'bidQty') resultPct = pcts.obiBidPct;
+                // OBI Ask % 对应 Ask Qty
+                else if (field.key === 'askQty') resultPct = pcts.obiAskPct;
+                
+                if (pctSpan && resultPct !== null) {
+                    // 显示 TAR Ask/Bid % 和 OBI Bid/Ask %
+                    pctSpan.textContent = (resultPct * 100).toFixed(1) + "%";
+                }
+            });
+        }
+        
+        // --- 核心結構渲染函數 (將解讀與戰略綁定，視覺優化) ---
+        function renderAnalysisBlock(title, data, tarKey, obiKey, isDetailed) {
+            
+            // 根據 TAR 判斷顏色
+            let themeColor = "text-gray-400";
+            let themeBorder = "border-gray-600";
+            let themeBg = "bg-gray-800";
+
+            // 15-Key 顏色依據 15-Key 的 TarKey
+            if (isDetailed) {
+                 if (tarKey.includes("Strong Bid") || tarKey.includes("Bid-biased")) { 
+                    themeColor = "text-green-400"; themeBorder = "border-green-500"; themeBg = "bg-green-900/20"; 
+                 } else if (tarKey.includes("Strong Ask") || tarKey.includes("Ask-biased")) { 
+                    themeColor = "text-red-400"; themeBorder = "border-red-500"; themeBg = "bg-red-900/20"; 
+                 } else { // Neutral TAR
+                    themeColor = "text-blue-300"; themeBorder = "border-blue-500"; themeBg = "bg-blue-900/20"; 
+                 }
+            } 
+            // 9-Key 顏色依據 9-Key 的 TarKey
+            else {
+                 if (tarKey.includes("Strong Bullish")) { 
+                    themeColor = "text-green-400"; themeBorder = "border-green-500"; themeBg = "bg-green-900/20"; 
+                 } else if (tarKey.includes("Strong Bearish")) { 
+                    themeColor = "text-red-400"; themeBorder = "border-red-500"; themeBg = "bg-red-900/20"; 
+                 } else { // Neutral
+                    themeColor = "text-blue-300"; themeBorder = "border-blue-500"; themeBg = "bg-blue-900/20"; 
+                 }
+            }
+
+
+            const interpretationBorder = isDetailed ? "border-gray-500" : "border-gray-400";
+            const playbookBorder = isDetailed ? "border-blue-500" : "border-yellow-500";
+
+            // 調整顯示：15-Key OBI 顯示完整，9-Key OBI 顯示簡化
+            let obiDisplay = obiKey;
+            if (isDetailed) {
+                // 15-Key OBI 顯示
+                obiDisplay = obiKey.replace('Bid-heavy OBI', '買厚').replace('Ask-heavy OBI', '賣厚').replace('Balanced OBI', '均衡');
+            } else {
+                // 9-Key OBI 顯示
+                obiDisplay = obiKey.replace('Buy-heavy', '買厚').replace('Ask-heavy', '賣厚').replace('Balanced', '均衡');
+            }
+
+
+            const keyDisplay = isDetailed 
+                ? tarKey.replace(' TAR', '').replace('Bid', '多頭').replace('Ask', '空頭').replace('Neutral', '中性').replace('biased', '偏') + ' / ' + obiDisplay
+                : tarKey.replace('Bullish', '多頭').replace('Bearish', '空頭').replace('Neutral', '中性') + ' / ' + obiDisplay;
+            
+            return `
+                <div class="space-y-4">
+                    <!-- Key Type Header -->
+                    <div class="px-4 py-2 rounded-lg ${themeBg} border ${themeBorder}">
+                         <h3 class="text-lg font-bold ${themeColor} leading-tight">${title}</h3>
+                         <p class="text-xs text-gray-300 font-medium">組合鍵 (Key): ${keyDisplay}</p>
+                    </div>
+
+                    <!-- Interpretation (解讀) -->
+                    <div class="bg-black/30 p-3 rounded-lg border-l-4 ${interpretationBorder} shadow-inner shadow-black/20">
+                        <div class="flex items-center gap-2 text-gray-400 font-bold uppercase tracking-widest mb-3">
+                           <!-- Icon: BookOpen (SVG) -->
+                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 4 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 4 0 0 1 3-3h7z"/></svg>
+                           <span class="text-xs">趨勢解讀 (Interpretation)</span>
+                        </div>
+                        <p class="text-sm text-white font-bold mb-1 leading-snug">${data.zh}</p>
+                        <p class="text-xs text-gray-400 italic font-serif leading-snug">${data.en}</p>
+                    </div>
+
+                    <!-- Playbook (戰略提示) -->
+                    <div class="bg-black/30 p-3 rounded-lg border-l-4 ${playbookBorder} shadow-inner shadow-black/20">
+                        <div class="flex items-center gap-2 text-blue-400 font-bold uppercase tracking-widest mb-3">
+                           <!-- Icon: Zap (SVG) -->
+                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-400"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                           <span class="text-xs">DK 戰略提示 (Playbook Hint)</span>
+                        </div>
+                        <p class="text-sm text-white font-bold mb-1 leading-snug">${data.pb_zh}</p>
+                        <p class="text-xs text-gray-400 italic font-serif leading-snug">${data.pb_en}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 渲染指標指示器
+        function renderIndexIndicator(label, index, bucketKey) {
+            const indexColor = index > 0.1 ? "text-green-400" : index < -0.1 ? "text-red-400" : "text-blue-400";
+            // 調整顯示比例：將 -0.4 到 +0.4 (TAR) 或 -0.2 到 +0.2 (OBI) 映射到 0% 到 100% 的寬度
+            const maxAbsIndex = label === 'TAR' ? 0.40 : 0.20; 
+            
+            // 計算 barWidth: 將 maxAbsIndex 映射到 50%
+            const barWidth = Math.min((Math.abs(index) / maxAbsIndex) * 50, 50); 
+            const barMargin = index > 0 ? '50%' : `${50 - barWidth}%`;
+            const barBg = index > 0 ? 'bg-green-500' : 'bg-red-500';
+            
+            // 處理中文顯示 (使用 15-Key 的詳細分級作為指標顯示)
+            let zhBucketKey = bucketKey;
+            if (label === 'TAR') {
+                // 根據新的五級分法調整中文顯示
+                if (zhBucketKey.includes("Strong Bid")) { zhBucketKey = '強勢多頭(≥+0.40)'; }
+                else if (zhBucketKey.includes("Bid-biased")) { zhBucketKey = '偏多區(+0.20~+0.40)'; }
+                else if (zhBucketKey.includes("Neutral")) { zhBucketKey = '中性區間(-0.10~+0.20)'; }
+                else if (zhBucketKey.includes("Ask-biased")) { zhBucketKey = '偏空區(-0.20~-0.10]'; }
+                else if (zhBucketKey.includes("Strong Ask")) { zhBucketKey = '強勢空頭(< -0.20)'; }
+
+            } else if (label === 'OBI') {
+                zhBucketKey = zhBucketKey.replace('Bid-heavy OBI', '買厚(>+0.20)').replace('Ask-heavy OBI', '賣厚(<-0.20)').replace('Balanced OBI', '均衡區(±0.20)');
+            }
+
+
+            return `
+                <div class="bg-[#1c1c1c] px-4 py-3 rounded-xl border border-gray-700 flex items-center justify-between shadow-inner shadow-black/20">
+                  <div class="flex flex-col">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">${label} 指數與分級</span>
+                    <span class="text-sm font-black ${indexColor} leading-tight">
+                      ${zhBucketKey}
+                    </span>
+                  </div>
+                  <div class="w-32 flex flex-col items-end">
+                     <div class="h-2 w-full bg-gray-800 rounded-full overflow-hidden relative mb-1">
+                        <div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/20"></div>
+                        <div style="width: ${barWidth}%; margin-left: ${barMargin};" 
+                          class="h-full transition-all ${barBg}">
+                        </div>
+                     </div>
+                     <span class="text-sm text-gray-400 font-mono font-bold">${index.toFixed(4)}</span>
+                  </div>
+                </div>
+            `;
+        }
+
+
+        // 主更新邏輯
+        function updateResults() {
+            const { askPrints, bidPrints, bidQty, askQty } = state;
+            const totalPrints = askPrints + bidPrints;
+            const totalBook = bidQty + askQty;
+
+            if (totalPrints <= 0 || totalBook <= 0) {
+                resultArea.innerHTML = '<p class="text-center text-gray-500 mt-6">請輸入大於零的數據以計算結果。</p>';
+                updateInputPercentages(null); 
+                return;
+            }
+
+            // --- OBI 統一門檻定義 (不變: +/- 0.20) ---
+            const OBI_THRESHOLD = 0.20; 
+            // --- 9-Key 核心 TAR 門檻定義 (維持原始三級分: +/- 0.10) ---
+            const CORE_TAR_STRONG_THRESHOLD = 0.10;
+            // --- 15-Key 詳細 TAR 門檻定義 (匹配用戶提供的 Excel 公式) ---
+            const DETAILED_TAR_STRONG_BID = 0.40;
+            const DETAILED_TAR_BID_BIASED = 0.20;
+            const DETAILED_TAR_NEUTRAL_LOWER = -0.10;
+            const DETAILED_TAR_ASK_BIASED = -0.20;
+            
+
+            // --- 計算指數 ---
+            const tarAskPct = askPrints / totalPrints; 
+            const tarBidPct = bidPrints / totalPrints; 
+            const tarIndex = tarAskPct - tarBidPct; // >0 = 買方主動性高 (tar-ask - obi_bid)
+            
+            const obiBidPct = bidQty / totalBook;
+            const obiAskPct = askQty / totalBook;
+            const obiIndex = obiBidPct - obiAskPct; // >0 = 買方掛單較厚 (tar_index - obi_index)
+
+            // ----------------------------------------------------
+            // --- OBI 判斷邏輯 (統一) ---
+            // ----------------------------------------------------
+            let obiKey = "";
+            if (obiIndex > OBI_THRESHOLD) obiKey = "Bid-heavy OBI";
+            else if (obiIndex < -OBI_THRESHOLD) obiKey = "Ask-heavy OBI";
+            else obiKey = "Balanced OBI";
+
+
+            // ----------------------------------------------------
+            // --- 1. 15-Key 詳細判斷邏輯 (匹配用戶提供的 Excel 公式 - 五級分) ---
+            // ----------------------------------------------------
+            let detTarKey = "";
+            // 遵循 Excel IF 公式的判斷順序
+            if (tarIndex >= DETAILED_TAR_STRONG_BID) {             // tarIndex >= 0.40
+                detTarKey = "Strong Bid TAR";
+            } else if (tarIndex >= DETAILED_TAR_BID_BIASED) {      // 0.20 <= tarIndex < 0.40
+                detTarKey = "Bid-biased TAR";
+            } else if (tarIndex > DETAILED_TAR_NEUTRAL_LOWER) {    // -0.10 < tarIndex < 0.20
+                detTarKey = "Neutral TAR";
+            } else if (tarIndex > DETAILED_TAR_ASK_BIASED) {       // -0.20 < tarIndex <= -0.10
+                detTarKey = "Ask-biased TAR";
+            } else {                                               // tarIndex <= -0.20
+                detTarKey = "Strong Ask TAR";
+            }
+            
+            // 15-Key Lookup
+            const keyDetailed = `${detTarKey}|${obiKey}`; 
+            const dataDetailed = MAP_DETAILED[keyDetailed] || { en: "N/A", zh: "N/A", pb_en: "N/A", pb_zh: "N/A" };
+            
+            // ----------------------------------------------------
+            // --- 2. 9-Key 核心判斷邏輯 (維持原始三級分: +/- 0.10) ---
+            // ----------------------------------------------------
+            let coreTarKey = "";
+            if (tarIndex >= CORE_TAR_STRONG_THRESHOLD) coreTarKey = "Strong Bullish"; // TAR Index >= 0.10
+            else if (tarIndex <= -CORE_TAR_STRONG_THRESHOLD) coreTarKey = "Strong Bearish"; // TAR Index <= -0.10
+            else coreTarKey = "Neutral"; // -0.10 < TAR Index < 0.10
+
+            // OBI 核心判斷邏輯 (使用 9-Key 的 Key 命名)
+            let coreObiKey = "";
+            // 9-Key 的 OBI Key 不包含 " OBI" 後綴
+            if (obiIndex > OBI_THRESHOLD) coreObiKey = "Buy-heavy";
+            else if (obiIndex < -OBI_THRESHOLD) coreObiKey = "Ask-heavy";
+            else coreObiKey = "Balanced";
+
+            const keyCore = `${coreTarKey}|${coreObiKey}`;
+            const dataCore = MAP_CORE[keyCore] || { en: "N/A", zh: "N/A", pb_en: "N/A", pb_zh: "N/A" };
+
+            // 1. 更新輸入欄位上的百分比 
+            updateInputPercentages({ tarAskPct, tarBidPct, obiBidPct, obiAskPct });
+
+            // 2. 渲染結果區塊
+            resultArea.innerHTML = `
+                <div class="animate-in space-y-8">
+                    
+                    <!-- Index Indicators -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        ${renderIndexIndicator("TAR", tarIndex, detTarKey)}
+                        ${renderIndexIndicator("OBI", obiIndex, obiKey)}
+                    </div>
+
+                    <!-- Strategy Card (New Grouped Layout) -->
+                    <div class="rounded-xl border-2 border-gray-700 bg-black/50 shadow-2xl shadow-black/50 overflow-hidden p-5 space-y-8">
+                        
+                        <!-- Analysis Blocks -->
+                        <div class="space-y-8">
+                            <!-- 詳細組合分析 (15-Key) -->
+                            ${renderAnalysisBlock(
+                                "15-Key 詳細組合分析 (五級分判斷)", 
+                                dataDetailed, 
+                                detTarKey, 
+                                obiKey,
+                                true
+                            )}
+
+                            <!-- 核心趨勢分析 (9-Key) -->
+                            ${renderAnalysisBlock(
+                                "9-Key 核心趨勢分析 (三級分判斷 ±0.10)", 
+                                dataCore, 
+                                coreTarKey, 
+                                coreObiKey
+                            )}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 初始設定
+        function setupApp() {
+            inputFields.forEach(initInputField);
+            updateResults(); // 首次載入時計算並顯示結果
+        }
+
+        window.onload = setupApp;
+    </script>
+</body>
+</html>
