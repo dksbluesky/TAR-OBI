@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DK 邏輯交易計算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/2563EB/FFFFFF?text=DK">
+    <link rel="shortcut icon" href="https://placehold.co/64x64/2563EB/FFFFFF?text=DK">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+        .animate-pulse { animation: pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+    <div id="app" class="min-h-screen pb-10 p-4 sm:p-6 flex justify-center">
+        <div class="max-w-lg w-full space-y-5">
+
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-700 to-blue-500 p-4 rounded-xl shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/20 p-3 rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white w-6 h-6"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-extrabold text-white tracking-wide">DK 交易邏輯計算器</h1>
+                        <p class="text-xs text-blue-100">TAR (成交主動性) 與 OBI (掛單不平衡) 分析</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== Fugle API 區塊 ===== -->
+            <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
+                <!-- 標題列 -->
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
+                        <span class="text-sm font-bold text-blue-600 uppercase tracking-wider">Fugle 行情 API</span>
+                    </div>
+                    <button id="toggle-api-panel" class="text-xs text-gray-400 hover:text-gray-600 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-gray-300">
+                        <span id="toggle-api-text">收起</span>
+                    </button>
+                </div>
+
+                <!-- 可收合面板 -->
+                <div id="api-settings-panel" class="space-y-3">
+
+                    <!-- 股票代碼 + 立即取得 -->
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-wider block mb-1">股票代碼</label>
+                            <input id="symbol-input" type="text" maxlength="6" placeholder="如 2330、0050"
+                                   class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:outline-none uppercase"/>
+                        </div>
+                        <div class="flex flex-col justify-end">
+                            <label class="text-[10px] text-transparent uppercase font-bold tracking-wider block mb-1">.</label>
+                            <button id="fetch-btn"
+                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span id="fetch-btn-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="11" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+                                </span>
+                                <span id="fetch-btn-text">立即取得</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- API Key -->
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-wider block mb-1">Fugle API Key</label>
+                        <div class="relative">
+                            <input id="api-key-input" type="password" placeholder="輸入您的 Fugle Market Data API Key"
+                                   class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-600 font-mono text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:outline-none pr-10"/>
+                            <button id="toggle-key-visibility" title="顯示/隱藏"
+                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg id="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-1">
+                            API Key 僅儲存於本機瀏覽器 (localStorage)，不會上傳。
+                            取得方式：<a href="https://developer.fugle.tw" target="_blank" class="text-blue-500 hover:text-blue-700 underline">developer.fugle.tw</a>
+                        </p>
+                    </div>
+
+                    <!-- 自動更新 + 狀態 -->
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <div class="relative">
+                                <input type="checkbox" id="auto-refresh-toggle" class="sr-only peer"/>
+                                <div class="w-9 h-5 bg-gray-200 peer-checked:bg-blue-500 rounded-full transition-colors"></div>
+                                <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow"></div>
+                            </div>
+                            <span class="text-xs text-gray-500">每 <select id="refresh-interval" class="bg-transparent text-gray-600 text-xs focus:outline-none cursor-pointer">
+                                <option value="10">10</option>
+                                <option value="30" selected>30</option>
+                                <option value="60">60</option>
+                            </select> 秒自動更新</span>
+                        </label>
+                        <div id="api-status" class="text-xs text-gray-400 text-right max-w-[160px] truncate"></div>
+                    </div>
+
+                    <!-- 資料來源說明 -->
+                    <div class="text-[10px] text-gray-400 border-t border-gray-100 pt-2 leading-relaxed">
+                        外盤 ← <code class="text-gray-500">total.tradeVolumeAtAsk</code> &nbsp;|&nbsp;
+                        內盤 ← <code class="text-gray-500">total.tradeVolumeAtBid</code> &nbsp;|&nbsp;
+                        掛單 ← <code class="text-gray-500">bids/asks[].size</code> 加總
+                    </div>
+                </div>
+            </div>
+            <!-- ===== End Fugle API 區塊 ===== -->
+
+            <!-- 輸入區塊 -->
+            <div id="input-section" class="grid grid-cols-2 gap-4">
+                <!-- TAR Inputs -->
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 text-yellow-600 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                        <span class="text-sm font-bold uppercase tracking-wider">成交量 (TAR)</span>
+                    </div>
+                    <div id="ask-prints-container"></div>
+                    <div id="bid-prints-container"></div>
+                </div>
+
+                <!-- OBI Inputs -->
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 text-purple-600 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span class="text-sm font-bold uppercase tracking-wider">掛單量 (OBI)</span>
+                    </div>
+                    <div id="bid-qty-container"></div>
+                    <div id="ask-qty-container"></div>
+                </div>
+            </div>
+
+            <!-- 結果區塊 -->
+            <div id="results-area"></div>
+
+            <div class="text-xs text-center text-gray-400 mt-8">
+                <p>請將此頁面加入手機主畫面，以獲得最佳 App 體驗。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── Data Maps ───────────────────────────────────────────────────────────
+
+        const MAP_DETAILED = {
+          "Strong Bid TAR|Bid-heavy OBI": { en: "Very strong buy pressure; breakout or sharp squeeze likely.", zh: "買盤極度強勢；極可能出現突破或軋空噴出。", pb_en: "Can chase long or add; use tight trailing stop above breakout level.", pb_zh: "可順勢追多或加碼；利用移動停損守在突破點之上。" },
+          "Strong Bid TAR|Balanced OBI": { en: "Aggressive buyers in control, but book not yet stretched.", zh: "主動買盤掌控局面，但掛單尚未過度延伸。", pb_en: "Buy pullbacks toward intraday support; trail stop under last swing low.", pb_zh: "拉回至盤中支撐位時做多；停損設在前波低點下方。" },
+          "Strong Bid TAR|Ask-heavy OBI": { en: "Strong buying vs a heavy ask wall (absorption).", zh: "強力買盤對抗厚重賣牆（籌碼吸收中）。", pb_en: "Only buy near strong support; partial size and quick to cut if wall holds.", pb_zh: "僅在強支撐附近小量試單；若賣牆遲遲不破，應快速離場。" },
+          "Bid-biased TAR|Bid-heavy OBI": { en: "Upward tilt; dip buyers and strong book support.", zh: "趨勢向上；低接買盤與掛單支撐強勁。", pb_en: "Buy on mild pullbacks; target VWAP/upper range; can hold with confidence.", pb_zh: "淺回檔即可做多；目標看向 VWAP 或區間上緣；持單信心度高。" },
+          "Bid-biased TAR|Balanced OBI": { en: "Gentle bullish bias; orderly uptrend or grind higher.", zh: "溫和偏多；有序上漲或盤堅。", pb_en: "Light long bias; buy near VWAP/support, avoid chasing highs.", pb_zh: "輕倉偏多操作；在 VWAP 或支撐附近買進，切勿追高。" },
+          "Bid-biased TAR|Ask-heavy OBI": { en: "Buyers active but facing strong overhead supply.", zh: "買方活躍但面臨上方沉重賣壓。", pb_en: "Range trade long near support, take profits quickly into resistance.", pb_zh: "區間操作：支撐做多，接近壓力區迅速獲利了結。" },
+          "Neutral TAR|Bid-heavy OBI": { en: "Quiet tape but strong bids parked below.", zh: "成交清淡但下方有強力買單停泊。", pb_en: "Buy near support/previous low with tight stop; fade breakdown attempts.", pb_zh: "在前低或支撐附近做多（嚴格停損）；若出現假跌破可逆勢做多。" },
+          "Neutral TAR|Balanced OBI": { en: "Sideways/mean-reversion regime.", zh: "橫盤整理/均值回歸狀態。", pb_en: "Range trade around VWAP; avoid breakout trades and oversized positions.", pb_zh: "圍繞 VWAP 區間操作；避免做突破單，部位不宜過大。" },
+          "Neutral TAR|Ask-heavy OBI": { en: "Passive ask pressure; slow drift or range with downward skew.", zh: "被動賣壓；緩跌或區間偏弱。", pb_en: "Scalp short near resistance; avoid aggressive longs until book relaxes.", pb_zh: "壓力區極短線放空；在賣壓減輕前避免積極做多。" },
+          "Ask-biased TAR|Bid-heavy OBI": { en: "Tape leaning down but book still supports on the bid.", zh: "成交偏弱但內盤掛單仍有支撐。", pb_en: "Only tactical longs near strong support; or very small shorts above VWAP.", pb_zh: "僅在強支撐附近嘗試戰術性做多；或在 VWAP 上方極輕倉放空。" },
+          "Ask-biased TAR|Balanced OBI": { en: "Mild selling pressure; slow bleed or choppy downside.", zh: "輕微賣壓；緩步盤跌或震盪向下。", pb_en: "Short bounces toward VWAP/resistance; keep targets modest.", pb_zh: "反彈至 VWAP 或壓力位時做空；獲利目標不宜過大。" },
+          "Ask-biased TAR|Ask-heavy OBI": { en: "Sellers pressing with a heavy ask wall.", zh: "賣方施壓且有厚重賣牆。", pb_en: "Short into pops; add near resistance; respect hard stops above wall.", pb_zh: "逢反彈做空；接近壓力區加碼；突破賣牆嚴格停損。" },
+          "Strong Ask TAR|Bid-heavy OBI": { en: "Aggressive selling into a strong bid base (possible battle/absorption).", zh: "強力賣壓撞擊強勁買盤基底（多空交戰/吸收）。", pb_en: "Wait for resolution; scalp both sides only at clear levels.", pb_zh: "等待方向明確；僅在明確的關鍵價位進行雙向極短線操作。" },
+          "Strong Ask TAR|Balanced OBI": { en: "Downside momentum dominant.", zh: "下跌動能主導。", pb_en: "Favour shorts; sell failed bounces; trail stop above last lower high.", pb_zh: "偏空操作；反彈失敗時放空；移動停損設在前波反彈高點上方。" },
+          "Strong Ask TAR|Ask-heavy OBI": { en: "Capitulation-style sell pressure; trend-down / potential flush.", zh: "投降式賣壓；趨勢向下或可能急殺。", pb_en: "Short rallies; can size up but lock in profits into spikes or key support.", pb_zh: "反彈即空；可放大部位，但急跌或遇關鍵支撐時需鎖定獲利。" }
+        };
+
+        const MAP_CORE = {
+          "Strong Bullish|Buy-heavy": { en: "Aggressive buyers + stacked bids; trend-up continuation most likely.", zh: "主動買盤 + 買牆偏多，續漲機率高。", pb_en: "Buy pullbacks above VWAP; add on ask-lifts that hold. Stop: below VWAP/last swing. Targets: HOD then +1~2 ticks.", pb_zh: "VWAP上方回檔偏多；遇抬價不回落可加碼。停損：VWAP或前低；目標：當日高、再上1~2檔。" },
+          "Strong Bullish|Balanced": { en: "Buy pressure strong; book neutral — can grind up but whips possible.", zh: "買壓強、簿平衡；偏磨高但易震盪。", pb_en: "Staggered scale‑in on dips above VWAP; avoid chasing. Stop: VWAP‑0.3~0.5%.", pb_zh: "VWAP上方分批承接，避免追價；停損：VWAP下方0.3~0.5%。" },
+          "Strong Bullish|Ask-heavy": { en: "Buy prints lead but asks reload — potential cap unless asks thin out.", zh: "買單主動但賣壓補量，可能壓頂。", pb_en: "Only buy after visible ask de‑queue at key level; quick stop if refills return.", pb_zh: "需見賣檔明顯消化再進；若再度補量立即停損。" },
+          "Neutral|Buy-heavy": { en: "Tape mixed but book supports — mean‑revert up toward VWAP/resistance.", zh: "成交中性、簿偏多；容易回升至VWAP/壓力位。", pb_en: "Fade weak dips into bid walls; take profits at VWAP/prev swing.", pb_zh: "靠買牆回補短多，於VWAP或前波高減碼。" },
+          "Neutral|Balanced": { en: "Two‑way chop; no edge without a catalyst/level.", zh: "雙向震盪；無明顯勝率。", pb_en: "Liquidity scalp only at mapped levels; tight stops.", pb_zh: "僅在關鍵價做流動性短單；嚴格停損。" },
+          "Neutral|Ask-heavy": { en: "Tape mixed but book leans ask — pops likely to fade.", zh: "成交中性、簿偏空；反彈易回落。", pb_en: "Fade pops into ask walls; cover near VWAP/prev swing low.", pb_zh: "靠賣牆逢高放空，回到VWAP或前低回補。" },
+          "Strong Bearish|Buy-heavy": { en: "Sellers hit tape but bids reload — risk of bear trap/bounce.", zh: "賣壓強但買牆補量，易假跌真彈。", pb_en: "Avoid chasing down; wait for failed breakdowns then quick long to VWAP.", pb_zh: "不追空！等破而不下後搶反彈至VWAP。" },
+          "Strong Bearish|Balanced": { en: "Sellers control tape, book neutral. Likely slow bleed lower.", zh: "賣方主控、簿平衡。走勢易緩跌。", pb_en: "Sell rallies towards VWAP; don't short the hole.", pb_zh: "反彈至VWAP附近做空；避免殺低。" },
+          "Strong Bearish|Ask-heavy": { en: "Aggressive selling + heavy asks pushing down. Trend continuation.", zh: "主動賣壓強 + 上方賣牆壓頂。空頭趨勢明確。", pb_en: "Short breakouts/breakdowns; add on bid-failures. Stop above recent lower-high.", pb_zh: "順勢做空；見買單竭盡加碼。停損設在近期反彈高點之上。" }
+        };
+
+        // ─── App State ───────────────────────────────────────────────────────────
+
+        let state = {
+            askPrints: 12570,
+            bidPrints: 17847,
+            bidQty: 11713,
+            askQty: 7270,
+        };
+
+        const inputFields = [
+            { key: 'askPrints', label: '外盤 (Ask Prints)', containerId: 'ask-prints-container', bull: true  },
+            { key: 'bidPrints', label: '內盤 (Bid Prints)', containerId: 'bid-prints-container', bull: false },
+            { key: 'bidQty',    label: '委託買入 (Bid Qty)', containerId: 'bid-qty-container',    bull: true  },
+            { key: 'askQty',    label: '委託賣出 (Ask Qty)', containerId: 'ask-qty-container',    bull: false },
+        ];
+
+        const resultArea = document.getElementById('results-area');
+
+        // ─── Fugle API ────────────────────────────────────────────────────────────
+
+        const FUGLE_API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
+        let autoRefreshTimer = null;
+        let apiPanelOpen = true;
+
+        function loadApiSettings() {
+            const savedKey      = localStorage.getItem('fugle_api_key')      || '';
+            const savedSymbol   = localStorage.getItem('fugle_symbol')       || '2330';
+            const savedAuto     = localStorage.getItem('fugle_auto_refresh') === 'true';
+            const savedInterval = localStorage.getItem('fugle_interval')     || '30';
+
+            document.getElementById('api-key-input').value        = savedKey;
+            document.getElementById('symbol-input').value         = savedSymbol;
+            document.getElementById('auto-refresh-toggle').checked = savedAuto;
+            document.getElementById('refresh-interval').value     = savedInterval;
+
+            if (savedAuto && savedKey) startAutoRefresh();
+        }
+
+        function showApiStatus(msg, type) {
+            const el = document.getElementById('api-status');
+            const colors = {
+                success: 'text-green-600',
+                error:   'text-red-500',
+                loading: 'text-yellow-600',
+                info:    'text-gray-500',
+            };
+            el.className = `text-xs text-right max-w-[160px] truncate ${colors[type] || 'text-gray-500'}`;
+            el.textContent = msg;
+        }
+
+        function setFetchBtnState(loading) {
+            const btn      = document.getElementById('fetch-btn');
+            const iconSlot = document.getElementById('fetch-btn-icon');
+            const txtSlot  = document.getElementById('fetch-btn-text');
+            btn.disabled = loading;
+            if (loading) {
+                iconSlot.innerHTML = `<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
+                txtSlot.textContent = '取得中…';
+            } else {
+                iconSlot.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="11" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>`;
+                txtSlot.textContent = '立即取得';
+            }
+        }
+
+        async function fetchFugleData() {
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            const symbol = document.getElementById('symbol-input').value.trim().toUpperCase();
+
+            if (!symbol) { showApiStatus('請輸入股票代碼', 'error'); return; }
+            if (!apiKey)  { showApiStatus('請輸入 API Key',  'error'); return; }
+
+            localStorage.setItem('fugle_api_key', apiKey);
+            localStorage.setItem('fugle_symbol',  symbol);
+
+            setFetchBtnState(true);
+            showApiStatus('連線中…', 'loading');
+
+            try {
+                const res = await fetch(
+                    `${FUGLE_API_BASE}/stock/intraday/quote/${symbol}`,
+                    { headers: { 'X-API-KEY': apiKey } }
+                );
+
+                if (res.status === 401) throw new Error('API Key 無效或過期');
+                if (res.status === 403) throw new Error('無存取權限');
+                if (res.status === 404) throw new Error(`找不到股票代碼 ${symbol}`);
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    throw new Error(body.message || `HTTP ${res.status}`);
+                }
+
+                const data = await res.json();
+
+                const askPrints = data.total?.tradeVolumeAtAsk ?? 0;
+                const bidPrints = data.total?.tradeVolumeAtBid ?? 0;
+                const bidQty    = (data.bids || []).reduce((s, b) => s + (b.size || 0), 0);
+                const askQty    = (data.asks || []).reduce((s, a) => s + (a.size || 0), 0);
+
+                if (askPrints === 0 && bidPrints === 0) {
+                    showApiStatus('資料全為 0，可能尚未開盤', 'info');
+                } else {
+                    const now = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    showApiStatus(`✓ ${symbol}  ${now}`, 'success');
+                }
+
+                state.askPrints = askPrints;
+                state.bidPrints = bidPrints;
+                state.bidQty    = bidQty;
+                state.askQty    = askQty;
+
+                ['askPrints','bidPrints','bidQty','askQty'].forEach(k => {
+                    const el = document.getElementById(`${k}-input`);
+                    if (el) el.value = state[k];
+                });
+
+                updateResults();
+
+            } catch (err) {
+                console.error('[Fugle]', err);
+                const msg = err.message || '';
+                if (err instanceof TypeError || msg.toLowerCase().includes('fetch')) {
+                    showApiStatus('網路/CORS 錯誤：確認 Key 或本機開啟', 'error');
+                } else {
+                    showApiStatus(`錯誤：${msg}`, 'error');
+                }
+            } finally {
+                setFetchBtnState(false);
+            }
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            const secs = parseInt(document.getElementById('refresh-interval').value, 10) || 30;
+            autoRefreshTimer = setInterval(fetchFugleData, secs * 1000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+        }
+
+        function bindApiControls() {
+            document.getElementById('fetch-btn').addEventListener('click', fetchFugleData);
+
+            document.getElementById('toggle-api-panel').addEventListener('click', () => {
+                apiPanelOpen = !apiPanelOpen;
+                document.getElementById('api-settings-panel').style.display = apiPanelOpen ? '' : 'none';
+                document.getElementById('toggle-api-text').textContent = apiPanelOpen ? '收起' : '展開';
+            });
+
+            document.getElementById('toggle-key-visibility').addEventListener('click', () => {
+                const inp = document.getElementById('api-key-input');
+                const isPassword = inp.type === 'password';
+                inp.type = isPassword ? 'text' : 'password';
+                document.getElementById('eye-icon').classList.toggle('hidden', isPassword);
+                document.getElementById('eye-off-icon').classList.toggle('hidden', !isPassword);
+            });
+
+            document.getElementById('auto-refresh-toggle').addEventListener('change', e => {
+                localStorage.setItem('fugle_auto_refresh', e.target.checked);
+                e.target.checked ? startAutoRefresh() : stopAutoRefresh();
+            });
+
+            document.getElementById('refresh-interval').addEventListener('change', e => {
+                localStorage.setItem('fugle_interval', e.target.value);
+                if (document.getElementById('auto-refresh-toggle').checked) startAutoRefresh();
+            });
+
+            document.getElementById('symbol-input').addEventListener('keydown', e => {
+                if (e.key === 'Enter') fetchFugleData();
+            });
+        }
+
+        // ─── Input Fields ─────────────────────────────────────────────────────────
+
+        function initInputField(field) {
+            const container = document.getElementById(field.containerId);
+            if (!container) return;
+
+            const color       = field.bull ? 'text-green-600' : 'text-red-600';
+            const focusBorder = field.bull ? 'focus:border-green-500' : 'focus:border-red-500';
+            const focusRing   = field.bull ? 'focus:ring-green-500/20' : 'focus:ring-red-500/20';
+            const labelColor  = field.bull ? 'text-green-600' : 'text-red-600';
+
+            container.innerHTML = `
+                <div>
+                    <div class="flex justify-between text-[10px] uppercase mb-1">
+                        <span class="${labelColor} font-bold">${field.label}</span>
+                        <span id="${field.key}-pct" class="${color} font-mono"></span>
+                    </div>
+                    <input
+                        type="number"
+                        id="${field.key}-input"
+                        value="${state[field.key]}"
+                        class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 ${color} font-mono text-base ${focusBorder} focus:ring-1 ${focusRing} focus:outline-none"
+                        min="0"
+                    />
+                </div>
+            `;
+
+            document.getElementById(`${field.key}-input`).addEventListener('input', e => {
+                state[field.key] = Number(e.target.value);
+                updateResults();
+            });
+        }
+
+        function updateInputPercentages(pcts) {
+            if (!pcts) return;
+            inputFields.forEach(field => {
+                const pctSpan = document.getElementById(`${field.key}-pct`);
+                let v = null;
+                if      (field.key === 'askPrints') v = pcts.tarAskPct;
+                else if (field.key === 'bidPrints') v = pcts.tarBidPct;
+                else if (field.key === 'bidQty')    v = pcts.obiBidPct;
+                else if (field.key === 'askQty')    v = pcts.obiAskPct;
+                if (pctSpan && v !== null) pctSpan.textContent = (v * 100).toFixed(1) + '%';
+            });
+        }
+
+        // ─── Rendering ────────────────────────────────────────────────────────────
+
+        function renderAnalysisBlock(title, data, tarKey, obiKey, isDetailed) {
+            let themeColor  = 'text-gray-600';
+            let themeBorder = 'border-gray-400';
+            let themeBg     = 'bg-gray-50';
+
+            if (isDetailed) {
+                if (tarKey.includes('Strong Bid') || tarKey.includes('Bid-biased'))
+                    { themeColor='text-green-700'; themeBorder='border-green-400'; themeBg='bg-green-50'; }
+                else if (tarKey.includes('Strong Ask') || tarKey.includes('Ask-biased'))
+                    { themeColor='text-red-700';   themeBorder='border-red-400';   themeBg='bg-red-50'; }
+                else { themeColor='text-blue-700'; themeBorder='border-blue-400';  themeBg='bg-blue-50'; }
+            } else {
+                if (tarKey.includes('Strong Bullish'))
+                    { themeColor='text-green-700'; themeBorder='border-green-400'; themeBg='bg-green-50'; }
+                else if (tarKey.includes('Strong Bearish'))
+                    { themeColor='text-red-700';   themeBorder='border-red-400';   themeBg='bg-red-50'; }
+                else { themeColor='text-blue-700'; themeBorder='border-blue-400';  themeBg='bg-blue-50'; }
+            }
+
+            const interpretationBorder = isDetailed ? 'border-gray-400'   : 'border-gray-500';
+            const playbookBorder       = isDetailed ? 'border-blue-400'   : 'border-yellow-400';
+
+            let obiDisplay = obiKey;
+            if (isDetailed) {
+                obiDisplay = obiKey.replace('Bid-heavy OBI','買厚').replace('Ask-heavy OBI','賣厚').replace('Balanced OBI','均衡');
+            } else {
+                obiDisplay = obiKey.replace('Buy-heavy','買厚').replace('Ask-heavy','賣厚').replace('Balanced','均衡');
+            }
+
+            const keyDisplay = isDetailed
+                ? tarKey.replace(' TAR','').replace('Bid','多頭').replace('Ask','空頭').replace('Neutral','中性').replace('biased','偏') + ' / ' + obiDisplay
+                : tarKey.replace('Bullish','多頭').replace('Bearish','空頭').replace('Neutral','中性') + ' / ' + obiDisplay;
+
+            return `
+                <div class="space-y-3">
+                    <div class="px-4 py-2 rounded-lg ${themeBg} border ${themeBorder}">
+                        <h3 class="text-base font-bold ${themeColor} leading-tight">${title}</h3>
+                        <p class="text-xs text-gray-500 font-medium">組合鍵: ${keyDisplay}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg border-l-4 ${interpretationBorder}">
+                        <div class="flex items-center gap-2 text-gray-500 font-bold uppercase tracking-widest mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 4 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 4 0 0 1 3-3h7z"/></svg>
+                            <span class="text-[10px]">趨勢解讀 (Interpretation)</span>
+                        </div>
+                        <p class="text-sm text-gray-900 font-bold mb-1 leading-snug">${data.zh}</p>
+                        <p class="text-xs text-gray-500 italic font-serif leading-snug">${data.en}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg border-l-4 ${playbookBorder}">
+                        <div class="flex items-center gap-2 font-bold uppercase tracking-widest mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <span class="text-[10px] text-gray-500">DK 戰略提示 (Playbook Hint)</span>
+                        </div>
+                        <p class="text-sm text-gray-900 font-bold mb-1 leading-snug">${data.pb_zh}</p>
+                        <p class="text-xs text-gray-500 italic font-serif leading-snug">${data.pb_en}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderIndexIndicator(label, index, bucketKey) {
+            const indexColor  = index > 0.1 ? 'text-green-600' : index < -0.1 ? 'text-red-600' : 'text-blue-600';
+            const maxAbsIndex = label === 'TAR' ? 0.40 : 0.20;
+            const barWidth    = Math.min((Math.abs(index) / maxAbsIndex) * 50, 50);
+            const barMargin   = index > 0 ? '50%' : `${50 - barWidth}%`;
+            const barBg       = index > 0 ? 'bg-green-500' : 'bg-red-500';
+
+            let zhBucketKey = bucketKey;
+            if (label === 'TAR') {
+                if      (zhBucketKey.includes('Strong Bid'))   zhBucketKey = '強勢多頭(≥+0.40)';
+                else if (zhBucketKey.includes('Bid-biased'))   zhBucketKey = '偏多區(+0.20~+0.40)';
+                else if (zhBucketKey.includes('Neutral'))      zhBucketKey = '中性區間(-0.10~+0.20)';
+                else if (zhBucketKey.includes('Ask-biased'))   zhBucketKey = '偏空區(-0.20~-0.10]';
+                else if (zhBucketKey.includes('Strong Ask'))   zhBucketKey = '強勢空頭(< -0.20)';
+            } else {
+                zhBucketKey = zhBucketKey.replace('Bid-heavy OBI','買厚(>+0.20)').replace('Ask-heavy OBI','賣厚(<-0.20)').replace('Balanced OBI','均衡區(±0.20)');
+            }
+
+            return `
+                <div class="bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">${label} 指數與分級</span>
+                        <span class="text-sm font-black ${indexColor} leading-tight">${zhBucketKey}</span>
+                    </div>
+                    <div class="w-32 flex flex-col items-end">
+                        <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden relative mb-1">
+                            <div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-gray-400/40"></div>
+                            <div style="width:${barWidth}%; margin-left:${barMargin};" class="h-full transition-all ${barBg}"></div>
+                        </div>
+                        <span class="text-sm text-gray-500 font-mono font-bold">${index.toFixed(4)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ─── Core Calculation ─────────────────────────────────────────────────────
+
+        function updateResults() {
+            const { askPrints, bidPrints, bidQty, askQty } = state;
+            const totalPrints = askPrints + bidPrints;
+            const totalBook   = bidQty + askQty;
+
+            if (totalPrints <= 0 || totalBook <= 0) {
+                resultArea.innerHTML = '<p class="text-center text-gray-400 mt-6">請輸入大於零的數據以計算結果。</p>';
+                updateInputPercentages(null);
+                return;
+            }
+
+            const OBI_THRESHOLD              = 0.20;
+            const CORE_TAR_STRONG_THRESHOLD  = 0.10;
+            const DETAILED_TAR_STRONG_BID    = 0.40;
+            const DETAILED_TAR_BID_BIASED    = 0.20;
+            const DETAILED_TAR_NEUTRAL_LOWER = -0.10;
+            const DETAILED_TAR_ASK_BIASED    = -0.20;
+
+            const tarAskPct = askPrints / totalPrints;
+            const tarBidPct = bidPrints / totalPrints;
+            const tarIndex  = tarAskPct - tarBidPct;
+
+            const obiBidPct = bidQty / totalBook;
+            const obiAskPct = askQty / totalBook;
+            const obiIndex  = obiBidPct - obiAskPct;
+
+            let obiKey = '';
+            if      (obiIndex >  OBI_THRESHOLD) obiKey = 'Bid-heavy OBI';
+            else if (obiIndex < -OBI_THRESHOLD) obiKey = 'Ask-heavy OBI';
+            else                                 obiKey = 'Balanced OBI';
+
+            let detTarKey = '';
+            if      (tarIndex >= DETAILED_TAR_STRONG_BID)    detTarKey = 'Strong Bid TAR';
+            else if (tarIndex >= DETAILED_TAR_BID_BIASED)    detTarKey = 'Bid-biased TAR';
+            else if (tarIndex >  DETAILED_TAR_NEUTRAL_LOWER) detTarKey = 'Neutral TAR';
+            else if (tarIndex >  DETAILED_TAR_ASK_BIASED)    detTarKey = 'Ask-biased TAR';
+            else                                               detTarKey = 'Strong Ask TAR';
+
+            const keyDetailed  = `${detTarKey}|${obiKey}`;
+            const dataDetailed = MAP_DETAILED[keyDetailed] || { en:'N/A', zh:'N/A', pb_en:'N/A', pb_zh:'N/A' };
+
+            let coreTarKey = '';
+            if      (tarIndex >=  CORE_TAR_STRONG_THRESHOLD) coreTarKey = 'Strong Bullish';
+            else if (tarIndex <= -CORE_TAR_STRONG_THRESHOLD) coreTarKey = 'Strong Bearish';
+            else                                               coreTarKey = 'Neutral';
+
+            let coreObiKey = '';
+            if      (obiIndex >  OBI_THRESHOLD) coreObiKey = 'Buy-heavy';
+            else if (obiIndex < -OBI_THRESHOLD) coreObiKey = 'Ask-heavy';
+            else                                 coreObiKey = 'Balanced';
+
+            const keyCore  = `${coreTarKey}|${coreObiKey}`;
+            const dataCore = MAP_CORE[keyCore] || { en:'N/A', zh:'N/A', pb_en:'N/A', pb_zh:'N/A' };
+
+            updateInputPercentages({ tarAskPct, tarBidPct, obiBidPct, obiAskPct });
+
+            resultArea.innerHTML = `
+                <div class="space-y-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        ${renderIndexIndicator('TAR', tarIndex, detTarKey)}
+                        ${renderIndexIndicator('OBI', obiIndex, obiKey)}
+                    </div>
+                    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden p-5 space-y-6">
+                        ${renderAnalysisBlock('15-Key 詳細組合分析 (五級分判斷)', dataDetailed, detTarKey, obiKey, true)}
+                        <hr class="border-gray-100"/>
+                        ${renderAnalysisBlock('9-Key 核心趨勢分析 (三級分判斷 ±0.10)', dataCore, coreTarKey, coreObiKey, false)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ─── Init ─────────────────────────────────────────────────────────────────
+
+        function setupApp() {
+            inputFields.forEach(initInputField);
+            bindApiControls();
+            loadApiSettings();
+            updateResults();
+        }
+
+        window.onload = setupApp;
+    </script>
+</body>
+</html>
