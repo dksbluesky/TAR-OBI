@@ -121,6 +121,22 @@
             </div>
             <!-- ===== End Fugle API 區塊 ===== -->
 
+            <!-- VWAP 卡片（取得行情後顯示） -->
+            <div id="vwap-card" class="hidden bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">VWAP 均價 <span id="vwap-symbol" class="text-gray-300"></span></span>
+                        <span id="vwap-value" class="text-xl font-black text-gray-900 font-mono leading-tight">--</span>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">現價</span>
+                        <span id="vwap-last-price" class="text-base font-bold text-gray-700 font-mono leading-tight">--</span>
+                        <span id="vwap-deviation" class="text-xs font-mono font-bold"></span>
+                    </div>
+                </div>
+                <div id="vwap-position" class="mt-2 text-xs font-bold text-center py-1 rounded-lg"></div>
+            </div>
+
             <!-- 輸入區塊 -->
             <div id="input-section" class="grid grid-cols-2 gap-4">
                 <!-- TAR Inputs -->
@@ -301,6 +317,7 @@
                     if (el) el.value = state[k];
                 });
 
+                updateVwapCard(data, symbol);
                 updateResults();
 
             } catch (err) {
@@ -314,6 +331,45 @@
             } finally {
                 setFetchBtnState(false);
             }
+        }
+
+        function updateVwapCard(data, symbol) {
+            const card      = document.getElementById('vwap-card');
+            const lastPrice = data.lastPrice ?? data.closePrice ?? null;
+
+            let vwap = data.avgPrice ?? null;
+            if (vwap == null && data.total?.tradeValue > 0 && data.total?.tradeVolume > 0) {
+                vwap = data.total.tradeValue / data.total.tradeVolume;
+                // tradeVolume 若以「張」為單位，換算回股
+                if (lastPrice && vwap / lastPrice > 100) vwap /= 1000;
+            }
+
+            if (vwap == null || !(vwap > 0)) {
+                card.classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('vwap-symbol').textContent     = symbol ? `(${symbol})` : '';
+            document.getElementById('vwap-value').textContent      = vwap.toFixed(2);
+            document.getElementById('vwap-last-price').textContent = lastPrice != null ? lastPrice.toFixed(2) : '--';
+
+            const devEl = document.getElementById('vwap-deviation');
+            const posEl = document.getElementById('vwap-position');
+
+            if (lastPrice != null) {
+                const devPct = ((lastPrice - vwap) / vwap) * 100;
+                const above  = devPct > 0.05, below = devPct < -0.05;
+                devEl.textContent = `${devPct >= 0 ? '+' : ''}${devPct.toFixed(2)}% vs VWAP`;
+                devEl.className   = `text-xs font-mono font-bold ${above ? 'text-green-600' : below ? 'text-red-600' : 'text-blue-600'}`;
+                posEl.textContent = above ? '現價高於 VWAP（多方控盤區）' : below ? '現價低於 VWAP（空方控盤區）' : '現價貼近 VWAP（均衡區）';
+                posEl.className   = `mt-2 text-xs font-bold text-center py-1 rounded-lg ${above ? 'bg-green-50 text-green-700' : below ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`;
+            } else {
+                devEl.textContent = '';
+                posEl.textContent = '';
+                posEl.className   = 'mt-2';
+            }
+
+            card.classList.remove('hidden');
         }
 
         function startAutoRefresh() {
