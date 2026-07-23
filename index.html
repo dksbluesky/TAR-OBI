@@ -137,6 +137,32 @@
                 <div id="vwap-position" class="mt-2 text-xs font-bold text-center py-1 rounded-lg"></div>
             </div>
 
+            <!-- 輸入區塊 -->
+            <div id="input-section" class="grid grid-cols-2 gap-4">
+                <!-- TAR Inputs -->
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 text-yellow-600 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                        <span class="text-sm font-bold uppercase tracking-wider">成交量 (TAR)</span>
+                    </div>
+                    <div id="ask-prints-container"></div>
+                    <div id="bid-prints-container"></div>
+                </div>
+
+                <!-- OBI Inputs -->
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 text-purple-600 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span class="text-sm font-bold uppercase tracking-wider">掛單量 (OBI)</span>
+                    </div>
+                    <div id="bid-qty-container"></div>
+                    <div id="ask-qty-container"></div>
+                </div>
+            </div>
+
+            <!-- 結果區塊 -->
+            <div id="results-area-top"></div>
+
             <!-- Breakout Confirmation -->
             <div id="breakout-card" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                 <div class="flex items-center justify-between gap-3 mb-4">
@@ -164,31 +190,8 @@
                     <p id="breakout-explanation" class="text-xs text-gray-500 mt-1 leading-relaxed">Set a valid Trigger Level to begin observation.</p>
                 </div>
             </div>
-            <!-- 輸入區塊 -->
-            <div id="input-section" class="grid grid-cols-2 gap-4">
-                <!-- TAR Inputs -->
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                    <div class="flex items-center gap-2 text-yellow-600 mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                        <span class="text-sm font-bold uppercase tracking-wider">成交量 (TAR)</span>
-                    </div>
-                    <div id="ask-prints-container"></div>
-                    <div id="bid-prints-container"></div>
-                </div>
 
-                <!-- OBI Inputs -->
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                    <div class="flex items-center gap-2 text-purple-600 mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        <span class="text-sm font-bold uppercase tracking-wider">掛單量 (OBI)</span>
-                    </div>
-                    <div id="bid-qty-container"></div>
-                    <div id="ask-qty-container"></div>
-                </div>
-            </div>
-
-            <!-- 結果區塊 -->
-            <div id="results-area"></div>
+            <div id="results-area-bottom"></div>
 
             <div class="text-xs text-center text-gray-400 mt-8">
                 <p>請將此頁面加入手機主畫面，以獲得最佳 App 體驗。</p>
@@ -257,7 +260,8 @@
             { key: 'askQty',    label: '委託賣出 (Ask Qty)', containerId: 'ask-qty-container',    bull: false },
         ];
 
-        const resultArea = document.getElementById('results-area');
+        const resultAreaTop = document.getElementById('results-area-top');
+        const resultAreaBottom = document.getElementById('results-area-bottom');
 
         // ─── Fugle API ────────────────────────────────────────────────────────────
 
@@ -766,7 +770,8 @@
 
             if (totalPrints <= 0 || totalBook <= 0) {
                 latestIndicators = null;
-                resultArea.innerHTML = '<p class="text-center text-gray-400 mt-6">請輸入大於零的數據以計算結果。</p>';
+                resultAreaTop.innerHTML = '<p class="text-center text-gray-400 mt-6">請輸入大於零的數據以計算結果。</p>';
+                resultAreaBottom.innerHTML = '';
                 updateInputPercentages(null);
                 return;
             }
@@ -818,17 +823,20 @@
 
             updateInputPercentages({ tarAskPct, tarBidPct, obiBidPct, obiAskPct });
 
-            resultArea.innerHTML = `
+            resultAreaTop.innerHTML = `
                 <div class="space-y-5">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         ${renderIndexIndicator('TAR', tarIndex, detTarKey)}
                         ${renderIndexIndicator('OBI', obiIndex, obiKey)}
                     </div>
-                    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden p-5 space-y-6">
+                    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden p-5">
                         ${renderAnalysisBlock('15-Key 詳細組合分析 (五級分判斷)', dataDetailed, detTarKey, obiKey, true)}
-                        <hr class="border-gray-100"/>
-                        ${renderAnalysisBlock('9-Key 核心趨勢分析 (三級分判斷 ±0.10)', dataCore, coreTarKey, coreObiKey, false)}
                     </div>
+                </div>
+            `;
+            resultAreaBottom.innerHTML = `
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden p-5">
+                    ${renderAnalysisBlock('9-Key 核心趨勢分析 (三級分判斷 ±0.10)', dataCore, coreTarKey, coreObiKey, false)}
                 </div>
             `;
         }
