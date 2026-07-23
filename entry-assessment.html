@@ -36,10 +36,10 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <label class="text-xs font-bold text-slate-600">Entry Range Basis / 進場區間基準
                     <select id="entry-basis" class="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
-                        <option value="bidAsk">Bid / Ask / 買一賣一</option>
-                        <option value="vwap">VWAP / 成交均價</option>
-                        <option value="combined">Bid / Ask + VWAP / 買一賣一與VWAP綜合</option>
-                        <option value="current">Current Price / 現價</option>
+                        <option value="bidAsk" data-basis-label="Bid / Ask">Bid / Ask / 買一賣一</option>
+                        <option value="vwap" data-basis-label="VWAP">VWAP / 成交均價</option>
+                        <option value="combined" data-basis-label="Bid / Ask + VWAP">Bid / Ask + VWAP / 買一賣一與VWAP綜合</option>
+                        <option value="current" data-basis-label="Current Price">Current Price / 現價</option>
                     </select>
                 </label>
                 <label class="text-xs font-bold text-slate-600">Invalidation Basis / 失效價基準
@@ -66,7 +66,23 @@
                 </div>
                 <p id="closed-note" class="mt-3 hidden rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Closed-session result / 收盤結果，非即時進場評估</p>
                 <dl class="mt-6 grid grid-cols-2 gap-3">
-                    <div class="col-span-2 rounded-lg bg-blue-50 p-4"><dt class="text-xs font-bold text-blue-600">Preferred Entry Range / 建議進場區間</dt><dd id="entry-range" class="mt-1 font-mono text-2xl font-black text-blue-900">Unavailable / 資料不足</dd></div>
+                    <div class="col-span-2 rounded-lg bg-blue-50 p-4">
+                        <dt class="text-xs font-bold text-blue-600"><span class="block">Preferred Entry Range</span><span class="block">建議進場區間</span></dt>
+                        <dd id="entry-range" class="mt-1 font-mono text-2xl font-black text-blue-900">Unavailable / 資料不足</dd>
+                        <div class="mt-4 border-t border-blue-100 pt-3">
+                            <p class="text-xs font-bold text-slate-500"><span class="block">Distance to Preferred Entry</span><span class="block">距離建議進場區</span></p>
+                            <p id="entry-distance" class="mt-1 text-sm font-bold text-slate-500">Unavailable / 資料不足</p>
+                        </div>
+                        <div id="pullback-section" class="mt-3 hidden">
+                            <p class="text-xs font-bold text-slate-500">Estimated Pullback Required</p>
+                            <p id="pullback-required" class="mt-1 font-mono text-sm font-bold text-amber-700"></p>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-400">
+                            <p class="font-bold">Basis</p>
+                            <p id="entry-basis-label" class="mt-1"></p>
+                            <p>Dynamic TAR / OBI Adjustment</p>
+                        </div>
+                    </div>
                     <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Trading Range / 目前成交區間</dt><dd id="trading-range" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Maximum Entry Price / 最高可接受進場價</dt><dd id="maximum-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Invalidation Level / 條件失效價</dt><dd id="invalidation-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
@@ -200,6 +216,43 @@
 
         const pricesActionable = !['stale', 'unavailable'].includes(session);
         document.getElementById('entry-range').textContent = pricesActionable && Number.isFinite(assessment.lower) ? `${formatPrice(assessment.lower, tick)}–${formatPrice(assessment.upper, tick)}` : 'Unavailable / 資料不足';
+        const distanceEl = document.getElementById('entry-distance');
+        const hasPreferredRange = pricesActionable && Number.isFinite(price) && Number.isFinite(assessment.lower) && Number.isFinite(assessment.upper);
+        let entryDistance = null;
+        if (hasPreferredRange && price > assessment.upper) {
+            entryDistance = price - assessment.upper;
+            const distancePct = entryDistance / price * 100;
+            distanceEl.textContent = `▲ Current is +${formatPrice(entryDistance, tick)} (+${distancePct.toFixed(2)}%) above preferred range`;
+            distanceEl.className = 'mt-1 text-sm font-bold text-amber-600';
+        } else if (hasPreferredRange && price < assessment.lower) {
+            entryDistance = price - assessment.lower;
+            const distancePct = entryDistance / price * 100;
+            distanceEl.textContent = `▼ Current is -${formatPrice(Math.abs(entryDistance), tick)} (-${Math.abs(distancePct).toFixed(2)}%) below preferred range`;
+            distanceEl.className = 'mt-1 text-sm font-bold text-blue-600';
+        } else if (hasPreferredRange) {
+            entryDistance = 0;
+            distanceEl.textContent = '✓ Current is inside preferred range';
+            distanceEl.className = 'mt-1 text-sm font-bold text-emerald-600';
+        } else {
+            distanceEl.textContent = 'Unavailable / 資料不足';
+            distanceEl.className = 'mt-1 text-sm font-bold text-slate-500';
+        }
+        const pullbackSection = document.getElementById('pullback-section');
+        const pullbackRequired = document.getElementById('pullback-required');
+        const showPullback = assessment.state === 'WAIT FOR PULLBACK' && Number.isFinite(entryDistance);
+        const noPullback = assessment.state === 'ENTRY CONDITIONS MET';
+        pullbackSection.classList.toggle('hidden', !showPullback && !noPullback);
+        if (showPullback) {
+            const pullbackAmount = Math.abs(entryDistance);
+            const pullbackPct = Number.isFinite(price) && price > 0 ? pullbackAmount / price * 100 : null;
+            pullbackRequired.textContent = `${formatPrice(pullbackAmount, tick)}${Number.isFinite(pullbackPct) ? ` (+${pullbackPct.toFixed(2)}%)` : ''}`;
+        } else if (noPullback) {
+            pullbackRequired.textContent = 'No pullback required';
+        } else {
+            pullbackRequired.textContent = '';
+        }
+        const entryBasisSelect = document.getElementById('entry-basis');
+        document.getElementById('entry-basis-label').textContent = entryBasisSelect.selectedOptions[0]?.dataset.basisLabel || 'Unavailable';
         document.getElementById('trading-range').textContent = pricesActionable && Number.isFinite(assessment.tradingLower) ? `${formatPrice(assessment.tradingLower, tick)}–${formatPrice(assessment.tradingUpper, tick)}` : 'Unavailable';
         document.getElementById('maximum-price').textContent = pricesActionable ? formatPrice(assessment.maximum, tick) : 'Unavailable';
         document.getElementById('invalidation-price').textContent = pricesActionable ? formatPrice(assessment.invalidation, tick) : 'Unavailable';

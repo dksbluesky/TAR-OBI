@@ -64,7 +64,7 @@ assert.deepEqual([extended.tradingLower, extended.tradingUpper], [32.95, 33], 'e
 assert.ok(extended.upper < 33, 'preferred range is below extended current price');
 assert.ok(extended.upper <= extended.maximum, 'preferred upper does not exceed maximum');
 assert.ok(extended.factors.includes('✕ Current Price above preferred entry range'), 'pullback factor reports price above preferred range');
-assert.ok(!extended.factors.includes('✓ Price inside preferred entry range'), 'pullback does not claim price is inside preferred range');
+assert.ok(!extended.factors.includes('✓ Current Price inside preferred entry range'), 'pullback does not claim price is inside preferred range');
 assert.equal(assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }).state, 'DO NOT ENTER', 'selling below VWAP blocks entry');
 assert.equal(assess({ bid: 32.3, ask: 32.5 }).confidence, 'Low', 'wide spread lowers confidence');
 assert.equal(assess({ entryBasis: 'vwap', vwap: null }).state, 'DATA UNAVAILABLE', 'missing selected anchor is unavailable');

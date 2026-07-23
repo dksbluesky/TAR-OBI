@@ -215,7 +215,7 @@
         else if (state === 'ENTRY CONDITIONS MET' && inside && tar === 'Buyer Active' && obi !== 'Ask Dominant' && !materialExtension && input.volumeQuality && input.volumeQuality !== 'Unavailable') confidence = 'High';
 
         const factors = [];
-        factors.push(insidePreferredRange ? '✓ Price inside preferred entry range'
+        factors.push(insidePreferredRange ? '✓ Current Price inside preferred entry range'
             : price > upper ? '✕ Current Price above preferred entry range'
             : '– Current Price below preferred entry range');
         factors.push(price <= maximum ? '✓ Below maximum entry price' : '✕ Above maximum entry price');
