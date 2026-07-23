@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intraday Entry Assessment | TAR-OBI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./shared-market.js"></script>
+    <style>body{font-family:Inter,sans-serif}.value-change{transition:color .15s ease}</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+<main class="min-h-screen p-4 sm:p-6">
+    <div class="mx-auto max-w-5xl space-y-5">
+        <header class="rounded-xl bg-gradient-to-r from-blue-700 to-blue-500 p-5 text-white shadow-md">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h1 class="text-2xl font-black tracking-tight sm:text-3xl">Intraday Entry Assessment / 盤中進場評估</h1>
+                    <p class="mt-1 text-sm text-blue-100">Intraday decision support / 盤中客觀評估</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span id="market-badge" class="rounded-full bg-white/20 px-3 py-1.5 text-xs font-black tracking-wider">DATA UNAVAILABLE</span>
+                    <a id="back-link" href="./index.html" class="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-bold hover:bg-white/10">← Back to TAR-OBI / 返回 TAR-OBI</a>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-col gap-2 border-t border-white/20 pt-3 text-xs text-blue-50 sm:flex-row sm:items-center sm:justify-between">
+                <span id="source-summary">Waiting for saved Fugle settings…</span>
+                <button id="refresh-button" class="self-start rounded-lg bg-white px-3 py-1.5 font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50">Refresh / 更新</button>
+            </div>
+        </header>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <h2 class="text-xs font-black tracking-wider text-slate-600">ASSESSMENT SETTINGS / 評估設定</h2>
+                <button id="reset-settings" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Reset Settings / 重設</button>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <label class="text-xs font-bold text-slate-600">Entry Range Basis / 進場區間基準
+                    <select id="entry-basis" class="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
+                        <option value="bidAsk">Bid / Ask / 買一賣一</option>
+                        <option value="vwap">VWAP / 成交均價</option>
+                        <option value="combined">Bid / Ask + VWAP / 買一賣一與VWAP綜合</option>
+                        <option value="current">Current Price / 現價</option>
+                    </select>
+                </label>
+                <label class="text-xs font-bold text-slate-600">Invalidation Basis / 失效價基準
+                    <select id="invalidation-basis" class="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
+                        <option value="match">Match Entry Basis / 對應進場基準</option>
+                        <option value="bidAsk">Bid / Ask / 買一賣一</option>
+                        <option value="vwap">VWAP / 成交均價</option>
+                        <option value="range">Suggested Entry Range / 建議進場區間</option>
+                        <option value="current">Current Price / 現價</option>
+                    </select>
+                </label>
+            </div>
+        </section>
+
+        <section class="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+            <article class="flex min-h-[300px] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-black tracking-wider text-slate-500">ASSESSMENT / 盤中評估</p>
+                        <h2 id="assessment-state" class="mt-3 text-2xl font-black text-slate-700">DATA UNAVAILABLE</h2>
+                        <p id="assessment-zh" class="mt-1 text-sm font-bold text-slate-500">資料不足</p>
+                    </div>
+                    <span id="confidence" class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">Confidence: Low</span>
+                </div>
+                <p id="closed-note" class="mt-3 hidden rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">Closed-session result / 收盤結果，非即時進場評估</p>
+                <dl class="mt-6 grid grid-cols-2 gap-3">
+                    <div class="col-span-2 rounded-lg bg-blue-50 p-4"><dt class="text-xs font-bold text-blue-600">Suggested Entry Range / 建議進場區間</dt><dd id="entry-range" class="mt-1 font-mono text-2xl font-black text-blue-900">Unavailable / 資料不足</dd></div>
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Maximum Entry Price / 最高可接受進場價</dt><dd id="maximum-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Invalidation Level / 條件失效價</dt><dd id="invalidation-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
+                    <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Price / 現價</dt><dd id="current-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
+                </dl>
+                <p class="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET means configured intraday criteria are currently satisfied. It does not guarantee future performance.</p>
+            </article>
+
+            <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 class="text-xs font-black tracking-wider text-slate-600">ASSESSMENT FACTORS / 評估依據</h2>
+                <ul id="factor-list" class="mt-4 space-y-3 text-sm text-slate-600"><li>– Waiting for fresh market data</li></ul>
+            </article>
+        </section>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-4 text-xs font-black tracking-wider text-slate-600">CURRENT MARKET DATA / 即時市場資料</h2>
+            <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+                <div><dt class="text-slate-500">Bid 1 / 買一</dt><dd id="bid" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Ask 1 / 賣一</dt><dd id="ask" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Spread / 價差</dt><dd id="spread" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Tick Size / 跳動點</dt><dd id="tick-size" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">VWAP / 成交均價</dt><dd id="vwap" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Price vs VWAP / 現價相對均價</dt><dd id="vwap-difference" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">TAR / 成交主動性</dt><dd id="tar" class="font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">OBI / 掛單不平衡</dt><dd id="obi" class="font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Current Volume / 當前成交量</dt><dd id="volume" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Volume Quality / 成交量品質</dt><dd id="volume-quality" class="font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Data Timestamp / 資料時間</dt><dd id="timestamp" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Data Freshness / 資料新鮮度</dt><dd id="freshness" class="font-bold">Unavailable</dd></div>
+            </dl>
+        </section>
+
+        <section class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">TAR</span><strong id="tar-card" class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">OBI</span><strong id="obi-card" class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">VWAP Position</span><strong id="vwap-card" class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">Volume Quality</span><strong class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-1"><span class="text-xs font-bold text-slate-500">Market State</span><strong id="market-card" class="mt-2 block text-sm">DATA UNAVAILABLE</strong></div>
+        </section>
+    </div>
+</main>
+<script>
+    const API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
+    const ENTRY_KEY = 'tarObi.entryAssessment.entryBasis';
+    const INVALIDATION_KEY = 'tarObi.entryAssessment.invalidationBasis';
+    const validEntryBases = ['bidAsk', 'vwap', 'combined', 'current'];
+    const validInvalidationBases = ['match', 'bidAsk', 'vwap', 'range', 'current'];
+    let quoteData = null;
+    let metrics = null;
+    let fetching = false;
+    let refreshTimer = null;
+    let acceptedTimestamp = null;
+
+    function querySettings() {
+        const params = new URLSearchParams(location.search);
+        const storedSymbol = (localStorage.getItem('fugle_symbol') || '2330').trim().toUpperCase();
+        const symbol = (params.get('symbol') || storedSymbol).trim().toUpperCase();
+        const source = (params.get('source') || 'fugle').toLowerCase();
+        const interval = Number(params.get('interval')) || Number(localStorage.getItem('fugle_interval')) || 30;
+        return { apiKey: localStorage.getItem('fugle_api_key') || '', symbol, source, interval: [10, 30, 60].includes(interval) ? interval : 30 };
+    }
+
+    function firstLevel(side) {
+        const level = quoteData?.[side]?.[0];
+        const value = Number(level?.price);
+        return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    function currentPrice() {
+        const value = Number(quoteData?.lastPrice ?? quoteData?.closePrice);
+        return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    function formatPrice(value, tick = MarketData.inferTickSize(quoteData)) {
+        if (!Number.isFinite(value) || !Number.isFinite(tick)) return 'Unavailable';
+        const decimals = Math.max(0, Math.min(4, Math.ceil(-Math.log10(tick) - 1e-9)));
+        return value.toFixed(decimals);
+    }
+
+    function sessionInfo(session) {
+        return {
+            live: ['INTRADAY / 盤中交易中', 'bg-emerald-50 text-emerald-700'],
+            preopen: ['WAIT FOR MARKET OPEN / 等待開盤', 'bg-amber-50 text-amber-700'],
+            closed: ['MARKET CLOSED / 市場已收盤', 'bg-slate-100 text-slate-600'],
+            stale: ['DATA UNAVAILABLE / 資料不足', 'bg-red-50 text-red-700'],
+            unavailable: ['DATA UNAVAILABLE / 資料不足', 'bg-slate-100 text-slate-600'],
+        }[session] || ['DATA UNAVAILABLE / 資料不足', 'bg-slate-100 text-slate-600'];
+    }
+
+    function render() {
+        const settings = querySettings();
+        const tick = MarketData.inferTickSize(quoteData);
+        const price = currentPrice();
+        const bid = firstLevel('bids');
+        const ask = firstLevel('asks');
+        const vwap = MarketData.getVwap(quoteData);
+        const timestamp = MarketData.timestampToMs(quoteData?.lastUpdated || quoteData?.lastTrade?.time || quoteData?.closeTime);
+        const session = MarketData.getMarketSession(quoteData, settings.interval * 1000);
+        const tar = MarketData.getTarContext(metrics?.detTarKey);
+        const obi = MarketData.getObiContext(metrics?.obiKey);
+        const assessment = MarketData.calculateEntryAssessment({
+            current: price, bid, ask, vwap, tick, timestamp, session, tar, obi,
+            entryBasis: document.getElementById('entry-basis').value,
+            invalidationBasis: document.getElementById('invalidation-basis').value,
+            volumeQuality: 'Unavailable',
+        });
+        const [marketText, marketClass] = sessionInfo(session);
+        const badge = document.getElementById('market-badge');
+        badge.textContent = marketText;
+        badge.className = `rounded-full px-3 py-1.5 text-xs font-black tracking-wider ${marketClass}`;
+        document.getElementById('market-card').textContent = marketText;
+        document.getElementById('source-summary').textContent = `${settings.symbol}${quoteData?.name ? ` · ${quoteData.name}` : ''} · ${settings.source === 'fugle' ? 'Fugle' : settings.source} · every ${settings.interval}s`;
+        document.getElementById('back-link').href = `./index.html?symbol=${encodeURIComponent(settings.symbol)}`;
+
+        const stateMap = {
+            'ENTRY CONDITIONS MET': ['進場條件成立', 'text-emerald-700'],
+            'WAIT FOR PULLBACK': ['等待回落', 'text-amber-700'],
+            'WAIT FOR CONFIRMATION': ['等待確認', 'text-blue-700'],
+            'DO NOT ENTER': ['暫不進場', 'text-red-700'],
+            'DATA UNAVAILABLE': ['資料不足', 'text-slate-700'],
+        };
+        let displayState = assessment.state;
+        let displayZh = stateMap[displayState][0];
+        if (session === 'preopen') { displayState = 'WAIT FOR MARKET OPEN'; displayZh = '等待開盤'; }
+        const stateEl = document.getElementById('assessment-state');
+        stateEl.textContent = displayState;
+        stateEl.className = `mt-3 text-2xl font-black ${stateMap[assessment.state][1]}`;
+        document.getElementById('assessment-zh').textContent = displayZh;
+        document.getElementById('confidence').textContent = `Confidence: ${assessment.confidence}`;
+        document.getElementById('closed-note').classList.toggle('hidden', session !== 'closed');
+
+        const pricesActionable = !['stale', 'unavailable'].includes(session);
+        document.getElementById('entry-range').textContent = pricesActionable && Number.isFinite(assessment.lower) ? `${formatPrice(assessment.lower, tick)}–${formatPrice(assessment.upper, tick)}` : 'Unavailable / 資料不足';
+        document.getElementById('maximum-price').textContent = pricesActionable ? formatPrice(assessment.maximum, tick) : 'Unavailable';
+        document.getElementById('invalidation-price').textContent = pricesActionable ? formatPrice(assessment.invalidation, tick) : 'Unavailable';
+        document.getElementById('current-price').textContent = formatPrice(price, tick);
+
+        const spread = Number.isFinite(bid) && Number.isFinite(ask) && ask >= bid ? ask - bid : null;
+        const diff = Number.isFinite(price) && Number.isFinite(vwap) ? price - vwap : null;
+        const diffPct = Number.isFinite(diff) ? diff / vwap * 100 : null;
+        const vwapPosition = MarketData.getVwapPosition(price, vwap);
+        const values = {
+            bid: formatPrice(bid, tick), ask: formatPrice(ask, tick), spread: formatPrice(spread, tick),
+            'tick-size': formatPrice(tick, tick), vwap: formatPrice(vwap, tick),
+            'vwap-difference': Number.isFinite(diff) ? `${diff >= 0 ? '+' : '−'}${formatPrice(Math.abs(diff), tick)} / ${diffPct >= 0 ? '+' : '−'}${Math.abs(diffPct).toFixed(2)}% · ${vwapPosition}` : 'Unavailable',
+            tar, obi, volume: Number.isFinite(quoteData?.total?.tradeVolume) ? Number(quoteData.total.tradeVolume).toLocaleString() : 'Unavailable',
+            timestamp: timestamp ? new Date(timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : 'Unavailable',
+            freshness: session === 'live' ? 'Fresh / 最新' : session === 'closed' ? 'Closed session / 已收盤' : session === 'preopen' ? 'Pre-market / 開盤前' : 'Unavailable / 資料不足',
+        };
+        Object.entries(values).forEach(([id, value]) => { document.getElementById(id).textContent = value; });
+        document.getElementById('tar-card').textContent = tar;
+        document.getElementById('obi-card').textContent = obi;
+        document.getElementById('vwap-card').textContent = vwapPosition;
+        document.getElementById('factor-list').innerHTML = assessment.factors.map(factor => `<li>${factor}</li>`).join('');
+    }
+
+    async function fetchData() {
+        if (fetching) return;
+        const settings = querySettings();
+        if (!settings.apiKey || !settings.symbol || settings.source !== 'fugle') {
+            quoteData = null; metrics = null; render(); return;
+        }
+        fetching = true;
+        document.getElementById('refresh-button').disabled = true;
+        try {
+            const response = await fetch(`${API_BASE}/stock/intraday/quote/${settings.symbol}`, { headers: { 'X-API-KEY': settings.apiKey } });
+            if (!response.ok) throw new Error(`Quote HTTP ${response.status}`);
+            const nextQuote = await response.json();
+            const nextTimestamp = MarketData.timestampToMs(nextQuote?.lastUpdated || nextQuote?.lastTrade?.time || nextQuote?.closeTime);
+            if (acceptedTimestamp && nextTimestamp && nextTimestamp < acceptedTimestamp) return;
+            quoteData = nextQuote;
+            acceptedTimestamp = nextTimestamp || acceptedTimestamp;
+            const askPrints = Number(quoteData.total?.tradeVolumeAtAsk) || 0;
+            const bidPrints = Number(quoteData.total?.tradeVolumeAtBid) || 0;
+            const bidQty = (quoteData.bids || []).reduce((sum, level) => sum + (Number(level.size) || 0), 0);
+            const askQty = (quoteData.asks || []).reduce((sum, level) => sum + (Number(level.size) || 0), 0);
+            metrics = MarketData.calculateTarObi(askPrints, bidPrints, bidQty, askQty);
+        } catch (error) {
+            console.error('[Entry Assessment]', error);
+            quoteData = null; metrics = null;
+        } finally {
+            fetching = false;
+            document.getElementById('refresh-button').disabled = false;
+            render();
+            if (MarketData.getMarketSession(quoteData, settings.interval * 1000) === 'closed') {
+                clearInterval(refreshTimer); refreshTimer = null;
+            }
+        }
+    }
+
+    function setup() {
+        const savedEntry = localStorage.getItem(ENTRY_KEY);
+        const savedInvalidation = localStorage.getItem(INVALIDATION_KEY);
+        document.getElementById('entry-basis').value = validEntryBases.includes(savedEntry) ? savedEntry : 'combined';
+        document.getElementById('invalidation-basis').value = validInvalidationBases.includes(savedInvalidation) ? savedInvalidation : 'match';
+        document.getElementById('entry-basis').addEventListener('change', event => { localStorage.setItem(ENTRY_KEY, event.target.value); render(); });
+        document.getElementById('invalidation-basis').addEventListener('change', event => { localStorage.setItem(INVALIDATION_KEY, event.target.value); render(); });
+        document.getElementById('reset-settings').addEventListener('click', () => {
+            localStorage.removeItem(ENTRY_KEY); localStorage.removeItem(INVALIDATION_KEY);
+            document.getElementById('entry-basis').value = 'combined';
+            document.getElementById('invalidation-basis').value = 'match';
+            render();
+        });
+        document.getElementById('refresh-button').addEventListener('click', fetchData);
+        render(); fetchData();
+        refreshTimer = setInterval(fetchData, querySettings().interval * 1000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });
+    }
+    window.addEventListener('load', setup);
+</script>
+</body>
+</html>

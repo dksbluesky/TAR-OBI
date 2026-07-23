@@ -101,14 +101,119 @@
         return price < 10 ? 0.01 : price < 50 ? 0.05 : price < 100 ? 0.1 : price < 500 ? 0.5 : price < 1000 ? 1 : 5;
     }
 
-    function getCompleted15mCandle(candleResponse, quote) {
-        if (!candleResponse || !Array.isArray(candleResponse.data) || !candleResponse.data.length) return null;
-        const referenceMs = timestampToMs(quote?.lastUpdated || quote?.lastTrade?.time || quote?.closeTime) || Date.now();
-        const completed = candleResponse.data.filter(candle => {
-            const startMs = Date.parse(candle.date);
-            return Number.isFinite(startMs) && startMs + 15 * 60 * 1000 <= referenceMs;
-        });
-        return completed.length ? completed[completed.length - 1] : null;
+    function roundToTick(value, tick, direction = 'nearest') {
+        if (!Number.isFinite(value) || !Number.isFinite(tick) || tick <= 0) return null;
+        const units = value / tick;
+        const rounded = direction === 'down' ? Math.floor(units + 1e-9)
+            : direction === 'up' ? Math.ceil(units - 1e-9)
+            : Math.round(units);
+        return Number((rounded * tick).toFixed(8));
+    }
+
+    function calculateEntryAssessment(input) {
+        const price = Number(input.current);
+        const bid = Number(input.bid);
+        const ask = Number(input.ask);
+        const vwap = Number(input.vwap);
+        const tick = Number(input.tick);
+        const hasPrice = Number.isFinite(price) && price > 0;
+        const hasBid = Number.isFinite(bid) && bid > 0;
+        const hasAsk = Number.isFinite(ask) && ask > 0;
+        const hasVwap = Number.isFinite(vwap) && vwap > 0;
+        const hasTick = Number.isFinite(tick) && tick > 0;
+        const session = input.session || 'unavailable';
+        const entryBasis = input.entryBasis || 'combined';
+        const invalidationBasis = input.invalidationBasis || 'match';
+        const tar = input.tar || 'Unavailable';
+        const obi = input.obi || 'Unavailable';
+        const unavailable = value => ({ state: 'DATA UNAVAILABLE', confidence: 'Low', lower: null, upper: null, maximum: null, invalidation: null, factors: [value] });
+
+        if (!hasPrice || !hasTick || !input.timestamp || ['unavailable', 'stale'].includes(session)) return unavailable(session === 'stale' ? 'Data stale' : 'Critical market data unavailable');
+        if (tar === 'Unavailable' || obi === 'Unavailable') return unavailable('Essential TAR or OBI data unavailable');
+        if (entryBasis === 'bidAsk' && !hasBid && !hasAsk) return unavailable('Bid and ask unavailable');
+        if (entryBasis === 'vwap' && !hasVwap) return unavailable('VWAP unavailable for selected basis');
+        if (entryBasis === 'combined' && (!hasVwap || (!hasBid && !hasAsk))) return unavailable('Combined basis anchors unavailable');
+
+        const spread = hasBid && hasAsk && ask >= bid ? ask - bid : null;
+        let lower;
+        let upper;
+        if (entryBasis === 'bidAsk') {
+            lower = hasBid ? bid : ask;
+            upper = hasAsk ? ask : bid;
+        } else if (entryBasis === 'vwap') {
+            lower = vwap - tick;
+            upper = vwap + tick;
+        } else if (entryBasis === 'current') {
+            lower = price - tick;
+            upper = price;
+        } else {
+            const marketLower = hasBid ? bid : ask;
+            const marketUpper = hasAsk ? ask : bid;
+            const widthCap = Math.max(2 * tick, Number.isFinite(spread) ? spread : 0);
+            lower = Math.min(marketLower, vwap);
+            upper = Math.max(marketUpper, vwap);
+            if (upper - lower > widthCap) {
+                lower = marketLower;
+                upper = Math.max(marketUpper, marketLower + widthCap);
+            }
+        }
+
+        lower = roundToTick(lower, tick, 'down');
+        const baseUpper = roundToTick(upper, tick, 'up');
+        const tarScore = tar === 'Buyer Active' ? 1 : tar === 'Seller Active' ? -1 : 0;
+        const obiScore = obi === 'Bid Dominant' ? 1 : obi === 'Ask Dominant' ? -1 : 0;
+        const netScore = tarScore + obiScore;
+        const vwapDifference = hasVwap ? price - vwap : null;
+        const vwapPercent = hasVwap ? vwapDifference / vwap : null;
+        const materialExtension = hasVwap && vwapDifference > Math.max(vwap * 0.003, 4 * tick);
+        const wideSpread = Number.isFinite(spread) && spread > 3 * tick + 1e-9;
+        const appliedScore = materialExtension && netScore > 0 ? 0 : netScore;
+        upper = roundToTick(Math.max(lower, baseUpper + appliedScore * tick), tick, appliedScore < 0 ? 'down' : 'up');
+        const maximum = roundToTick(Math.max(upper, baseUpper + Math.max(0, appliedScore) * tick), tick, 'up');
+
+        let anchor;
+        let resolvedInvalidation = invalidationBasis;
+        if (resolvedInvalidation === 'match') resolvedInvalidation = entryBasis;
+        if (resolvedInvalidation === 'bidAsk') anchor = hasBid ? bid : null;
+        else if (resolvedInvalidation === 'vwap') anchor = hasVwap ? vwap : null;
+        else if (resolvedInvalidation === 'range') anchor = lower;
+        else if (resolvedInvalidation === 'current') anchor = price;
+        else if (resolvedInvalidation === 'combined') anchor = hasBid && hasVwap ? Math.min(bid, vwap) : null;
+        if (!Number.isFinite(anchor)) {
+            return { ...unavailable('Invalidation anchor unavailable'), lower, upper, maximum };
+        }
+        const bufferTicks = netScore > 0 ? 2 : netScore === 0 ? 3 : netScore === -1 ? 4 : 5;
+        let invalidation = roundToTick(anchor - bufferTicks * tick, tick, 'down');
+        invalidation = roundToTick(Math.min(invalidation, lower - tick, price), tick, 'down');
+
+        if (!(lower <= upper && upper <= maximum && invalidation < lower)) return unavailable('Price relationship validation failed');
+
+        const inside = price >= lower - 1e-9 && price <= upper + tick + 1e-9;
+        const aboveMaximum = price > maximum + 1e-9;
+        const belowInvalidation = price < invalidation - 1e-9;
+        const belowVwapSelling = hasVwap && price < vwap && tar === 'Seller Active' && obi !== 'Bid Dominant';
+        const stronglyNegative = tar === 'Seller Active' && obi === 'Ask Dominant';
+        const internallyInconsistent = hasBid && hasAsk && bid > ask;
+        let state;
+        if (belowInvalidation || stronglyNegative || belowVwapSelling || (wideSpread && netScore < 0) || internallyInconsistent) state = 'DO NOT ENTER';
+        else if (aboveMaximum || materialExtension) state = 'WAIT FOR PULLBACK';
+        else if (wideSpread || netScore < 0 || tar === 'Balanced' || (obi === 'Ask Dominant' && tar !== 'Buyer Active') || !inside) state = 'WAIT FOR CONFIRMATION';
+        else state = 'ENTRY CONDITIONS MET';
+
+        let confidence = 'Moderate';
+        if (state === 'DATA UNAVAILABLE' || state === 'DO NOT ENTER' || aboveMaximum || wideSpread || netScore < 0 || (!hasBid || !hasAsk)) confidence = 'Low';
+        else if (state === 'ENTRY CONDITIONS MET' && inside && tar === 'Buyer Active' && obi !== 'Ask Dominant' && !materialExtension && input.volumeQuality && input.volumeQuality !== 'Unavailable') confidence = 'High';
+
+        const factors = [];
+        factors.push(inside ? '✓ Price inside suggested range' : aboveMaximum ? '✕ Price above maximum entry price' : '– Price outside suggested range');
+        factors.push(price <= maximum ? '✓ Below maximum entry price' : '✕ Above maximum entry price');
+        factors.push(tar === 'Buyer Active' ? '✓ TAR buyer active' : tar === 'Seller Active' ? '✕ TAR seller active' : '– TAR balanced');
+        factors.push(obi === 'Bid Dominant' ? '✓ OBI bid dominant' : obi === 'Ask Dominant' ? '✕ OBI ask dominant' : '– OBI balanced');
+        if (hasVwap) factors.push(materialExtension ? '✕ Price materially above VWAP' : Math.abs(vwapPercent) <= Math.max(0.001, 2 * tick / vwap) ? '✓ Price near VWAP' : price > vwap ? '✓ Price above VWAP' : '✕ Price below VWAP');
+        factors.push(wideSpread ? '✕ Spread is wide' : '✓ Spread acceptable');
+        factors.push(input.volumeQuality && input.volumeQuality !== 'Unavailable' ? `– Volume quality ${input.volumeQuality.toLowerCase()}` : '– Volume quality unavailable');
+
+        return { state, confidence, lower, upper, maximum, invalidation, netScore, spread, wideSpread, materialExtension, vwapDifference, vwapPercent, factors: factors.slice(0, 7) };
     }
 
     global.MarketData = Object.freeze({
@@ -127,6 +232,7 @@
         timestampToMs,
         getMarketSession,
         inferTickSize,
-        getCompleted15mCandle,
+        roundToTick,
+        calculateEntryAssessment,
     });
 })(window);

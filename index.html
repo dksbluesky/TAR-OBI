@@ -42,10 +42,10 @@
                 </div>
             </div>
 
-            <a href="./breakout.html" target="_blank" rel="noopener noreferrer"
+            <a id="entry-assessment-link" href="./entry-assessment.html?source=fugle" target="_blank" rel="noopener noreferrer"
                class="flex items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-blue-200 shadow-sm text-blue-700 hover:bg-blue-50 transition-colors">
                 <div>
-                    <span class="text-sm font-bold">Breakout Confirmation / 突破確認</span>
+                    <span class="text-sm font-bold">Intraday Entry Assessment / 盤中進場評估</span>
                     <span class="block text-[10px] text-gray-500 mt-0.5">Open dedicated page / 在新分頁開啟</span>
                 </div>
                 <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
@@ -237,9 +237,16 @@
         let autoRefreshTimer = null;
         let apiPanelOpen = true;
 
+        function updateEntryAssessmentLink() {
+            const symbol = (document.getElementById('symbol-input').value || '2330').trim().toUpperCase();
+            const interval = document.getElementById('refresh-interval').value || '30';
+            document.getElementById('entry-assessment-link').href = `./entry-assessment.html?symbol=${encodeURIComponent(symbol)}&source=fugle&interval=${encodeURIComponent(interval)}`;
+        }
+
         function loadApiSettings() {
             const savedKey      = localStorage.getItem('fugle_api_key')      || '';
-            const savedSymbol   = localStorage.getItem('fugle_symbol')       || '2330';
+            const querySymbol   = new URLSearchParams(location.search).get('symbol');
+            const savedSymbol   = querySymbol || localStorage.getItem('fugle_symbol') || '2330';
             const savedAuto     = localStorage.getItem('fugle_auto_refresh') === 'true';
             const savedInterval = localStorage.getItem('fugle_interval')     || '30';
 
@@ -247,6 +254,7 @@
             document.getElementById('symbol-input').value         = savedSymbol;
             document.getElementById('auto-refresh-toggle').checked = savedAuto;
             document.getElementById('refresh-interval').value     = savedInterval;
+            updateEntryAssessmentLink();
 
             if (savedAuto && savedKey) startAutoRefresh();
         }
@@ -287,6 +295,7 @@
 
             localStorage.setItem('fugle_api_key', apiKey);
             localStorage.setItem('fugle_symbol',  symbol);
+            updateEntryAssessmentLink();
 
             setFetchBtnState(true);
             showApiStatus('連線中…', 'loading');
@@ -415,9 +424,11 @@
 
             document.getElementById('refresh-interval').addEventListener('change', e => {
                 localStorage.setItem('fugle_interval', e.target.value);
+                updateEntryAssessmentLink();
                 if (document.getElementById('auto-refresh-toggle').checked) startAutoRefresh();
             });
 
+            document.getElementById('symbol-input').addEventListener('input', updateEntryAssessmentLink);
             document.getElementById('symbol-input').addEventListener('keydown', e => {
                 if (e.key === 'Enter') fetchFugleData();
             });
