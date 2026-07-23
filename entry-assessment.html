@@ -83,7 +83,6 @@
                             <p>Dynamic TAR / OBI Adjustment</p>
                         </div>
                     </div>
-                    <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Trading Range / 目前成交區間</dt><dd id="trading-range" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Maximum Entry Price / 最高可接受進場價</dt><dd id="maximum-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Invalidation Level / 條件失效價</dt><dd id="invalidation-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Price / 現價</dt><dd id="current-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
@@ -253,7 +252,6 @@
         }
         const entryBasisSelect = document.getElementById('entry-basis');
         document.getElementById('entry-basis-label').textContent = entryBasisSelect.selectedOptions[0]?.dataset.basisLabel || 'Unavailable';
-        document.getElementById('trading-range').textContent = pricesActionable && Number.isFinite(assessment.tradingLower) ? `${formatPrice(assessment.tradingLower, tick)}–${formatPrice(assessment.tradingUpper, tick)}` : 'Unavailable';
         document.getElementById('maximum-price').textContent = pricesActionable ? formatPrice(assessment.maximum, tick) : 'Unavailable';
         document.getElementById('invalidation-price').textContent = pricesActionable ? formatPrice(assessment.invalidation, tick) : 'Unavailable';
         document.getElementById('current-price').textContent = formatPrice(price, tick);
