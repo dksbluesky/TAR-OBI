@@ -30,6 +30,7 @@ assert.equal(assess().lower, 32.45, 'combined lower boundary');
 assert.equal(assess().upper, 32.6, 'positive score expands upper boundary two ticks');
 assert.equal(assess().maximum, 32.6, 'positive score expands maximum two ticks');
 assert.equal(assess().state, 'ENTRY CONDITIONS MET');
+assert.deepEqual([assess().tradingLower, assess().tradingUpper], [32.45, 32.5], 'trading range remains executable bid/ask');
 
 assert.deepEqual(
     [assess({ entryBasis: 'bidAsk' }).lower, assess({ entryBasis: 'bidAsk' }).upper],
@@ -48,7 +49,8 @@ assert.deepEqual(
 );
 
 const farVwap = assess({ vwap: 30, tar: 'Balanced', obi: 'Balanced' });
-assert.ok(farVwap.upper - farVwap.lower <= 0.1 + 1e-9, 'far VWAP does not widen combined range');
+assert.ok(farVwap.upper - farVwap.lower <= 0.15 + 1e-9, 'far VWAP uses the capped pullback band');
+assert.ok(farVwap.upper < base.current, 'far VWAP preferred range remains below current price');
 
 assert.equal(assess({ tar: 'Buyer Active', obi: 'Balanced' }).upper, 32.55, 'moderately positive adds one tick');
 assert.equal(assess({ tar: 'Balanced', obi: 'Balanced' }).upper, 32.5, 'neutral adds no ticks');
@@ -56,7 +58,13 @@ assert.equal(assess({ tar: 'Seller Active', obi: 'Balanced' }).upper, 32.45, 'mo
 assert.equal(assess({ tar: 'Seller Active', obi: 'Ask Dominant' }).state, 'DO NOT ENTER', 'strong negative blocks entry');
 assert.equal(assess({ current: 32.8 }).state, 'WAIT FOR PULLBACK', 'price above maximum waits for pullback');
 assert.equal(assess({ tar: 'Balanced', obi: 'Ask Dominant' }).state, 'WAIT FOR CONFIRMATION', 'mixed evidence waits for confirmation');
-assert.equal(assess({ vwap: 31.5 }).state, 'WAIT FOR PULLBACK', 'material VWAP extension waits for pullback');
+const extended = assess({ current: 33, bid: 32.95, ask: 33, vwap: 32.5 });
+assert.equal(extended.state, 'WAIT FOR PULLBACK', 'material VWAP extension waits for pullback');
+assert.deepEqual([extended.tradingLower, extended.tradingUpper], [32.95, 33], 'extended trading range remains bid/ask');
+assert.ok(extended.upper < 33, 'preferred range is below extended current price');
+assert.ok(extended.upper <= extended.maximum, 'preferred upper does not exceed maximum');
+assert.ok(extended.factors.includes('✕ Current Price above preferred entry range'), 'pullback factor reports price above preferred range');
+assert.ok(!extended.factors.includes('✓ Price inside preferred entry range'), 'pullback does not claim price is inside preferred range');
 assert.equal(assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }).state, 'DO NOT ENTER', 'selling below VWAP blocks entry');
 assert.equal(assess({ bid: 32.3, ask: 32.5 }).confidence, 'Low', 'wide spread lowers confidence');
 assert.equal(assess({ entryBasis: 'vwap', vwap: null }).state, 'DATA UNAVAILABLE', 'missing selected anchor is unavailable');

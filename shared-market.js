@@ -126,7 +126,12 @@
         const invalidationBasis = input.invalidationBasis || 'match';
         const tar = input.tar || 'Unavailable';
         const obi = input.obi || 'Unavailable';
-        const unavailable = value => ({ state: 'DATA UNAVAILABLE', confidence: 'Low', lower: null, upper: null, maximum: null, invalidation: null, factors: [value] });
+        const tradingLower = hasBid ? bid : hasAsk ? ask : null;
+        const tradingUpper = hasAsk ? ask : hasBid ? bid : null;
+        const unavailable = value => ({
+            state: 'DATA UNAVAILABLE', confidence: 'Low', lower: null, upper: null,
+            maximum: null, invalidation: null, tradingLower, tradingUpper, factors: [value],
+        });
 
         if (!hasPrice || !hasTick || !input.timestamp || ['unavailable', 'stale'].includes(session)) return unavailable(session === 'stale' ? 'Data stale' : 'Critical market data unavailable');
         if (tar === 'Unavailable' || obi === 'Unavailable') return unavailable('Essential TAR or OBI data unavailable');
@@ -135,9 +140,16 @@
         if (entryBasis === 'combined' && (!hasVwap || (!hasBid && !hasAsk))) return unavailable('Combined basis anchors unavailable');
 
         const spread = hasBid && hasAsk && ask >= bid ? ask - bid : null;
+        const vwapDifference = hasVwap ? price - vwap : null;
+        const vwapPercent = hasVwap ? vwapDifference / vwap : null;
+        const materialExtension = hasVwap && vwapDifference > Math.max(vwap * 0.003, 4 * tick);
         let lower;
         let upper;
-        if (entryBasis === 'bidAsk') {
+        if (materialExtension) {
+            const pullbackWidth = Math.max(2 * tick, Math.min(Number.isFinite(spread) ? spread : 0, 3 * tick));
+            lower = vwap - tick;
+            upper = vwap + pullbackWidth;
+        } else if (entryBasis === 'bidAsk') {
             lower = hasBid ? bid : ask;
             upper = hasAsk ? ask : bid;
         } else if (entryBasis === 'vwap') {
@@ -163,9 +175,6 @@
         const tarScore = tar === 'Buyer Active' ? 1 : tar === 'Seller Active' ? -1 : 0;
         const obiScore = obi === 'Bid Dominant' ? 1 : obi === 'Ask Dominant' ? -1 : 0;
         const netScore = tarScore + obiScore;
-        const vwapDifference = hasVwap ? price - vwap : null;
-        const vwapPercent = hasVwap ? vwapDifference / vwap : null;
-        const materialExtension = hasVwap && vwapDifference > Math.max(vwap * 0.003, 4 * tick);
         const wideSpread = Number.isFinite(spread) && spread > 3 * tick + 1e-9;
         const appliedScore = materialExtension && netScore > 0 ? 0 : netScore;
         upper = roundToTick(Math.max(lower, baseUpper + appliedScore * tick), tick, appliedScore < 0 ? 'down' : 'up');
@@ -188,6 +197,7 @@
 
         if (!(lower <= upper && upper <= maximum && invalidation < lower)) return unavailable('Price relationship validation failed');
 
+        const insidePreferredRange = price >= lower - 1e-9 && price <= upper + 1e-9;
         const inside = price >= lower - 1e-9 && price <= upper + tick + 1e-9;
         const aboveMaximum = price > maximum + 1e-9;
         const belowInvalidation = price < invalidation - 1e-9;
@@ -205,7 +215,9 @@
         else if (state === 'ENTRY CONDITIONS MET' && inside && tar === 'Buyer Active' && obi !== 'Ask Dominant' && !materialExtension && input.volumeQuality && input.volumeQuality !== 'Unavailable') confidence = 'High';
 
         const factors = [];
-        factors.push(inside ? '✓ Price inside suggested range' : aboveMaximum ? '✕ Price above maximum entry price' : '– Price outside suggested range');
+        factors.push(insidePreferredRange ? '✓ Price inside preferred entry range'
+            : price > upper ? '✕ Current Price above preferred entry range'
+            : '– Current Price below preferred entry range');
         factors.push(price <= maximum ? '✓ Below maximum entry price' : '✕ Above maximum entry price');
         factors.push(tar === 'Buyer Active' ? '✓ TAR buyer active' : tar === 'Seller Active' ? '✕ TAR seller active' : '– TAR balanced');
         factors.push(obi === 'Bid Dominant' ? '✓ OBI bid dominant' : obi === 'Ask Dominant' ? '✕ OBI ask dominant' : '– OBI balanced');
@@ -213,7 +225,11 @@
         factors.push(wideSpread ? '✕ Spread is wide' : '✓ Spread acceptable');
         factors.push(input.volumeQuality && input.volumeQuality !== 'Unavailable' ? `– Volume quality ${input.volumeQuality.toLowerCase()}` : '– Volume quality unavailable');
 
-        return { state, confidence, lower, upper, maximum, invalidation, netScore, spread, wideSpread, materialExtension, vwapDifference, vwapPercent, factors: factors.slice(0, 7) };
+        return {
+            state, confidence, lower, upper, maximum, invalidation, tradingLower, tradingUpper,
+            netScore, spread, wideSpread, materialExtension, vwapDifference, vwapPercent,
+            factors: factors.slice(0, 7),
+        };
     }
 
     global.MarketData = Object.freeze({
