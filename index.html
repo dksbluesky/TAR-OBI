@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>💻DK 邏輯交易計算器</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./shared-market.js"></script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#2563eb">
@@ -41,6 +42,14 @@
                 </div>
             </div>
 
+            <a href="./breakout.html" target="_blank" rel="noopener noreferrer"
+               class="flex items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-blue-200 shadow-sm text-blue-700 hover:bg-blue-50 transition-colors">
+                <div>
+                    <span class="text-sm font-bold">Breakout Confirmation / 突破確認</span>
+                    <span class="block text-[10px] text-gray-500 mt-0.5">Open dedicated page / 在新分頁開啟</span>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </a>
             <!-- ===== Fugle API 區塊 ===== -->
             <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
                 <!-- 標題列 -->
@@ -162,36 +171,7 @@
 
             <!-- 結果區塊 -->
             <div id="results-area-top"></div>
-
             <div id="results-area-bottom"></div>
-
-            <!-- Breakout Confirmation -->
-            <div id="breakout-card" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <div class="flex items-center justify-between gap-3 mb-4">
-                    <div><h2 class="text-sm font-bold text-gray-900">Breakout Confirmation / 突破確認</h2><p class="text-[10px] text-gray-400 mt-0.5">Intraday decision support / 盤中客觀狀態</p></div>
-                    <span id="breakout-session-badge" class="shrink-0 px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold">NO DATA</span>
-                </div>
-                <div class="mb-4">
-                    <label for="trigger-level-input" class="text-[10px] text-gray-500 uppercase font-bold tracking-wider block mb-1">Trigger Level / 觸發價位</label>
-                    <input id="trigger-level-input" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 239.10" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 font-mono text-base focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:outline-none"/>
-                    <p class="text-[10px] text-gray-400 mt-1">接近：觸發價下方 0.20% 內；失效容許：0.05%。變更價位會立即重設本次確認歷史。</p>
-                </div>
-                <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                    <span class="text-gray-500">Current Price / 現價</span><span id="breakout-current-price" class="text-right font-mono font-bold text-gray-800">--</span>
-                    <span class="text-gray-500">Distance / 距離</span><span id="breakout-distance" class="text-right font-mono font-bold text-gray-800">--</span>
-                    <span class="text-gray-500">Observed Above / 已觀察站上</span><span id="breakout-time-above" class="text-right font-mono font-bold text-gray-800">--</span>
-                    <span class="text-gray-500">15m Candle Close / 15分K收盤</span><span id="breakout-candle" class="text-right font-bold text-gray-800">Unavailable</span>
-                    <span class="text-gray-500">TAR / 成交主動性</span><span id="breakout-tar" class="text-right font-bold text-gray-800">Unavailable</span>
-                    <span class="text-gray-500">OBI / 掛單不平衡</span><span id="breakout-obi" class="text-right font-bold text-gray-800">Unavailable</span>
-                    <span class="text-gray-500">VWAP Position / 均價位置</span><span id="breakout-vwap" class="text-right font-bold text-gray-800">Unavailable</span>
-                    <span class="text-gray-500">Volume / 成交量</span><span id="breakout-volume" class="text-right font-bold text-gray-800">Unavailable</span>
-                </div>
-                <div id="breakout-status-box" class="mt-4 rounded-lg bg-gray-50 border border-gray-200 p-3">
-                    <div class="flex items-center justify-between gap-3"><span class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Status / 狀態</span><span id="breakout-confidence" class="text-[10px] font-bold text-gray-500">Confidence: Low</span></div>
-                    <div id="breakout-status" class="font-bold text-gray-800 mt-1">Waiting for Trigger Level</div>
-                    <p id="breakout-explanation" class="text-xs text-gray-500 mt-1 leading-relaxed">Set a valid Trigger Level to begin observation.</p>
-                </div>
-            </div>
 
             <div class="text-xs text-center text-gray-400 mt-8">
                 <p>請將此頁面加入手機主畫面，以獲得最佳 App 體驗。</p>
@@ -241,18 +221,6 @@
             askQty: 7270,
         };
 
-        const BREAKOUT_PROXIMITY_PCT = 0.002;
-        const BREAKOUT_TOLERANCE_PCT = 0.0005;
-        const BREAKOUT_ACCEPTANCE_MS = 60 * 1000;
-        const BREAKOUT_FAILURE_MS = 60 * 1000;
-        let latestMarketData = null;
-        let latestCandles = null;
-        let latestIndicators = null;
-        let breakoutState = createBreakoutState();
-
-        function createBreakoutState(trigger = null) {
-            return { trigger, tradingDate: null, symbol: null, samples: [], aboveSince: null, belowSince: null, wasTesting: false, wasProvisional: false, wasConfirmed: false };
-        }
         const inputFields = [
             { key: 'askPrints', label: '外盤 (Ask Prints)', containerId: 'ask-prints-container', bull: true  },
             { key: 'bidPrints', label: '內盤 (Bid Prints)', containerId: 'bid-prints-container', bull: false },
@@ -279,11 +247,6 @@
             document.getElementById('symbol-input').value         = savedSymbol;
             document.getElementById('auto-refresh-toggle').checked = savedAuto;
             document.getElementById('refresh-interval').value     = savedInterval;
-            const savedTrigger = Number(localStorage.getItem('breakout_trigger_level'));
-            if (Number.isFinite(savedTrigger) && savedTrigger > 0) {
-                document.getElementById('trigger-level-input').value = savedTrigger;
-                breakoutState = createBreakoutState(savedTrigger);
-            }
 
             if (savedAuto && savedKey) startAutoRefresh();
         }
@@ -343,13 +306,6 @@
                 }
 
                 const data = await res.json();
-                let candleData = null;
-                try {
-                    const candleRes = await fetch(`${FUGLE_API_BASE}/stock/intraday/candles/${symbol}?timeframe=15&sort=asc`, { headers: { 'X-API-KEY': apiKey } });
-                    if (candleRes.ok) candleData = await candleRes.json();
-                } catch (candleErr) {
-                    console.warn('[Fugle candles]', candleErr);
-                }
 
                 const askPrints = data.total?.tradeVolumeAtAsk ?? 0;
                 const bidPrints = data.total?.tradeVolumeAtBid ?? 0;
@@ -367,8 +323,6 @@
                 state.bidPrints = bidPrints;
                 state.bidQty    = bidQty;
                 state.askQty    = askQty;
-                latestMarketData = data;
-                latestCandles = candleData;
 
                 ['askPrints','bidPrints','bidQty','askQty'].forEach(k => {
                     const el = document.getElementById(`${k}-input`);
@@ -377,7 +331,6 @@
 
                 updateVwapCard(data, symbol);
                 updateResults();
-                updateBreakoutObservation(data, candleData, symbol);
 
             } catch (err) {
                 console.error('[Fugle]', err);
@@ -387,7 +340,6 @@
                 } else {
                     showApiStatus(`錯誤：${msg}`, 'error');
                 }
-                renderBreakoutPanel({ dataUnavailable: true });
             } finally {
                 setFetchBtnState(false);
             }
@@ -397,12 +349,8 @@
             const card      = document.getElementById('vwap-card');
             const lastPrice = data.lastPrice ?? data.closePrice ?? null;
 
-            let vwap = data.avgPrice ?? null;
-            if (vwap == null && data.total?.tradeValue > 0 && data.total?.tradeVolume > 0) {
-                vwap = data.total.tradeValue / data.total.tradeVolume;
-                // tradeVolume 若以「張」為單位，換算回股
-                if (lastPrice && vwap / lastPrice > 100) vwap /= 1000;
-            }
+            const vwap = MarketData.getVwap(data);
+
 
             if (vwap == null || !(vwap > 0)) {
                 card.classList.add('hidden');
@@ -418,7 +366,8 @@
 
             if (lastPrice != null) {
                 const devPct = ((lastPrice - vwap) / vwap) * 100;
-                const above  = devPct > 0.05, below = devPct < -0.05;
+                const vwapPosition = MarketData.getVwapPosition(lastPrice, vwap);
+                const above = vwapPosition === 'Above VWAP', below = vwapPosition === 'Below VWAP';
                 devEl.textContent = `${devPct >= 0 ? '+' : ''}${devPct.toFixed(2)}% vs VWAP`;
                 devEl.className   = `text-xs font-mono font-bold ${above ? 'text-green-600' : below ? 'text-red-600' : 'text-blue-600'}`;
                 posEl.textContent = above ? '現價高於 VWAP（多方控盤區）' : below ? '現價低於 VWAP（空方控盤區）' : '現價貼近 VWAP（均衡區）';
@@ -472,153 +421,8 @@
             document.getElementById('symbol-input').addEventListener('keydown', e => {
                 if (e.key === 'Enter') fetchFugleData();
             });
-            document.getElementById('trigger-level-input').addEventListener('input', e => {
-                const trigger = Number(e.target.value);
-                const validTrigger = Number.isFinite(trigger) && trigger > 0 ? trigger : null;
-                if (validTrigger == null) localStorage.removeItem('breakout_trigger_level');
-                else localStorage.setItem('breakout_trigger_level', String(validTrigger));
-                breakoutState = createBreakoutState(validTrigger);
-                renderBreakoutPanel();
-            });
         }
 
-        function timestampToMs(value) {
-            const n = Number(value);
-            if (!Number.isFinite(n) || n <= 0) return null;
-            if (n > 1e14) return Math.floor(n / 1000);
-            if (n > 1e11) return Math.floor(n);
-            return Math.floor(n * 1000);
-        }
-
-        function currentRefreshMs() {
-            return (Number(document.getElementById('refresh-interval')?.value) || 30) * 1000;
-        }
-
-        function getMarketSession(data, now = new Date()) {
-            if (!data) return 'unavailable';
-            if (data.isClose) return 'closed';
-            const updatedMs = timestampToMs(data.lastUpdated || data.lastTrade?.time || data.closeTime);
-            if (!updatedMs) return 'unavailable';
-            const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short' }).formatToParts(now);
-            const p = Object.fromEntries(parts.map(item => [item.type, item.value]));
-            const today = `${p.year}-${p.month}-${p.day}`;
-            const minute = Number(p.hour) * 60 + Number(p.minute);
-            if (p.weekday === 'Sat' || p.weekday === 'Sun') return 'closed';
-            if (minute < 540) return 'preopen';
-            if (data.date !== today || minute >= 810) return 'closed';
-            return now.getTime() - updatedMs > Math.max(90000, currentRefreshMs() * 2 + 15000) ? 'stale' : 'live';
-        }
-
-        function getCompleted15mCandle(candleData, quoteData) {
-            if (!candleData || !Array.isArray(candleData.data) || !candleData.data.length) return null;
-            const referenceMs = timestampToMs(quoteData?.lastUpdated || quoteData?.lastTrade?.time || quoteData?.closeTime) || Date.now();
-            const completed = candleData.data.filter(candle => {
-                const startMs = Date.parse(candle.date);
-                return Number.isFinite(startMs) && startMs + 15 * 60 * 1000 <= referenceMs;
-            });
-            return completed.length ? completed[completed.length - 1] : null;
-        }
-
-        function formatObservedDuration(ms) {
-            const totalSeconds = Math.floor(ms / 1000);
-            return `${Math.floor(totalSeconds / 60)}m ${String(totalSeconds % 60).padStart(2, '0')}s (observed)`;
-        }
-
-        function updateBreakoutObservation(data, candleData, symbol) {
-            const trigger = breakoutState.trigger;
-            const price = data?.lastPrice ?? data?.closePrice ?? null;
-            const observedMs = timestampToMs(data?.lastUpdated || data?.lastTrade?.time || data?.closeTime);
-            const session = getMarketSession(data);
-            if (breakoutState.tradingDate !== data?.date || breakoutState.symbol !== symbol) {
-                breakoutState = createBreakoutState(trigger);
-                breakoutState.tradingDate = data?.date || null;
-                breakoutState.symbol = symbol;
-            }
-            if (trigger && Number.isFinite(price) && observedMs && session === 'live') {
-                const lastSample = breakoutState.samples[breakoutState.samples.length - 1];
-                const maxGap = Math.max(90000, currentRefreshMs() * 2 + 15000);
-                if (lastSample && observedMs - lastSample.time > maxGap) {
-                    breakoutState.samples = [];
-                    breakoutState.aboveSince = null;
-                    breakoutState.belowSince = null;
-                }
-                if (!lastSample || observedMs > lastSample.time) {
-                    breakoutState.samples.push({ time: observedMs, price });
-                    if (breakoutState.samples.length > 240) breakoutState.samples.shift();
-                }
-                const tolerance = trigger * BREAKOUT_TOLERANCE_PCT;
-                if (price > trigger) {
-                    if (breakoutState.aboveSince == null) breakoutState.aboveSince = observedMs;
-                    breakoutState.belowSince = null;
-                    breakoutState.wasTesting = true;
-                } else if (price < trigger - tolerance) {
-                    if (breakoutState.belowSince == null) breakoutState.belowSince = observedMs;
-                    breakoutState.aboveSince = null;
-                }
-            }
-            renderBreakoutPanel({ data, candleData, session });
-        }
-
-        function renderBreakoutPanel(options = {}) {
-            const data = options.data || latestMarketData;
-            const candleData = options.candleData === undefined ? latestCandles : options.candleData;
-            const session = options.dataUnavailable ? 'unavailable' : (options.session || getMarketSession(data));
-            const trigger = breakoutState.trigger;
-            const price = data?.lastPrice ?? data?.closePrice ?? null;
-            const observedMs = timestampToMs(data?.lastUpdated || data?.lastTrade?.time || data?.closeTime);
-            const completedCandle = getCompleted15mCandle(candleData, data);
-            const candleAbove = Boolean(trigger && completedCandle && completedCandle.close > trigger);
-            const aboveDuration = breakoutState.aboveSince && observedMs ? Math.max(0, observedMs - breakoutState.aboveSince) : null;
-            const belowDuration = breakoutState.belowSince && observedMs ? Math.max(0, observedMs - breakoutState.belowSince) : null;
-            const buyerTar = latestIndicators?.detTarKey === 'Strong Bid TAR' || latestIndicators?.detTarKey === 'Bid-biased TAR';
-            const bidObi = latestIndicators?.obiKey === 'Bid-heavy OBI';
-            const vwapValue = data?.avgPrice;
-            const aboveVwap = Number.isFinite(price) && Number.isFinite(vwapValue) && vwapValue > 0 && price > vwapValue * 1.0005;
-            const supportScore = Number(buyerTar) + Number(bidObi) + Number(aboveVwap);
-            let status = 'Waiting for Trigger Level', explanation = 'Set a valid Trigger Level to begin observation.', confidence = 'Low', theme = 'gray';
-
-            if (!trigger) {}
-            else if (session === 'unavailable' || session === 'stale' || !Number.isFinite(price)) { status = 'Data Unavailable'; explanation = 'Live quote data is missing or stale; no confirmation is retained.'; }
-            else if (session === 'preopen') { status = 'Waiting for Market Open'; explanation = 'Observation starts when regular trading data becomes live.'; }
-            else if (session === 'closed') {
-                if (breakoutState.wasConfirmed && Number.isFinite(price) && price < trigger * (1 - BREAKOUT_TOLERANCE_PCT)) { status = 'Breakout Failed (Completed Session)'; explanation = 'The final session price lost the trigger after an observed confirmation.'; theme = 'red'; }
-                else if (breakoutState.wasConfirmed && Number.isFinite(price) && price > trigger) { status = 'Breakout Confirmed (Completed Session)'; explanation = 'The observed intraday confirmation remained intact at the final available session update.'; confidence = supportScore >= 2 ? 'High' : 'Moderate'; theme = 'green'; }
-                else if (candleAbove && Number.isFinite(price) && price > trigger) { status = 'Provisional Breakout (Completed Session)'; explanation = 'A completed 15-minute candle and final price are above the trigger, but continuous holding was not fully observed.'; confidence = 'Moderate'; theme = 'yellow'; }
-                else { status = 'Market Closed'; explanation = 'Completed-session data is shown without accumulating additional holding time.'; }
-            }
-            else if (belowDuration >= BREAKOUT_FAILURE_MS && (breakoutState.wasProvisional || breakoutState.wasConfirmed)) { status = 'Breakout Failed'; explanation = 'Price remained below tolerance after a provisional or confirmed breakout.'; theme = 'red'; }
-            else if (belowDuration >= Math.min(BREAKOUT_FAILURE_MS, currentRefreshMs()) && breakoutState.wasTesting) { status = 'Rejected at Trigger'; explanation = 'Price tested the trigger but returned below it without acceptance.'; theme = 'red'; }
-            else if (price > trigger && candleAbove && aboveDuration >= BREAKOUT_ACCEPTANCE_MS) { status = 'Breakout Confirmed'; explanation = 'A completed 15-minute candle closed above the trigger and observed price acceptance remains intact.'; confidence = supportScore >= 2 ? 'High' : 'Moderate'; theme = 'green'; breakoutState.wasConfirmed = true; }
-            else if (price > trigger && (candleAbove || aboveDuration >= BREAKOUT_ACCEPTANCE_MS)) { status = 'Provisional Breakout'; explanation = candleAbove ? 'The completed candle is above the trigger, but observed continuous holding is not yet sufficient.' : 'Observed holding exists, but completed 15-minute candle confirmation is pending.'; confidence = 'Moderate'; theme = 'yellow'; breakoutState.wasProvisional = true; }
-            else if (price > trigger) { status = 'Testing Breakout'; explanation = 'Price is above the trigger, but confirmation requirements remain pending.'; confidence = 'Moderate'; theme = 'blue'; }
-            else if (price >= trigger * (1 - BREAKOUT_PROXIMITY_PCT)) { status = 'Approaching Trigger'; explanation = 'Price is below the trigger and within the documented 0.20% proximity range.'; theme = 'blue'; }
-            else { status = 'Waiting for Trigger'; explanation = 'Price remains meaningfully below the trigger.'; }
-
-            const sessionLabels = { live: 'INTRADAY', preopen: 'PRE-OPEN', closed: 'MARKET CLOSED', stale: 'STALE', unavailable: 'NO DATA' };
-            const badge = document.getElementById('breakout-session-badge');
-            badge.textContent = sessionLabels[session] || 'NO DATA';
-            badge.className = `shrink-0 px-2 py-1 rounded-full text-[10px] font-bold ${session === 'live' ? 'bg-green-50 text-green-700' : session === 'stale' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500'}`;
-            document.getElementById('breakout-current-price').textContent = Number.isFinite(price) ? price.toFixed(2) : '--';
-            if (trigger && Number.isFinite(price)) {
-                const distance = price - trigger, pct = distance / trigger * 100;
-                document.getElementById('breakout-distance').textContent = `${distance >= 0 ? '+' : ''}${distance.toFixed(2)} / ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-            } else document.getElementById('breakout-distance').textContent = '--';
-            document.getElementById('breakout-time-above').textContent = aboveDuration == null ? '--' : formatObservedDuration(aboveDuration);
-            document.getElementById('breakout-candle').textContent = !trigger ? 'Waiting for Trigger' : !candleData ? 'Unavailable' : completedCandle ? ((completedCandle.close > trigger ? 'Above' : 'Below') + ' Trigger (' + Number(completedCandle.close).toFixed(2) + ')') : 'Pending';
-            document.getElementById('breakout-tar').textContent = latestIndicators?.detTarKey === 'Strong Bid TAR' || latestIndicators?.detTarKey === 'Bid-biased TAR' ? 'Buyer Active' : latestIndicators?.detTarKey === 'Strong Ask TAR' || latestIndicators?.detTarKey === 'Ask-biased TAR' ? 'Seller Active' : latestIndicators ? 'Balanced' : 'Unavailable';
-            document.getElementById('breakout-obi').textContent = latestIndicators?.obiKey === 'Bid-heavy OBI' ? 'Bid Dominant' : latestIndicators?.obiKey === 'Ask-heavy OBI' ? 'Ask Dominant' : latestIndicators ? 'Balanced' : 'Unavailable';
-            const vwap = data?.avgPrice;
-            let vwapLabel = 'Unavailable';
-            if (Number.isFinite(price) && Number.isFinite(vwap) && vwap > 0) { const deviation = (price - vwap) / vwap; vwapLabel = deviation > 0.0005 ? 'Above VWAP' : deviation < -0.0005 ? 'Below VWAP' : 'Near VWAP'; }
-            document.getElementById('breakout-vwap').textContent = vwapLabel;
-            const volume = data?.total?.tradeVolume;
-            document.getElementById('breakout-volume').textContent = Number.isFinite(volume) ? `${volume.toLocaleString()} (quality unavailable)` : 'Unavailable';
-            const themeClasses = { gray: 'bg-gray-50 border-gray-200', blue: 'bg-blue-50 border-blue-200', green: 'bg-green-50 border-green-200', yellow: 'bg-yellow-50 border-yellow-200', red: 'bg-red-50 border-red-200' };
-            document.getElementById('breakout-status-box').className = `mt-4 rounded-lg border p-3 ${themeClasses[theme]}`;
-            document.getElementById('breakout-status').textContent = status;
-            document.getElementById('breakout-confidence').textContent = `Confidence: ${confidence}`;
-            document.getElementById('breakout-explanation').textContent = explanation;
-        }
         // ─── Input Fields ─────────────────────────────────────────────────────────
 
         function initInputField(field) {
@@ -765,61 +569,21 @@
 
         function updateResults() {
             const { askPrints, bidPrints, bidQty, askQty } = state;
-            const totalPrints = askPrints + bidPrints;
-            const totalBook   = bidQty + askQty;
+            const metrics = MarketData.calculateTarObi(askPrints, bidPrints, bidQty, askQty);
 
-            if (totalPrints <= 0 || totalBook <= 0) {
-                latestIndicators = null;
+            if (!metrics) {
                 resultAreaTop.innerHTML = '<p class="text-center text-gray-400 mt-6">請輸入大於零的數據以計算結果。</p>';
                 resultAreaBottom.innerHTML = '';
                 updateInputPercentages(null);
                 return;
             }
 
-            const OBI_THRESHOLD              = 0.20;
-            const CORE_TAR_STRONG_THRESHOLD  = 0.10;
-            const DETAILED_TAR_STRONG_BID    = 0.40;
-            const DETAILED_TAR_BID_BIASED    = 0.20;
-            const DETAILED_TAR_NEUTRAL_LOWER = -0.10;
-            const DETAILED_TAR_ASK_BIASED    = -0.20;
-
-            const tarAskPct = askPrints / totalPrints;
-            const tarBidPct = bidPrints / totalPrints;
-            const tarIndex  = tarAskPct - tarBidPct;
-
-            const obiBidPct = bidQty / totalBook;
-            const obiAskPct = askQty / totalBook;
-            const obiIndex  = obiBidPct - obiAskPct;
-
-            let obiKey = '';
-            if      (obiIndex >  OBI_THRESHOLD) obiKey = 'Bid-heavy OBI';
-            else if (obiIndex < -OBI_THRESHOLD) obiKey = 'Ask-heavy OBI';
-            else                                 obiKey = 'Balanced OBI';
-
-            let detTarKey = '';
-            if      (tarIndex >= DETAILED_TAR_STRONG_BID)    detTarKey = 'Strong Bid TAR';
-            else if (tarIndex >= DETAILED_TAR_BID_BIASED)    detTarKey = 'Bid-biased TAR';
-            else if (tarIndex >  DETAILED_TAR_NEUTRAL_LOWER) detTarKey = 'Neutral TAR';
-            else if (tarIndex >  DETAILED_TAR_ASK_BIASED)    detTarKey = 'Ask-biased TAR';
-            else                                               detTarKey = 'Strong Ask TAR';
-
+            const { tarAskPct, tarBidPct, tarIndex, obiBidPct, obiAskPct, obiIndex, obiKey, detTarKey, coreTarKey, coreObiKey } = metrics;
             const keyDetailed  = `${detTarKey}|${obiKey}`;
             const dataDetailed = MAP_DETAILED[keyDetailed] || { en:'N/A', zh:'N/A', pb_en:'N/A', pb_zh:'N/A' };
 
-            let coreTarKey = '';
-            if      (tarIndex >=  CORE_TAR_STRONG_THRESHOLD) coreTarKey = 'Strong Bullish';
-            else if (tarIndex <= -CORE_TAR_STRONG_THRESHOLD) coreTarKey = 'Strong Bearish';
-            else                                               coreTarKey = 'Neutral';
-
-            let coreObiKey = '';
-            if      (obiIndex >  OBI_THRESHOLD) coreObiKey = 'Buy-heavy';
-            else if (obiIndex < -OBI_THRESHOLD) coreObiKey = 'Ask-heavy';
-            else                                 coreObiKey = 'Balanced';
-
             const keyCore  = `${coreTarKey}|${coreObiKey}`;
             const dataCore = MAP_CORE[keyCore] || { en:'N/A', zh:'N/A', pb_en:'N/A', pb_zh:'N/A' };
-
-            latestIndicators = { tarIndex, obiIndex, detTarKey, obiKey, coreTarKey, coreObiKey };
 
             updateInputPercentages({ tarAskPct, tarBidPct, obiBidPct, obiAskPct });
 
@@ -848,7 +612,6 @@
             bindApiControls();
             loadApiSettings();
             updateResults();
-            renderBreakoutPanel();
         }
 
         window.onload = setupApp;

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breakout Confirmation | TAR-OBI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./shared-market.js"></script>
+    <meta name="theme-color" content="#f8fafc">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; min-width: 0; }
+        html, body { width: 100%; max-width: 100%; overflow-x: hidden; overflow-wrap: anywhere; }
+        @media (max-width: 480px) { #stage-progress { font-size: 8px; } }
+        body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+        #stage-progress > [data-stage] { min-width: 0; overflow-wrap: anywhere; }
+        #stage-progress span { line-height: 1.2; }
+        input[type='number']::-webkit-inner-spin-button, input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .stage-line { height: 2px; background: #dbe2ea; position: absolute; left: 6%; right: 6%; top: 10px; }
+        .stage-dot { width: 20px; height: 20px; border: 3px solid white; box-shadow: 0 0 0 1px #cbd5e1; background: #f8fafc; border-radius: 9999px; position: relative; z-index: 1; margin: 0 auto 6px; }
+        .stage-active .stage-dot { background: var(--stage-color); box-shadow: 0 0 0 2px var(--stage-color); }
+        .stage-active { color: #0f172a; font-weight: 700; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <main class="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto space-y-4">
+            <header class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div>
+                        <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Breakout Confirmation / 突破確認</h1>
+                        <p class="text-sm sm:text-base text-slate-500 mt-1">Intraday decision support / 盤中客觀狀態</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span id="market-badge" class="px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-black tracking-wider">DATA UNAVAILABLE</span>
+                        <a href="./index.html" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold">← Back to TAR-OBI / 返回</a>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                    <span id="source-summary">Waiting for saved Fugle settings…</span>
+                    <button id="refresh-button" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50">Refresh / 更新</button>
+                </div>
+            </header>
+
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    <h2 class="text-xs sm:text-sm font-black tracking-wider text-slate-600">TRIGGER LEVELS / 觸發價位</h2>
+                    <button id="reset-button" class="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold">Reset / 全部重設</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="block rounded-xl border border-slate-200 p-3">
+                        <span class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-2"><span><i class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></i>Trigger 1 / 第一觸發價</span><span id="trigger-1-stage" class="font-bold text-emerald-600">PRIMARY</span></span>
+                        <input id="trigger-1" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 237.00" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-lg font-bold font-mono focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
+                    </label>
+                    <label class="block rounded-xl border border-slate-200 p-3">
+                        <span class="flex items-center justify-between gap-2 text-xs text-slate-500 mb-2"><span><i class="inline-block w-2.5 h-2.5 rounded-full bg-slate-400 mr-2"></i>Trigger 2 / 第二觸發價</span><span id="trigger-2-stage" class="font-bold text-slate-400">SECONDARY</span></span>
+                        <input id="trigger-2" type="number" min="0" step="any" inputmode="decimal" placeholder="可留空" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-lg font-bold font-mono focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
+                    </label>
+                </div>
+                <div class="mt-3 flex flex-col sm:flex-row sm:justify-between gap-1 text-[11px] text-slate-500">
+                    <span id="threshold-note">接近門檻使用 0.20% 或四個有效跳動點中較小者；失效容許為一個有效跳動點。</span>
+                    <span>觸發價會保留；盤中確認歷史不會儲存。</span>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                    <div class="flex items-center justify-between mb-4"><h2 class="text-xs font-black tracking-wider text-slate-600">MARKET DATA & CONFIRMATION / 市場資料與確認</h2><span id="active-trigger-label" class="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-black">ACTIVE: T1</span></div>
+                    <dl class="grid grid-cols-[minmax(0,1fr)_minmax(0,45%)] gap-x-4 gap-y-3 text-sm [&_dd]:break-words">
+                        <dt class="text-slate-500">Current Price / 現價</dt><dd id="current-price" class="text-right font-black font-mono text-lg">--</dd>
+                        <dt class="text-slate-500">Tick Size / 跳動點</dt><dd id="tick-size" class="text-right font-mono font-bold">--</dd>
+                        <dt class="text-slate-500">Trigger 1 Distance / 與第一觸發價距離</dt><dd id="distance-1" class="text-right font-mono font-bold">--</dd>
+                        <dt class="text-slate-500">Trigger 2 Distance / 與第二觸發價距離</dt><dd id="distance-2" class="text-right font-mono font-bold">--</dd>
+                        <dt class="text-slate-500">Observed Above T1 / 觀察站上T1時間</dt><dd id="observed-time" class="text-right font-mono font-bold">--</dd>
+                        <dt class="text-slate-500">15m Candle Close / 15分K收盤</dt><dd id="candle-status" class="text-right font-bold">Unavailable</dd>
+                        <dt class="text-slate-500">TAR / 成交主動性</dt><dd id="tar-value" class="text-right font-bold">Unavailable</dd>
+                        <dt class="text-slate-500">OBI / 掛單不平衡</dt><dd id="obi-value" class="text-right font-bold">Unavailable</dd>
+                        <dt class="text-slate-500">VWAP Position / 均價位置</dt><dd id="vwap-value" class="text-right font-bold">Unavailable</dd>
+                        <dt class="text-slate-500">Current Volume / 目前成交量</dt><dd id="volume-value" class="text-right font-mono font-bold">--</dd>
+                        <dt class="text-slate-500">Volume Quality / 成交量品質</dt><dd id="volume-quality" class="text-right font-bold">Unavailable</dd>
+                    </dl>
+                </div>
+
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+                    <div class="flex items-center justify-between gap-3"><span class="text-xs font-black tracking-wider text-slate-600">STATUS / 狀態</span><span id="confidence-badge" class="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-black">Confidence: Low</span></div>
+                    <div class="mt-3 flex items-start gap-3"><span id="status-dot" class="mt-1.5 w-3 h-3 rounded-full bg-amber-400 shrink-0"></span><div><h2 id="status-title" class="text-xl font-black">Waiting for Trigger Level</h2><p id="status-zh" class="text-sm text-slate-500">等待設定觸發價</p></div></div>
+                    <div class="border-t border-slate-200 mt-4 pt-4"><h3 class="text-xs font-black tracking-wider text-slate-600 mb-2">CONFIRMATION FACTORS / 確認因素</h3><ul id="factor-list" class="space-y-2 text-sm text-slate-600"><li>○ Trigger 1 is not set</li></ul></div>
+                    <details class="mt-auto pt-4 group"><summary class="cursor-pointer list-none flex justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Details / 詳細規則 <span>⌄</span></summary><div class="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-500 leading-relaxed">15-minute confirmation uses completed fixed-boundary Fugle candles. Observed time counts only unique, consecutive live observations. One quote-derived tick is used as failure tolerance. TAR, OBI and VWAP affect confidence only.</div></details>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 overflow-hidden">
+                <h2 class="text-xs font-black tracking-wider text-slate-600 mb-4">PRICE ACTION & CONFIRMATION / 價格行為與確認</h2>
+                <div id="stage-progress" class="relative grid grid-cols-7 min-w-0 text-center text-[10px] sm:text-xs text-slate-400">
+                    <div class="stage-line"></div>
+                    <div data-stage="Waiting" style="--stage-color:#fbbf24"><div class="stage-dot"></div><span>Waiting<br>等待</span></div>
+                    <div data-stage="Approaching" style="--stage-color:#f97316"><div class="stage-dot"></div><span>Approach<br>接近</span></div>
+                    <div data-stage="Testing" style="--stage-color:#2563eb"><div class="stage-dot"></div><span>Testing<br>測試</span></div>
+                    <div data-stage="Provisional" style="--stage-color:#7c3aed"><div class="stage-dot"></div><span>Provisional<br>暫定</span></div>
+                    <div data-stage="Confirmed" style="--stage-color:#16a34a"><div class="stage-dot"></div><span>Confirmed<br>確認</span></div>
+                    <div data-stage="Rejected" style="--stage-color:#ef4444"><div class="stage-dot"></div><span>Rejected<br>受阻</span></div>
+                    <div data-stage="Failed" style="--stage-color:#dc2626"><div class="stage-dot"></div><span>Failed<br>失敗</span></div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div class="bg-white rounded-xl border border-slate-200 p-4"><span class="text-xs font-bold text-slate-500">TAR</span><strong id="tar-card" class="block mt-2 text-sm">Unavailable</strong></div>
+                <div class="bg-white rounded-xl border border-slate-200 p-4"><span class="text-xs font-bold text-slate-500">OBI</span><strong id="obi-card" class="block mt-2 text-sm">Unavailable</strong></div>
+                <div class="bg-white rounded-xl border border-slate-200 p-4"><span class="text-xs font-bold text-slate-500">VWAP</span><strong id="vwap-card-value" class="block mt-2 text-sm">Unavailable</strong></div>
+                <div class="bg-white rounded-xl border border-slate-200 p-4"><span class="text-xs font-bold text-slate-500">Volume Quality</span><strong class="block mt-2 text-sm text-slate-500">Unavailable</strong></div>
+                <div class="bg-white rounded-xl border border-slate-200 p-4 col-span-2 sm:col-span-1"><span class="text-xs font-bold text-slate-500">Market State</span><strong id="market-card" class="block mt-2 text-sm">DATA UNAVAILABLE</strong></div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
+        const TRIGGER_KEYS = ['tar_obi_breakout_trigger_1', 'tar_obi_breakout_trigger_2'];
+        const ACCEPTANCE_MS = 60 * 1000;
+        const FAILURE_MS = 60 * 1000;
+        let quoteData = null;
+        let candleData = null;
+        let metrics = null;
+        let refreshTimer = null;
+        let fetching = false;
+        let activeTriggerIndex = 0;
+        let triggerStates = [createTriggerState(readTrigger(0)), createTriggerState(readTrigger(1))];
+
+        function createTriggerState(level = null) {
+            return { level, tradingDate: null, symbol: null, samples: [], observedAboveMs: 0, belowSince: null, belowSamples: 0, wasTesting: false, wasProvisional: false, wasConfirmed: false, wasRejected: false, wasFailed: false };
+        }
+
+        function readTrigger(index) {
+            const value = Number(localStorage.getItem(TRIGGER_KEYS[index]));
+            return Number.isFinite(value) && value > 0 ? value : null;
+        }
+
+        function savedSettings() {
+            return {
+                apiKey: localStorage.getItem('fugle_api_key') || '',
+                symbol: (localStorage.getItem('fugle_symbol') || '2330').trim().toUpperCase(),
+                interval: Number(localStorage.getItem('fugle_interval')) || 30,
+            };
+        }
+
+        function resetHistory(index) {
+            triggerStates[index] = createTriggerState(triggerStates[index].level);
+        }
+
+        function setTrigger(index, rawValue) {
+            const value = Number(rawValue);
+            const valid = Number.isFinite(value) && value > 0 ? value : null;
+            triggerStates[index] = createTriggerState(valid);
+            if (valid == null) localStorage.removeItem(TRIGGER_KEYS[index]);
+            else localStorage.setItem(TRIGGER_KEYS[index], String(valid));
+            render();
+        }
+
+        function resetAll() {
+            TRIGGER_KEYS.forEach(key => localStorage.removeItem(key));
+            triggerStates = [createTriggerState(), createTriggerState()];
+            document.getElementById('trigger-1').value = '';
+            document.getElementById('trigger-2').value = '';
+            activeTriggerIndex = 0;
+            render();
+        }
+
+        function getPrice() { return quoteData?.lastPrice ?? quoteData?.closePrice ?? null; }
+        function getTimestamp() { return MarketData.timestampToMs(quoteData?.lastUpdated || quoteData?.lastTrade?.time || quoteData?.closeTime); }
+        function refreshMs() { return savedSettings().interval * 1000; }
+        function marketSession() { return MarketData.getMarketSession(quoteData, refreshMs()); }
+        function tickSize() { return MarketData.inferTickSize(quoteData); }
+
+        function observeTrigger(index) {
+            const state = triggerStates[index];
+            const price = getPrice();
+            const time = getTimestamp();
+            const session = marketSession();
+            const symbol = savedSettings().symbol;
+            if (state.tradingDate !== quoteData?.date || state.symbol !== symbol) {
+                triggerStates[index] = createTriggerState(state.level);
+                triggerStates[index].tradingDate = quoteData?.date || null;
+                triggerStates[index].symbol = symbol;
+            }
+            const current = triggerStates[index];
+            if (!current.level || !Number.isFinite(price) || !time || session !== 'live') return;
+            const last = current.samples[current.samples.length - 1];
+            const maxGap = Math.max(90000, refreshMs() * 2 + 15000);
+            if (last && time - last.time > maxGap) {
+                const level = current.level;
+                triggerStates[index] = createTriggerState(level);
+                triggerStates[index].tradingDate = quoteData.date;
+                triggerStates[index].symbol = symbol;
+            }
+            const target = triggerStates[index];
+            const previous = target.samples[target.samples.length - 1];
+            if (previous && time <= previous.time) return;
+            if (previous && previous.price > target.level && price > target.level) target.observedAboveMs += time - previous.time;
+            target.samples.push({ time, price });
+            if (target.samples.length > 360) target.samples.shift();
+            const tolerance = tickSize() || 0.01;
+            if (price > target.level) {
+                target.belowSince = null;
+                target.belowSamples = 0;
+                target.wasTesting = true;
+            } else if (price < target.level - tolerance) {
+                if (target.belowSince == null) target.belowSince = time;
+                target.belowSamples += 1;
+            } else {
+                target.belowSince = null;
+                target.belowSamples = 0;
+            }
+        }
+
+        function relevantCandle(index) {
+            const state = triggerStates[index];
+            const completed = MarketData.getCompleted15mCandle(candleData, quoteData);
+            if (!state.level || !completed) return { status: candleData ? 'Pending' : 'Unavailable', candle: null, above: false };
+            const above = Number(completed.close) > state.level;
+            return { status: above ? 'Above Trigger' : 'Below Trigger', candle: completed, above };
+        }
+
+        function evaluate(index) {
+            const state = triggerStates[index];
+            const level = state.level;
+            const price = getPrice();
+            const session = marketSession();
+            const tick = tickSize() || 0.01;
+            const candle = relevantCandle(index);
+            const belowDuration = state.belowSince && getTimestamp() ? Math.max(0, getTimestamp() - state.belowSince) : 0;
+            const vwap = MarketData.getVwap(quoteData);
+            const vwapPosition = MarketData.getVwapPosition(price, vwap);
+            const tar = MarketData.getTarContext(metrics?.detTarKey);
+            const obi = MarketData.getObiContext(metrics?.obiKey);
+            const supportScore = Number(tar === 'Buyer Active') + Number(obi === 'Bid Dominant') + Number(vwapPosition === 'Above VWAP');
+            const proximity = level ? Math.min(level * 0.002, tick * 4) : 0;
+            let title = 'Waiting for Trigger Level', zh = '等待設定觸發價', stage = 'Waiting', confidence = 'Low', color = 'amber', factors = [];
+
+            if (!level) factors = ['Trigger 1 is not set'];
+            else if (session === 'unavailable' || session === 'stale' || !Number.isFinite(price)) { title = 'Data Unavailable'; zh = '資料無法使用'; color = 'slate'; factors = ['Live quote is missing or stale']; }
+            else if (session === 'preopen') { title = 'Waiting for Market Open'; zh = '等待開盤'; color = 'slate'; factors = ['Regular market session has not started']; }
+            else if (session === 'closed') {
+                if (state.wasConfirmed && price < level - tick) { title = 'Breakout Failed'; zh = '突破失敗（已收盤）'; stage = 'Failed'; color = 'red'; factors = ['Final price below active trigger', 'Completed session result']; }
+                else if (state.wasConfirmed && price > level) { title = 'Breakout Confirmed'; zh = '突破確認（已收盤）'; stage = 'Confirmed'; confidence = supportScore >= 2 ? 'High' : 'Moderate'; color = 'green'; factors = ['Observed confirmation preserved at market close', candle.status]; }
+                else if (candle.above && price > level) { title = 'Provisional Breakout'; zh = '暫定突破（已收盤）'; stage = 'Provisional'; confidence = 'Moderate'; color = 'violet'; factors = ['Completed 15m candle above trigger', 'Continuous acceptance not fully observed']; }
+                else { title = 'Market Closed'; zh = '市場已收盤'; color = 'slate'; factors = ['No live observation is accumulating']; }
+            } else if (belowDuration >= FAILURE_MS && state.belowSamples >= 2 && (state.wasProvisional || state.wasConfirmed)) { title = 'Breakout Failed'; zh = '突破失敗'; stage = 'Failed'; color = 'red'; state.wasFailed = true; factors = ['Price remained below trigger beyond one tick', 'Prior breakout evidence was lost']; }
+            else if (belowDuration >= Math.min(FAILURE_MS, refreshMs()) && state.belowSamples >= 2 && state.wasTesting) { title = 'Rejected at Trigger'; zh = '觸發價受阻'; stage = 'Rejected'; color = 'red'; state.wasRejected = true; factors = ['Price tested the trigger', 'Price returned below one-tick tolerance']; }
+            else if (price > level && candle.above && state.observedAboveMs >= ACCEPTANCE_MS && supportScore >= 1) { title = 'Breakout Confirmed'; zh = '突破確認'; stage = 'Confirmed'; confidence = supportScore >= 2 ? 'High' : 'Moderate'; color = 'green'; state.wasConfirmed = true; factors = ['Price above active trigger', 'Completed 15m candle above trigger', 'Observed acceptance intact']; }
+            else if (price > level && (candle.above || state.observedAboveMs >= ACCEPTANCE_MS)) { title = 'Provisional Breakout'; zh = '暫定突破'; stage = 'Provisional'; confidence = 'Moderate'; color = 'violet'; state.wasProvisional = true; factors = [candle.above ? 'Completed 15m candle above trigger' : '15m candle confirmation pending', state.observedAboveMs >= ACCEPTANCE_MS ? 'Observed acceptance exists' : 'Observed acceptance is insufficient']; }
+            else if (price > level) { title = 'Testing Breakout'; zh = '測試突破'; stage = 'Testing'; confidence = 'Moderate'; color = 'blue'; factors = ['Price above active trigger', '15m confirmation or observed acceptance pending']; }
+            else if (price >= level - proximity) { title = 'Approaching Trigger'; zh = '接近觸發價'; stage = 'Approaching'; color = 'orange'; factors = ['Price below trigger', 'Price inside documented proximity threshold']; }
+            else { title = 'Waiting for Trigger'; zh = '等待觸發'; factors = ['Price remains meaningfully below the trigger']; }
+
+            if (level && Number.isFinite(price)) factors.unshift(`Active level: T${index + 1} ${level.toFixed(2)}`);
+            if (vwapPosition !== 'Unavailable') factors.push(`Price: ${vwapPosition}`);
+            if (tar !== 'Unavailable') factors.push(`TAR: ${tar}`);
+            if (obi !== 'Unavailable') factors.push(`OBI: ${obi}`);
+            factors.push('Volume quality unavailable');
+            return { title, zh, stage, confidence, color, factors: [...new Set(factors)].slice(0, 6), candle, supportScore };
+        }
+
+        function chooseActiveTrigger() {
+            const t1 = triggerStates[0], t2 = triggerStates[1], price = getPrice(), tick = tickSize() || 0.01;
+            if (t1.wasConfirmed && t2.level && Number.isFinite(price)) {
+                const proximity = Math.min(t2.level * 0.002, tick * 4);
+                if (price >= t2.level - proximity || t2.wasTesting || t2.wasProvisional || t2.wasConfirmed) return 1;
+            }
+            return 0;
+        }
+
+        function formatDistance(level) {
+            const price = getPrice();
+            if (!level || !Number.isFinite(price)) return '--';
+            const value = price - level, percent = value / level * 100;
+            return `${value >= 0 ? '+' : ''}${value.toFixed(2)} / ${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`;
+        }
+
+        function formatDuration(ms) {
+            const seconds = Math.floor(ms / 1000);
+            return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+        }
+
+        function setContextColor(element, value) {
+            element.className = `text-right font-bold ${value.includes('Buyer') || value.includes('Bid') || value.includes('Above') ? 'text-emerald-600' : value.includes('Seller') || value.includes('Ask') || value.includes('Below') ? 'text-red-600' : 'text-blue-600'}`;
+        }
+
+        function render() {
+            activeTriggerIndex = chooseActiveTrigger();
+            const evaluation = evaluate(activeTriggerIndex);
+            const price = getPrice(), tick = tickSize(), session = marketSession();
+            const tar = MarketData.getTarContext(metrics?.detTarKey), obi = MarketData.getObiContext(metrics?.obiKey);
+            const vwapPosition = MarketData.getVwapPosition(price, MarketData.getVwap(quoteData));
+            const sessionMap = { live: ['INTRADAY','bg-emerald-50 text-emerald-700'], preopen: ['PRE-MARKET','bg-amber-50 text-amber-700'], closed: ['MARKET CLOSED','bg-slate-100 text-slate-600'], stale: ['DATA UNAVAILABLE','bg-red-50 text-red-700'], unavailable: ['DATA UNAVAILABLE','bg-slate-100 text-slate-600'] };
+            const [sessionText, sessionClass] = sessionMap[session] || sessionMap.unavailable;
+            const badge = document.getElementById('market-badge'); badge.textContent = sessionText; badge.className = `px-3 py-1.5 rounded-full text-xs font-black tracking-wider ${sessionClass}`;
+            document.getElementById('market-card').textContent = sessionText;
+            document.getElementById('current-price').textContent = Number.isFinite(price) ? price.toFixed(2) : '--';
+            document.getElementById('tick-size').textContent = Number.isFinite(tick) ? tick.toFixed(tick < 0.1 ? 2 : 1) : '--';
+            document.getElementById('distance-1').textContent = formatDistance(triggerStates[0].level);
+            document.getElementById('distance-2').textContent = formatDistance(triggerStates[1].level);
+            document.getElementById('observed-time').textContent = triggerStates[0].level ? formatDuration(triggerStates[0].observedAboveMs) : '--';
+            document.getElementById('candle-status').textContent = evaluation.candle.status;
+            document.getElementById('tar-value').textContent = tar; document.getElementById('obi-value').textContent = obi; document.getElementById('vwap-value').textContent = vwapPosition;
+            setContextColor(document.getElementById('tar-value'), tar); setContextColor(document.getElementById('obi-value'), obi); setContextColor(document.getElementById('vwap-value'), vwapPosition);
+            document.getElementById('volume-value').textContent = Number.isFinite(quoteData?.total?.tradeVolume) ? quoteData.total.tradeVolume.toLocaleString() : '--';
+            document.getElementById('volume-quality').textContent = 'Unavailable';
+            document.getElementById('active-trigger-label').textContent = `ACTIVE: T${activeTriggerIndex + 1}`;
+            document.getElementById('trigger-1-stage').textContent = triggerStates[0].wasConfirmed ? 'CONFIRMED' : activeTriggerIndex === 0 ? 'PRIMARY' : 'COMPLETED STAGE';
+            document.getElementById('trigger-2-stage').textContent = activeTriggerIndex === 1 ? 'ACTIVE' : 'SECONDARY';
+            document.getElementById('status-title').textContent = evaluation.title; document.getElementById('status-zh').textContent = evaluation.zh;
+            const colorMap = { amber:'bg-amber-400', slate:'bg-slate-400', orange:'bg-orange-500', blue:'bg-blue-600', violet:'bg-violet-600', green:'bg-emerald-600', red:'bg-red-600' };
+            document.getElementById('status-dot').className = `mt-1.5 w-3 h-3 rounded-full shrink-0 ${colorMap[evaluation.color]}`;
+            document.getElementById('confidence-badge').textContent = `Confidence: ${evaluation.confidence}`;
+            document.getElementById('factor-list').innerHTML = evaluation.factors.map(factor => `<li>• ${factor}</li>`).join('');
+            document.querySelectorAll('[data-stage]').forEach(node => node.classList.toggle('stage-active', node.dataset.stage === evaluation.stage));
+            document.getElementById('tar-card').textContent = tar; document.getElementById('obi-card').textContent = obi; document.getElementById('vwap-card-value').textContent = vwapPosition;
+            const settings = savedSettings(); document.getElementById('source-summary').textContent = settings.apiKey ? `${settings.symbol} · Fugle · every ${settings.interval}s` : 'Fugle API key not found. Configure it on the TAR-OBI page.';
+        }
+
+        async function fetchData() {
+            if (fetching) return;
+            const settings = savedSettings();
+            if (!settings.apiKey || !settings.symbol) { quoteData = null; candleData = null; metrics = null; render(); return; }
+            fetching = true; document.getElementById('refresh-button').disabled = true;
+            try {
+                const headers = { 'X-API-KEY': settings.apiKey };
+                const [quoteResponse, candleResponse] = await Promise.all([
+                    fetch(`${API_BASE}/stock/intraday/quote/${settings.symbol}`, { headers }),
+                    fetch(`${API_BASE}/stock/intraday/candles/${settings.symbol}?timeframe=15&sort=asc`, { headers }),
+                ]);
+                if (!quoteResponse.ok) throw new Error(`Quote HTTP ${quoteResponse.status}`);
+                quoteData = await quoteResponse.json();
+                candleData = candleResponse.ok ? await candleResponse.json() : null;
+                const askPrints = quoteData.total?.tradeVolumeAtAsk ?? 0, bidPrints = quoteData.total?.tradeVolumeAtBid ?? 0;
+                const bidQty = (quoteData.bids || []).reduce((sum, level) => sum + (level.size || 0), 0), askQty = (quoteData.asks || []).reduce((sum, level) => sum + (level.size || 0), 0);
+                metrics = MarketData.calculateTarObi(askPrints, bidPrints, bidQty, askQty);
+                observeTrigger(0);
+                evaluate(0);
+                if (triggerStates[0].wasConfirmed) observeTrigger(1);
+            } catch (error) {
+                console.error('[Breakout]', error); quoteData = null; candleData = null; metrics = null;
+            } finally {
+                fetching = false; document.getElementById('refresh-button').disabled = false; render();
+            }
+        }
+
+        function setup() {
+            document.getElementById('trigger-1').value = triggerStates[0].level ?? '';
+            document.getElementById('trigger-2').value = triggerStates[1].level ?? '';
+            document.getElementById('trigger-1').addEventListener('input', event => setTrigger(0, event.target.value));
+            document.getElementById('trigger-2').addEventListener('input', event => setTrigger(1, event.target.value));
+            document.getElementById('reset-button').addEventListener('click', resetAll);
+            document.getElementById('refresh-button').addEventListener('click', fetchData);
+            render(); fetchData();
+            refreshTimer = setInterval(fetchData, refreshMs());
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });
+        }
+
+        window.addEventListener('load', setup);
+    </script>
+</body>
+</html>
