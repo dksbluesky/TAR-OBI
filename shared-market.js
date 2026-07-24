@@ -204,17 +204,17 @@
         const belowVwapSelling = hasVwap && price < vwap && tar === 'Seller Active' && obi !== 'Bid Dominant';
         const stronglyNegative = tar === 'Seller Active' && obi === 'Ask Dominant';
         const internallyInconsistent = hasBid && hasAsk && bid > ask;
+        const wideSpreadWithNegativeScore = wideSpread && netScore < 0;
+        const hardBlocks = { belowInvalidation, stronglyNegative, internallyInconsistent };
         const blockingFactors = [];
-        if (belowInvalidation) blockingFactors.push('✕ BLOCKING: Current Price below invalidation level');
-        if (stronglyNegative) blockingFactors.push('✕ BLOCKING: TAR seller active and OBI ask dominant');
-        if (belowVwapSelling) blockingFactors.push('✕ BLOCKING: Seller-active TAR while price is below VWAP');
-        if (wideSpread && netScore < 0) blockingFactors.push('✕ BLOCKING: Wide spread with negative TAR/OBI context');
-        if (internallyInconsistent) blockingFactors.push('✕ BLOCKING: Bid price exceeds ask price');
+        if (hardBlocks.belowInvalidation) blockingFactors.push('✕ BLOCKING: Current Price ' + price + ' below invalidation level ' + invalidation);
+        if (hardBlocks.stronglyNegative) blockingFactors.push('✕ BLOCKING: TAR ' + tar + ' + OBI ' + obi + ' (net score ' + netScore + ')');
+        if (hardBlocks.internallyInconsistent) blockingFactors.push('✕ BLOCKING: Bid 1 ' + bid + ' exceeds Ask 1 ' + ask);
 
         let state;
         if (blockingFactors.length > 0) state = 'DO NOT ENTER';
         else if (aboveMaximum || materialExtension) state = 'WAIT FOR PULLBACK';
-        else if (wideSpread || netScore < 0 || tar === 'Balanced' || (obi === 'Ask Dominant' && tar !== 'Buyer Active') || !inside) state = 'WAIT FOR CONFIRMATION';
+        else if (belowVwapSelling || wideSpreadWithNegativeScore || wideSpread || netScore < 0 || tar === 'Balanced' || (obi === 'Ask Dominant' && tar !== 'Buyer Active') || !inside) state = 'WAIT FOR CONFIRMATION';
         else state = 'ENTRY CONDITIONS MET';
 
         let confidence = 'Moderate';
@@ -235,6 +235,13 @@
         return {
             state, confidence, lower, upper, maximum, invalidation, tradingLower, tradingUpper,
             netScore, spread, wideSpread, materialExtension, vwapDifference, vwapPercent,
+            blockingReason: blockingFactors[0] || null,
+            ruleEvaluation: {
+                tar, obi, vwapPosition: getVwapPosition(price, vwap), bid1: hasBid ? bid : null,
+                ask1: hasAsk ? ask : null, spread, netScore, belowInvalidation, stronglyNegative,
+                belowVwapSelling, wideSpreadWithNegativeScore, internallyInconsistent,
+                hardBlockActive: blockingFactors.length > 0,
+            },
             factors: factors.slice(0, 7),
         };
     }

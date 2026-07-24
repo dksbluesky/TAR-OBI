@@ -65,7 +65,7 @@ assert.ok(extended.upper < 33, 'preferred range is below extended current price'
 assert.ok(extended.upper <= extended.maximum, 'preferred upper does not exceed maximum');
 assert.ok(extended.factors.includes('✕ Current Price above preferred entry range'), 'pullback factor reports price above preferred range');
 assert.ok(!extended.factors.includes('✓ Current Price inside preferred entry range'), 'pullback does not claim price is inside preferred range');
-assert.equal(assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }).state, 'DO NOT ENTER', 'selling below VWAP blocks entry');
+assert.equal(assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }).state, 'WAIT FOR CONFIRMATION', 'selling below VWAP with balanced OBI waits for confirmation');
 assert.equal(assess({ bid: 32.3, ask: 32.5 }).confidence, 'Low', 'wide spread lowers confidence');
 assert.equal(assess({ entryBasis: 'vwap', vwap: null }).state, 'DATA UNAVAILABLE', 'missing selected anchor is unavailable');
 assert.equal(assess({ session: 'stale' }).maximum, null, 'stale data has no actionable maximum');
@@ -95,13 +95,44 @@ assert.ok(
 
 const doNotEnterCases = [
     assess({ tar: 'Seller Active', obi: 'Ask Dominant' }),
-    assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }),
-    assess({ bid: 32.3, ask: 32.5, tar: 'Seller Active', obi: 'Balanced' }),
     assess({ bid: 32.55, ask: 32.5, tar: 'Balanced', obi: 'Balanced' }),
 ];
 for (const result of doNotEnterCases) {
-    assert.equal(result.state, 'DO NOT ENTER', 'blocking scenario is prohibited');
+    assert.equal(result.state, 'DO NOT ENTER', 'explicit hard blocking scenario is prohibited');
     assert.ok(result.factors.length > 0, 'DO NOT ENTER always has an assessment factor');
     assert.match(result.factors[0], /^✕ BLOCKING:/, 'DO NOT ENTER always starts with a blocking reason');
+    assert.equal(result.blockingReason, result.factors[0], 'blocking reason matches the first visible factor');
+    assert.equal(result.ruleEvaluation.hardBlockActive, true, 'DO NOT ENTER reports an active hard block');
 }
+
+const mixedEvidenceCases = [
+    assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }),
+    assess({ tar: 'Balanced', obi: 'Ask Dominant' }),
+    assess({ tar: 'Balanced', obi: 'Balanced' }),
+    assess({ bid: 32.3, ask: 32.5, tar: 'Seller Active', obi: 'Balanced' }),
+];
+for (const result of mixedEvidenceCases) {
+    assert.equal(result.state, 'WAIT FOR CONFIRMATION', 'mixed or insufficient evidence waits for confirmation');
+    assert.equal(result.blockingReason, null, 'mixed evidence has no hard blocking reason');
+    assert.equal(result.ruleEvaluation.hardBlockActive, false, 'mixed evidence does not report a hard block');
+}
+
+const diagnostic = insideRangeBlocked.ruleEvaluation;
+assert.deepEqual(
+    {
+        tar: diagnostic.tar, obi: diagnostic.obi, vwapPosition: diagnostic.vwapPosition,
+        bid1: diagnostic.bid1, ask1: diagnostic.ask1, spread: diagnostic.spread,
+        netScore: diagnostic.netScore, stronglyNegative: diagnostic.stronglyNegative,
+        belowVwapSelling: diagnostic.belowVwapSelling,
+        wideSpreadWithNegativeScore: diagnostic.wideSpreadWithNegativeScore,
+        internallyInconsistent: diagnostic.internallyInconsistent,
+    },
+    {
+        tar: 'Seller Active', obi: 'Ask Dominant', vwapPosition: 'Near VWAP',
+        bid1: 32.4, ask1: 32.5, spread: 0.10000000000000142,
+        netScore: -2, stronglyNegative: true, belowVwapSelling: false,
+        wideSpreadWithNegativeScore: false, internallyInconsistent: false,
+    },
+    'assessment exposes exact live values and evaluated blocking booleans'
+);
 console.log('assessment tests passed');
