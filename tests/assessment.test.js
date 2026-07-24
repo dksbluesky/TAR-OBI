@@ -84,4 +84,24 @@ for (const result of [
     }
 }
 
+const insideRangeBlocked = assess({ current: 32.4, bid: 32.4, ask: 32.5, vwap: 32.4, tar: 'Seller Active', obi: 'Ask Dominant' });
+assert.equal(insideRangeBlocked.state, 'DO NOT ENTER', 'inside preferred range remains blocked by stronger evidence');
+assert.match(insideRangeBlocked.factors[0], /^✕ BLOCKING:/, 'blocking reason is the first assessment factor');
+assert.ok(insideRangeBlocked.factors.includes('✓ Current Price inside preferred entry range'), 'price-range context remains visible after blocker');
+assert.ok(
+    insideRangeBlocked.factors.indexOf('✓ Current Price inside preferred entry range') > 0,
+    'blocking reason takes precedence over inside-range signal'
+);
+
+const doNotEnterCases = [
+    assess({ tar: 'Seller Active', obi: 'Ask Dominant' }),
+    assess({ current: 32.4, vwap: 32.5, tar: 'Seller Active', obi: 'Balanced' }),
+    assess({ bid: 32.3, ask: 32.5, tar: 'Seller Active', obi: 'Balanced' }),
+    assess({ bid: 32.55, ask: 32.5, tar: 'Balanced', obi: 'Balanced' }),
+];
+for (const result of doNotEnterCases) {
+    assert.equal(result.state, 'DO NOT ENTER', 'blocking scenario is prohibited');
+    assert.ok(result.factors.length > 0, 'DO NOT ENTER always has an assessment factor');
+    assert.match(result.factors[0], /^✕ BLOCKING:/, 'DO NOT ENTER always starts with a blocking reason');
+}
 console.log('assessment tests passed');

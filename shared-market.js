@@ -204,8 +204,15 @@
         const belowVwapSelling = hasVwap && price < vwap && tar === 'Seller Active' && obi !== 'Bid Dominant';
         const stronglyNegative = tar === 'Seller Active' && obi === 'Ask Dominant';
         const internallyInconsistent = hasBid && hasAsk && bid > ask;
+        const blockingFactors = [];
+        if (belowInvalidation) blockingFactors.push('✕ BLOCKING: Current Price below invalidation level');
+        if (stronglyNegative) blockingFactors.push('✕ BLOCKING: TAR seller active and OBI ask dominant');
+        if (belowVwapSelling) blockingFactors.push('✕ BLOCKING: Seller-active TAR while price is below VWAP');
+        if (wideSpread && netScore < 0) blockingFactors.push('✕ BLOCKING: Wide spread with negative TAR/OBI context');
+        if (internallyInconsistent) blockingFactors.push('✕ BLOCKING: Bid price exceeds ask price');
+
         let state;
-        if (belowInvalidation || stronglyNegative || belowVwapSelling || (wideSpread && netScore < 0) || internallyInconsistent) state = 'DO NOT ENTER';
+        if (blockingFactors.length > 0) state = 'DO NOT ENTER';
         else if (aboveMaximum || materialExtension) state = 'WAIT FOR PULLBACK';
         else if (wideSpread || netScore < 0 || tar === 'Balanced' || (obi === 'Ask Dominant' && tar !== 'Buyer Active') || !inside) state = 'WAIT FOR CONFIRMATION';
         else state = 'ENTRY CONDITIONS MET';
@@ -214,7 +221,7 @@
         if (state === 'DATA UNAVAILABLE' || state === 'DO NOT ENTER' || aboveMaximum || wideSpread || netScore < 0 || (!hasBid || !hasAsk)) confidence = 'Low';
         else if (state === 'ENTRY CONDITIONS MET' && inside && tar === 'Buyer Active' && obi !== 'Ask Dominant' && !materialExtension && input.volumeQuality && input.volumeQuality !== 'Unavailable') confidence = 'High';
 
-        const factors = [];
+        const factors = state === 'DO NOT ENTER' ? [...blockingFactors] : [];
         factors.push(insidePreferredRange ? '✓ Current Price inside preferred entry range'
             : price > upper ? '✕ Current Price above preferred entry range'
             : '– Current Price below preferred entry range');
