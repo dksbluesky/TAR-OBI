@@ -85,6 +85,47 @@
         return now.getTime() - updatedMs > Math.max(90000, refreshMs * 2 + 15000) ? 'stale' : 'live';
     }
 
+    function calculateVolumeQuality(candleResponse, referenceTimestamp, session = 'live') {
+        const unavailable = reason => ({
+            quality: 'Unavailable', ratio: null, latestVolume: null,
+            medianVolume: null, sampleCount: 0, reason,
+        });
+        if (session === 'stale' || session === 'unavailable' || session === 'preopen') return unavailable('Market data unavailable');
+        const referenceMs = timestampToMs(referenceTimestamp);
+        if (!referenceMs) return unavailable('Reference timestamp unavailable');
+        const candles = Array.isArray(candleResponse?.data) ? candleResponse.data : [];
+        const taipeiParts = value => {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Taipei', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit',
+            }).formatToParts(new Date(value));
+            return Object.fromEntries(parts.map(item => [item.type, item.value]));
+        };
+        const completed = candles.map(candle => {
+            const startMs = Date.parse(candle?.date);
+            const volume = Number(candle?.volume);
+            if (!Number.isFinite(startMs) || !Number.isFinite(volume) || volume < 0) return null;
+            const parts = taipeiParts(startMs);
+            if (parts.hour === '09' && parts.minute === '00') return null;
+            if (startMs + 5 * 60 * 1000 > referenceMs) return null;
+            return { startMs, volume, marketDate: `${parts.year}-${parts.month}-${parts.day}` };
+        }).filter(Boolean).sort((a, b) => a.startMs - b.startMs);
+        if (!completed.length) return unavailable('No completed 5-minute candles');
+        const latest = completed[completed.length - 1];
+        if (referenceMs - (latest.startMs + 5 * 60 * 1000) > 6 * 60 * 1000) return unavailable('Latest completed candle is stale');
+        const sameDay = completed.filter(candle => candle.marketDate === latest.marketDate);
+        if (sameDay.length < 5) return unavailable('At least five completed candles required');
+        const baseline = sameDay.slice(0, -1).map(candle => candle.volume).sort((a, b) => a - b);
+        const middle = Math.floor(baseline.length / 2);
+        const medianVolume = baseline.length % 2 ? baseline[middle] : (baseline[middle - 1] + baseline[middle]) / 2;
+        if (!Number.isFinite(medianVolume) || medianVolume <= 0) return unavailable('Baseline volume unavailable');
+        const ratio = latest.volume / medianVolume;
+        const quality = ratio < 0.60 ? 'Low' : ratio < 1.40 ? 'Normal' : ratio < 2.00 ? 'Expanding' : 'Heavy';
+        return {
+            quality, ratio, latestVolume: latest.volume, medianVolume,
+            sampleCount: baseline.length, reason: null,
+        };
+    }
     function inferTickSize(quote) {
         const prices = [...(quote?.bids || []), ...(quote?.asks || [])]
             .map(level => Number(level.price))
@@ -261,6 +302,7 @@
         getVwapPosition,
         timestampToMs,
         getMarketSession,
+        calculateVolumeQuality,
         inferTickSize,
         roundToTick,
         calculateEntryAssessment,
