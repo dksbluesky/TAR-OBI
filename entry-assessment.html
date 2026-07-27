@@ -267,6 +267,7 @@
             'tick-size': formatPrice(tick, tick), vwap: formatPrice(vwap, tick),
             'vwap-difference': Number.isFinite(diff) ? `${diff >= 0 ? '+' : '−'}${formatPrice(Math.abs(diff), tick)} / ${diffPct >= 0 ? '+' : '−'}${Math.abs(diffPct).toFixed(2)}% · ${vwapPosition}` : 'Unavailable',
             tar, obi, volume: Number.isFinite(quoteData?.total?.tradeVolume) ? Number(quoteData.total.tradeVolume).toLocaleString() : 'Unavailable',
+            'volume-quality': volumeQuality.quality,
             timestamp: timestamp ? new Date(timestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : 'Unavailable',
             freshness: session === 'live' ? 'Fresh / 最新' : session === 'closed' ? 'Closed session / 已收盤' : session === 'preopen' ? 'Pre-market / 開盤前' : 'Unavailable / 資料不足',
         };
