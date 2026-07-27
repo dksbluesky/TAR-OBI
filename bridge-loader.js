@@ -141,6 +141,23 @@
     }
 
     /**
+     * Re-reads the shared bridge for the current linked session.
+     * A replacement or removal ends only this TAR-OBI page's linked session.
+     * @returns {object|null} Refreshed linked bridge, or null after replacement/removal.
+     */
+    function refreshLinkedBridge() {
+        if (!initialized || !linkedBridge) return linkedBridge;
+        const bridgeId = linkedBridge.bridgeId;
+        const refreshed = readBridge();
+        linkedBridge = refreshed
+            && refreshed.bridgeId === bridgeId
+            && storageGet(DISMISSED_KEY) !== bridgeId
+            ? refreshed
+            : null;
+        return linkedBridge;
+    }
+
+    /**
      * Returns the current TAR-OBI operating mode.
      * @returns {'linked'|'standalone'} Current operating mode.
      */
@@ -225,7 +242,10 @@
                 <div><dt class="text-xs text-slate-500">C2</dt><dd data-bridge-field="c2" class="mt-1 font-bold"></dd></div>
                 <div><dt class="text-xs text-slate-500">C3</dt><dd data-bridge-field="c3" class="mt-1 font-bold"></dd></div>
                 <div><dt class="text-xs text-slate-500">C4</dt><dd data-bridge-field="c4" class="mt-1 font-bold"></dd></div>
-            </dl>`;
+            </dl>
+            <div data-bridge-monitor-slot></div>`;
+
+        const monitorSlot = container.querySelector('[data-bridge-monitor-slot]');
 
         const values = {
             source: bridge.sourceApplication,
@@ -245,6 +265,7 @@
             const element = container.querySelector(`[data-bridge-field="${field}"]`);
             if (element) element.textContent = value;
         });
+        if (typeof options.renderMonitor === 'function') options.renderMonitor(monitorSlot);
 
         container.querySelector('[data-bridge-disconnect]')?.addEventListener('click', () => {
             disconnectBridge();
@@ -263,6 +284,7 @@
         readBridge,
         initialize,
         getLinkedBridge,
+        refreshLinkedBridge,
         getMode,
         populateLinkedTicker,
         handleSymbolInput,

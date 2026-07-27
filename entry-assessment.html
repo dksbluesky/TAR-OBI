@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./shared-market.js"></script>
     <script src="./bridge-loader.js"></script>
+    <script src="./bridge-monitor.js"></script>
     <style>body{font-family:Inter,sans-serif}.value-change{transition:color .15s ease}</style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -55,6 +56,7 @@
             </div>
         </section>
 
+        <section id="bridge-alert" class="hidden"></section>
         <section id="execution-context" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm"></section>
 
         <section class="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
@@ -284,6 +286,18 @@
         document.getElementById('vwap-card').textContent = vwapPosition;
         document.getElementById('volume-quality-card').textContent = volumeQuality.quality;
         document.getElementById('factor-list').innerHTML = assessment.factors.map(factor => `<li>${factor}</li>`).join('');
+        return {
+            complete: Boolean(quoteData && metrics && timestamp),
+            ticker: settings.symbol,
+            evaluatedAt: timestamp ? new Date(timestamp).toISOString() : null,
+            currentPrice: price,
+            assessment,
+            tarState: tar,
+            obiState: obi,
+            vwapState: vwapPosition,
+            spreadState: Number.isFinite(spread) ? (assessment.wideSpread ? 'WIDE' : 'ACCEPTABLE') : null,
+            volumeQuality: volumeQuality.quality
+        };
     }
 
     async function fetchData() {
@@ -292,6 +306,7 @@
         if (!settings.apiKey || !settings.symbol || settings.source !== 'fugle') {
             quoteData = null; metrics = null; candleData = null; render(); return;
         }
+        let completedRefresh = false;
         fetching = true;
         document.getElementById('refresh-button').disabled = true;
         try {
@@ -313,13 +328,15 @@
             const bidQty = (quoteData.bids || []).reduce((sum, level) => sum + (Number(level.size) || 0), 0);
             const askQty = (quoteData.asks || []).reduce((sum, level) => sum + (Number(level.size) || 0), 0);
             metrics = MarketData.calculateTarObi(askPrints, bidPrints, bidQty, askQty);
+            completedRefresh = true;
         } catch (error) {
             console.error('[Entry Assessment]', error);
             quoteData = null; metrics = null; candleData = null;
         } finally {
             fetching = false;
             document.getElementById('refresh-button').disabled = false;
-            render();
+            const completedSnapshot = render();
+            if (completedRefresh) window.TarObiBridgeMonitor?.captureCompletedAssessment(completedSnapshot);
             if (MarketData.getMarketSession(quoteData, settings.interval * 1000) === 'closed') {
                 clearInterval(refreshTimer); refreshTimer = null;
             }
@@ -327,6 +344,8 @@
     }
 
     function setup() {
+        const executionContext = document.getElementById('execution-context');
+        const bridgeAlert = document.getElementById('bridge-alert');
         const savedEntry = localStorage.getItem(ENTRY_KEY);
         const savedInvalidation = localStorage.getItem(INVALIDATION_KEY);
         document.getElementById('entry-basis').value = validEntryBases.includes(savedEntry) ? savedEntry : 'combined';
@@ -340,12 +359,23 @@
             render();
         });
         document.getElementById('refresh-button').addEventListener('click', fetchData);
-        window.TarObiBridge?.renderContextPanel(document.getElementById('execution-context'), {
-            onDisconnect() {
-                quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
-                render();
-            }
+        const renderBridgeContext = () => {
+            window.TarObiBridge?.renderContextPanel(executionContext, {
+                renderMonitor(container) {
+                    window.TarObiBridgeMonitor?.renderControls(container);
+                },
+                onDisconnect() {
+                    quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
+                    render();
+                }
+            });
+        };
+        window.TarObiBridgeMonitor?.mount({
+            bridgeApi: window.TarObiBridge,
+            alertContainer: bridgeAlert,
+            onUiRefresh: renderBridgeContext
         });
+        renderBridgeContext();
         render(); fetchData();
         refreshTimer = setInterval(fetchData, querySettings().interval * 1000);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });
