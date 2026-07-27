@@ -1,0 +1,272 @@
+(function (root, factory) {
+    const api = factory(root);
+    if (typeof module === 'object' && module.exports) module.exports = api;
+    if (root) root.TarObiBridge = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
+    'use strict';
+
+    const STORAGE_KEY = 'etfDca.executionBridge.v1';
+    const DISMISSED_KEY = 'tarObi.executionBridge.dismissedBridgeId.v1';
+    const CONTRACT_VERSION = '1.0';
+    const ETF_DCA_URL = 'https://dksbluesky.github.io/ETF_DCA-plan/';
+    const SOURCE_APPLICATION = 'ETF_DCA-plan';
+    const MODE_STANDALONE = 'standalone';
+    const MODE_LINKED = 'linked';
+
+    let initialized = false;
+    let linkedBridge = null;
+
+    function storageGet(key) {
+        try {
+            return root.localStorage?.getItem(key) ?? null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function storageSet(key, value) {
+        try {
+            root.localStorage?.setItem(key, value);
+        } catch (error) {
+            // Storage failure must never prevent standalone TAR-OBI operation.
+        }
+    }
+
+    function nonEmptyString(value) {
+        return typeof value === 'string' && value.trim().length > 0;
+    }
+
+    function validOptionalNumber(value) {
+        return value === null || value === undefined || Number.isFinite(Number(value));
+    }
+
+    function validActiveZone(activeZone) {
+        if (activeZone === null || activeZone === undefined) return true;
+        if (typeof activeZone !== 'object') return false;
+        const low = Number(activeZone.low);
+        const high = Number(activeZone.high);
+        return Number.isFinite(low) && Number.isFinite(high) && low <= high;
+    }
+
+    function modeSnapshot() {
+        return Object.freeze({
+            mode: linkedBridge ? MODE_LINKED : MODE_STANDALONE,
+            bridge: linkedBridge
+        });
+    }
+
+    function displayValue(value, fallback = 'Unavailable') {
+        return nonEmptyString(value) ? value.trim() : fallback;
+    }
+
+    function displayCondition(condition) {
+        if (condition === null || condition === undefined) return 'Unavailable';
+        if (typeof condition === 'boolean') return condition ? '✓' : 'Pending';
+        if (condition.met === true) return '✓';
+        if (condition.met === false) return 'Pending';
+        return displayValue(condition.status);
+    }
+
+    function displaySetupStatus(setupStatus) {
+        if (nonEmptyString(setupStatus)) return setupStatus.trim();
+        return displayValue(setupStatus?.label);
+    }
+
+    function displayZone(activeZone) {
+        if (!validActiveZone(activeZone) || !activeZone) return 'Unavailable';
+        return `${Number(activeZone.low).toLocaleString()} ~ ${Number(activeZone.high).toLocaleString()}`;
+    }
+
+    function displayC4(c4) {
+        if (!c4) return 'Unavailable';
+        return displayValue(c4.classification, c4.confirmed === true ? 'Qualified' : 'Pending');
+    }
+
+    /**
+     * Validates a Phase 1 Execution Bridge object without changing it.
+     * @param {unknown} bridge Candidate bridge value.
+     * @returns {boolean} True only when the supported contract and required fields are valid.
+     */
+    function validateBridge(bridge) {
+        if (!bridge || typeof bridge !== 'object') return false;
+        if (bridge.version !== CONTRACT_VERSION) return false;
+        if (!nonEmptyString(bridge.bridgeId)) return false;
+        if (!nonEmptyString(bridge.ticker) || /\s/.test(bridge.ticker.trim())) return false;
+        if (!nonEmptyString(bridge.createdAt) || !Number.isFinite(Date.parse(bridge.createdAt))) return false;
+        if (bridge.sourceApplication !== SOURCE_APPLICATION) return false;
+        if (!nonEmptyString(bridge.marketTimeframe)) return false;
+        if (!validActiveZone(bridge.activeZone)) return false;
+        if (!validOptionalNumber(bridge.preferredEntry)) return false;
+        if (!validOptionalNumber(bridge.maximumEntryPrice)) return false;
+        if (!validOptionalNumber(bridge.invalidationLevel)) return false;
+        return true;
+    }
+
+    /**
+     * Reads and validates the current Phase 1 bridge object.
+     * Invalid, inaccessible, or malformed storage always resolves to null.
+     * @returns {object|null} A valid bridge object or null.
+     */
+    function readBridge() {
+        const raw = storageGet(STORAGE_KEY);
+        if (!raw) return null;
+        try {
+            const bridge = JSON.parse(raw);
+            return validateBridge(bridge) ? bridge : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Initializes bridge consumption once for the current page lifecycle.
+     * Repeated calls never re-read bridge storage.
+     * @returns {{mode: string, bridge: object|null}} Current operating mode.
+     */
+    function initialize() {
+        if (initialized) return modeSnapshot();
+        initialized = true;
+        const bridge = readBridge();
+        linkedBridge = bridge && storageGet(DISMISSED_KEY) !== bridge.bridgeId ? bridge : null;
+        return modeSnapshot();
+    }
+
+    /**
+     * Returns the bridge linked at page startup, or null in Standalone Mode.
+     * @returns {object|null} Current linked bridge.
+     */
+    function getLinkedBridge() {
+        initialize();
+        return linkedBridge;
+    }
+
+    /**
+     * Returns the current TAR-OBI operating mode.
+     * @returns {'linked'|'standalone'} Current operating mode.
+     */
+    function getMode() {
+        initialize();
+        return linkedBridge ? MODE_LINKED : MODE_STANDALONE;
+    }
+
+    /**
+     * Populates an existing ticker input from the linked bridge without fetching market data.
+     * @param {HTMLInputElement|null} input Existing TAR-OBI ticker input.
+     * @returns {object|null} Current linked bridge.
+     */
+    function populateLinkedTicker(input) {
+        const bridge = getLinkedBridge();
+        if (bridge && input) input.value = bridge.ticker;
+        return bridge;
+    }
+
+    /**
+     * Disconnects when a user-selected ticker differs from the linked ticker.
+     * The supplied value is never changed.
+     * @param {string} symbol Current user-entered ticker.
+     * @returns {'linked'|'standalone'} Resulting operating mode.
+     */
+    function handleSymbolInput(symbol) {
+        const bridge = getLinkedBridge();
+        if (bridge && String(symbol || '').trim().toUpperCase() !== bridge.ticker.toUpperCase()) {
+            disconnectBridge();
+        }
+        return getMode();
+    }
+
+    /**
+     * Disconnects TAR-OBI from the current bridge without modifying Phase 1 bridge storage.
+     * @returns {{mode: string, bridge: object|null}} Standalone mode snapshot.
+     */
+    function disconnectBridge() {
+        const bridge = getLinkedBridge();
+        if (bridge) storageSet(DISMISSED_KEY, bridge.bridgeId);
+        linkedBridge = null;
+        return modeSnapshot();
+    }
+
+    /**
+     * Renders the read-only Execution Context panel for Linked Monitor Mode.
+     * The panel remains hidden in Standalone Mode.
+     * @param {HTMLElement|null} container Context panel container.
+     * @param {{onDisconnect?: Function}} [options] Optional host callback after disconnect.
+     * @returns {void}
+     */
+    function renderContextPanel(container, options = {}) {
+        if (!container) return;
+        const bridge = getLinkedBridge();
+        if (!bridge) {
+            container.innerHTML = '';
+            container.classList?.add('hidden');
+            return;
+        }
+
+        container.classList?.remove('hidden');
+        container.innerHTML = `
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs font-black tracking-wider text-blue-600">EXECUTION CONTEXT</p>
+                    <p class="mt-1 text-xs font-bold text-slate-500">Linked Monitor Mode / 連結監控模式</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="${ETF_DCA_URL}" data-bridge-back class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500">Back to ETF_DCA-plan</a>
+                    <button type="button" data-bridge-disconnect class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Disconnect Bridge</button>
+                </div>
+            </div>
+            <dl class="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-4">
+                <div><dt class="text-xs text-slate-500">Source</dt><dd data-bridge-field="source" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">Ticker</dt><dd data-bridge-field="ticker" class="mt-1 font-mono font-bold"></dd></div>
+                <div class="col-span-2"><dt class="text-xs text-slate-500">Setup Status</dt><dd data-bridge-field="setup" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">Market Timeframe</dt><dd data-bridge-field="timeframe" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">Zone Mode</dt><dd data-bridge-field="zone-mode" class="mt-1 font-bold"></dd></div>
+                <div class="col-span-2"><dt class="text-xs text-slate-500">Active Zone</dt><dd data-bridge-field="active-zone" class="mt-1 font-mono font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">H Signal</dt><dd data-bridge-field="h-signal" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">C1</dt><dd data-bridge-field="c1" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">C2</dt><dd data-bridge-field="c2" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">C3</dt><dd data-bridge-field="c3" class="mt-1 font-bold"></dd></div>
+                <div><dt class="text-xs text-slate-500">C4</dt><dd data-bridge-field="c4" class="mt-1 font-bold"></dd></div>
+            </dl>`;
+
+        const values = {
+            source: bridge.sourceApplication,
+            ticker: bridge.ticker,
+            setup: displaySetupStatus(bridge.setupStatus),
+            timeframe: displayValue(bridge.marketLevelTimeframe, bridge.marketTimeframe),
+            'zone-mode': displayValue(bridge.zoneMode),
+            'active-zone': displayZone(bridge.activeZone),
+            'h-signal': displayValue(bridge.h1H2Status?.type, 'Pending'),
+            c1: displayCondition(bridge.C1),
+            c2: displayCondition(bridge.C2),
+            c3: displayCondition(bridge.C3),
+            c4: displayC4(bridge.C4)
+        };
+
+        Object.entries(values).forEach(([field, value]) => {
+            const element = container.querySelector(`[data-bridge-field="${field}"]`);
+            if (element) element.textContent = value;
+        });
+
+        container.querySelector('[data-bridge-disconnect]')?.addEventListener('click', () => {
+            disconnectBridge();
+            renderContextPanel(container, options);
+            if (typeof options.onDisconnect === 'function') options.onDisconnect();
+        });
+    }
+
+    return Object.freeze({
+        STORAGE_KEY,
+        DISMISSED_KEY,
+        CONTRACT_VERSION,
+        MODE_STANDALONE,
+        MODE_LINKED,
+        validateBridge,
+        readBridge,
+        initialize,
+        getLinkedBridge,
+        getMode,
+        populateLinkedTicker,
+        handleSymbolInput,
+        disconnectBridge,
+        renderContextPanel
+    });
+});

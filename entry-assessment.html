@@ -6,6 +6,7 @@
     <title>Intraday Entry Assessment | TAR-OBI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./shared-market.js"></script>
+    <script src="./bridge-loader.js"></script>
     <style>body{font-family:Inter,sans-serif}.value-change{transition:color .15s ease}</style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -53,6 +54,8 @@
                 </label>
             </div>
         </section>
+
+        <section id="execution-context" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm"></section>
 
         <section class="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
             <article class="flex min-h-[300px] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -140,7 +143,10 @@
     function querySettings() {
         const params = new URLSearchParams(location.search);
         const storedSymbol = (localStorage.getItem('fugle_symbol') || '2330').trim().toUpperCase();
-        const symbol = (params.get('symbol') || storedSymbol).trim().toUpperCase();
+        const requestedSymbol = (params.get('symbol') || '').trim().toUpperCase();
+        if (requestedSymbol) window.TarObiBridge?.handleSymbolInput(requestedSymbol);
+        const linkedSymbol = window.TarObiBridge?.getLinkedBridge()?.ticker || '';
+        const symbol = (linkedSymbol || requestedSymbol || storedSymbol).trim().toUpperCase();
         const source = (params.get('source') || 'fugle').toLowerCase();
         const interval = Number(params.get('interval')) || Number(localStorage.getItem('fugle_interval')) || 30;
         return { apiKey: localStorage.getItem('fugle_api_key') || '', symbol, source, interval: [10, 30, 60].includes(interval) ? interval : 30 };
@@ -334,6 +340,12 @@
             render();
         });
         document.getElementById('refresh-button').addEventListener('click', fetchData);
+        window.TarObiBridge?.renderContextPanel(document.getElementById('execution-context'), {
+            onDisconnect() {
+                quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
+                render();
+            }
+        });
         render(); fetchData();
         refreshTimer = setInterval(fetchData, querySettings().interval * 1000);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });

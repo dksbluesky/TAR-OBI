@@ -6,6 +6,7 @@
     <title>💻DK 邏輯交易計算器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./shared-market.js"></script>
+    <script src="./bridge-loader.js"></script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#2563eb">
@@ -430,7 +431,10 @@
                 if (document.getElementById('auto-refresh-toggle').checked) startAutoRefresh();
             });
 
-            document.getElementById('symbol-input').addEventListener('input', updateEntryAssessmentLink);
+            document.getElementById('symbol-input').addEventListener('input', event => {
+                window.TarObiBridge?.handleSymbolInput(event.target.value);
+                updateEntryAssessmentLink();
+            });
             document.getElementById('symbol-input').addEventListener('keydown', e => {
                 if (e.key === 'Enter') fetchFugleData(true);
             });
@@ -624,6 +628,8 @@
             inputFields.forEach(initInputField);
             bindApiControls();
             loadApiSettings();
+            window.TarObiBridge?.populateLinkedTicker(document.getElementById('symbol-input'));
+            updateEntryAssessmentLink();
             updateResults();
         }
 
