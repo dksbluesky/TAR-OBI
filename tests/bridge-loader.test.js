@@ -80,10 +80,17 @@ const disconnectButton = {
         this.click = handler;
     }
 };
+const backButton = {
+    addEventListener(eventName, handler) {
+        assert.equal(eventName, 'click');
+        this.click = handler;
+    }
+};
 const panel = {
     innerHTML: '',
     classList: { add() {}, remove() {} },
     querySelector(selector) {
+        if (selector === '[data-bridge-back]') return backButton;
         if (selector === '[data-bridge-disconnect]') return disconnectButton;
         const match = selector.match(/data-bridge-field="([^"]+)"/);
         if (!match) return null;
@@ -95,8 +102,8 @@ const panel = {
 let disconnected = false;
 consumer.renderContextPanel(panel, { onDisconnect() { disconnected = true; } });
 assert.doesNotMatch(panel.innerHTML, /<input|<select|contenteditable/i);
-assert.match(panel.innerHTML, /href="https:\/\/dksbluesky\.github\.io\/ETF_DCA-plan\/"/);
-assert.match(panel.innerHTML, />Back to ETF_DCA-plan<\/a>/);
+assert.doesNotMatch(panel.innerHTML, /href="https:\/\/dksbluesky\.github\.io\/ETF_DCA-plan\/"/);
+assert.match(panel.innerHTML, /data-bridge-back[^>]*>Back to ETF_DCA-plan<\/button>/);
 assert.equal(fields.get('ticker').textContent, '006208');
 assert.equal(fields.get('timeframe').textContent, '60m');
 assert.equal(fields.get('active-zone').textContent, '235.25 ~ 235.6');

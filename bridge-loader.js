@@ -82,6 +82,74 @@
         return displayValue(c4.classification, c4.confirmed === true ? 'Qualified' : 'Pending');
     }
 
+    function isMobileOrTablet() {
+        const navigatorInfo = root.navigator || {};
+        const userAgent = String(navigatorInfo.userAgent || '');
+        return navigatorInfo.userAgentData?.mobile === true
+            || /Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|Kindle/i.test(userAgent)
+            || (/Macintosh/i.test(userAgent) && Number(navigatorInfo.maxTouchPoints) > 1);
+    }
+
+    function hasSafeEtfHistory() {
+        if (!root.history || Number(root.history.length) <= 1) return false;
+        try {
+            const referrer = new URL(String(root.document?.referrer || ''));
+            const etfUrl = new URL(ETF_DCA_URL);
+            return referrer.origin === etfUrl.origin && referrer.pathname.startsWith(etfUrl.pathname);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function navigateToEtfFallback() {
+        try {
+            if (!root.location) return 'unavailable';
+            if (typeof root.location.assign === 'function') root.location.assign(ETF_DCA_URL);
+            else root.location.href = ETF_DCA_URL;
+            return 'fallback';
+        } catch (error) {
+            return 'unavailable';
+        }
+    }
+
+    /**
+     * Returns from Linked Monitor Mode to the ETF_DCA-plan page that started it.
+     * Desktop focuses a valid opener; mobile/tablet uses verified same-tab history.
+     * Neither path opens a new ETF_DCA-plan tab.
+     * @returns {'opener'|'history'|'fallback'|'unavailable'} Navigation path used.
+     */
+    function returnToEtfDca() {
+        if (isMobileOrTablet()) {
+            if (hasSafeEtfHistory() && typeof root.history.back === 'function') {
+                try {
+                    root.history.back();
+                    return 'history';
+                } catch (error) {
+                    return navigateToEtfFallback();
+                }
+            }
+            return navigateToEtfFallback();
+        }
+
+        try {
+            const opener = root.opener;
+            if (opener && opener.closed !== true && typeof opener.focus === 'function') {
+                opener.focus();
+                if (typeof root.close === 'function') {
+                    try {
+                        root.close();
+                    } catch (error) {
+                        // Browsers may refuse to close tabs they do not consider script-opened.
+                    }
+                }
+                return 'opener';
+            }
+        } catch (error) {
+            // Inaccessible opener falls through to same-tab fallback navigation.
+        }
+        return navigateToEtfFallback();
+    }
+
     /**
      * Validates a Phase 1 Execution Bridge object without changing it.
      * @param {unknown} bridge Candidate bridge value.
@@ -226,7 +294,7 @@
                     <p class="mt-1 text-xs font-bold text-slate-500">Linked Monitor Mode / 連結監控模式</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <a href="${ETF_DCA_URL}" data-bridge-back class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500">Back to ETF_DCA-plan</a>
+                    <button type="button" data-bridge-back class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500">Back to ETF_DCA-plan</button>
                     <button type="button" data-bridge-disconnect class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Disconnect Bridge</button>
                 </div>
             </div>
@@ -267,6 +335,10 @@
         });
         if (typeof options.renderMonitor === 'function') options.renderMonitor(monitorSlot);
 
+        container.querySelector('[data-bridge-back]')?.addEventListener('click', event => {
+            event?.preventDefault?.();
+            returnToEtfDca();
+        });
         container.querySelector('[data-bridge-disconnect]')?.addEventListener('click', () => {
             disconnectBridge();
             renderContextPanel(container, options);
@@ -285,6 +357,7 @@
         initialize,
         getLinkedBridge,
         refreshLinkedBridge,
+        returnToEtfDca,
         getMode,
         populateLinkedTicker,
         handleSymbolInput,
