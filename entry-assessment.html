@@ -127,6 +127,7 @@
     const API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
     const ENTRY_KEY = 'tarObi.entryAssessment.entryBasis';
     const INVALIDATION_KEY = 'tarObi.entryAssessment.invalidationBasis';
+    const REFRESH_REQUEST_KEY = 'tarObi.entryAssessment.refreshRequest';
     const validEntryBases = ['bidAsk', 'vwap', 'combined', 'current'];
     const validInvalidationBases = ['match', 'bidAsk', 'vwap', 'range', 'current'];
     let quoteData = null;
@@ -336,6 +337,7 @@
         render(); fetchData();
         refreshTimer = setInterval(fetchData, querySettings().interval * 1000);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });
+        window.addEventListener('storage', event => { if (event.key === REFRESH_REQUEST_KEY && event.newValue) fetchData(); });
     }
     window.addEventListener('load', setup);
 </script>

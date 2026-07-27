@@ -234,6 +234,7 @@
         // ─── Fugle API ────────────────────────────────────────────────────────────
 
         const FUGLE_API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
+        const ASSESSMENT_REFRESH_KEY = 'tarObi.entryAssessment.refreshRequest';
         let autoRefreshTimer = null;
         let apiPanelOpen = true;
 
@@ -285,7 +286,7 @@
             }
         }
 
-        async function fetchFugleData() {
+        async function fetchFugleData(notifyAssessment = false) {
             if (document.getElementById('fetch-btn').disabled) return;
             const apiKey = document.getElementById('api-key-input').value.trim();
             const symbol = document.getElementById('symbol-input').value.trim().toUpperCase();
@@ -295,6 +296,7 @@
 
             localStorage.setItem('fugle_api_key', apiKey);
             localStorage.setItem('fugle_symbol',  symbol);
+            if (notifyAssessment) localStorage.setItem(ASSESSMENT_REFRESH_KEY, JSON.stringify({ symbol, requestedAt: Date.now() }));
             updateEntryAssessmentLink();
 
             setFetchBtnState(true);
@@ -401,7 +403,7 @@
         }
 
         function bindApiControls() {
-            document.getElementById('fetch-btn').addEventListener('click', fetchFugleData);
+            document.getElementById('fetch-btn').addEventListener('click', () => fetchFugleData(true));
 
             document.getElementById('toggle-api-panel').addEventListener('click', () => {
                 apiPanelOpen = !apiPanelOpen;
@@ -430,7 +432,7 @@
 
             document.getElementById('symbol-input').addEventListener('input', updateEntryAssessmentLink);
             document.getElementById('symbol-input').addEventListener('keydown', e => {
-                if (e.key === 'Enter') fetchFugleData();
+                if (e.key === 'Enter') fetchFugleData(true);
             });
         }
 
