@@ -298,19 +298,37 @@
                     <button type="button" data-bridge-disconnect class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Disconnect Bridge</button>
                 </div>
             </div>
-            <dl class="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-4">
-                <div><dt class="text-xs text-slate-500">Source</dt><dd data-bridge-field="source" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">Ticker</dt><dd data-bridge-field="ticker" class="mt-1 font-mono font-bold"></dd></div>
-                <div class="col-span-2"><dt class="text-xs text-slate-500">Setup Status</dt><dd data-bridge-field="setup" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">Market Timeframe</dt><dd data-bridge-field="timeframe" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">Zone Mode</dt><dd data-bridge-field="zone-mode" class="mt-1 font-bold"></dd></div>
-                <div class="col-span-2"><dt class="text-xs text-slate-500">Active Zone</dt><dd data-bridge-field="active-zone" class="mt-1 font-mono font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">H Signal</dt><dd data-bridge-field="h-signal" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">C1</dt><dd data-bridge-field="c1" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">C2</dt><dd data-bridge-field="c2" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">C3</dt><dd data-bridge-field="c3" class="mt-1 font-bold"></dd></div>
-                <div><dt class="text-xs text-slate-500">C4</dt><dd data-bridge-field="c4" class="mt-1 font-bold"></dd></div>
-            </dl>
+            <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,35fr)_minmax(0,65fr)] lg:gap-5">
+                <dl data-bridge-section="metadata" class="grid grid-cols-2 gap-3 rounded-lg border border-blue-100 bg-white/70 p-4 text-sm">
+                    <div class="col-span-2">
+                        <dt class="text-xs text-slate-500">Ticker</dt>
+                        <dd data-bridge-field="ticker" class="mt-1 font-mono text-lg font-black text-slate-900"></dd>
+                    </div>
+                    <div class="col-span-2"><dt class="text-xs text-slate-500">Source</dt><dd data-bridge-field="source" class="mt-1 font-bold"></dd></div>
+                    <div><dt class="text-xs text-slate-500">Market Timeframe</dt><dd data-bridge-field="timeframe" class="mt-1 font-bold"></dd></div>
+                    <div><dt class="text-xs text-slate-500">Zone Mode</dt><dd data-bridge-field="zone-mode" class="mt-1 font-bold"></dd></div>
+                    <div class="col-span-2 rounded-lg bg-blue-100/70 p-3">
+                        <dt class="text-xs font-bold text-blue-700">Active Zone</dt>
+                        <dd data-bridge-field="active-zone" class="mt-1 font-mono text-xl font-black text-blue-900"></dd>
+                    </div>
+                </dl>
+                <div data-bridge-section="setup-signals" class="space-y-4 rounded-lg border border-blue-100 bg-white/70 p-4">
+                    <section>
+                        <h3 class="text-xs font-bold text-slate-500">Setup Status</h3>
+                        <p data-bridge-field="setup" class="mt-1 whitespace-normal break-words text-sm font-bold leading-6 text-slate-800"></p>
+                    </section>
+                    <section>
+                        <h3 class="text-xs font-bold text-slate-500">Signal Summary</h3>
+                        <dl data-bridge-signal-summary class="mt-2 flex flex-wrap gap-2 text-xs">
+                            <div class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5"><dt class="inline text-slate-500">H </dt><dd data-bridge-field="h-signal" class="inline font-black text-slate-800"></dd></div>
+                            <div class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5"><dt class="inline text-slate-500">C1 </dt><dd data-bridge-field="c1" class="inline font-black text-slate-800"></dd></div>
+                            <div class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5"><dt class="inline text-slate-500">C2 </dt><dd data-bridge-field="c2" class="inline font-black text-slate-800"></dd></div>
+                            <div class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5"><dt class="inline text-slate-500">C3 </dt><dd data-bridge-field="c3" class="inline font-black text-slate-800"></dd></div>
+                            <div class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5"><dt class="inline text-slate-500">C4 </dt><dd data-bridge-field="c4" class="inline font-black text-slate-800"></dd></div>
+                        </dl>
+                    </section>
+                </div>
+            </div>
             <div data-bridge-monitor-slot></div>`;
 
         const monitorSlot = container.querySelector('[data-bridge-monitor-slot]');

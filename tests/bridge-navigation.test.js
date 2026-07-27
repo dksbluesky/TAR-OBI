@@ -17,12 +17,13 @@ function loadNavigation({
     userAgent = mobile ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Mobile' : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     maxTouchPoints = mobile ? 5 : 0,
     opener = null,
+    focusThrows = false,
     historyLength = 1,
     referrer = ''
 } = {}) {
     const calls = { focus: 0, close: 0, back: 0, assign: [], open: 0 };
     if (opener) {
-        opener.focus = () => { calls.focus += 1; };
+        opener.focus = () => { calls.focus += 1; if (focusThrows) throw new Error('focus blocked'); };
     }
     defineGlobal('navigator', {
         userAgent,
@@ -70,6 +71,16 @@ function loadNavigation({
 }
 
 {
+    const opener = { closed: false };
+    const { navigation, calls } = loadNavigation({ opener, focusThrows: true });
+    assert.equal(navigation.returnToEtfDca(), 'fallback');
+    assert.equal(calls.focus, 1);
+    assert.equal(calls.close, 0);
+    assert.deepEqual(calls.assign, [ETF_URL]);
+    assert.equal(calls.open, 0);
+}
+
+{
     const { navigation, calls } = loadNavigation({
         mobile: true,
         historyLength: 2,
@@ -90,6 +101,20 @@ function loadNavigation({
     assert.equal(navigation.returnToEtfDca(), 'fallback');
     assert.equal(calls.back, 0);
     assert.deepEqual(calls.assign, [ETF_URL]);
+    assert.equal(calls.open, 0);
+}
+
+{
+    const { navigation, calls } = loadNavigation({
+        mobile: false,
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)',
+        maxTouchPoints: 5,
+        historyLength: 2,
+        referrer: ETF_URL
+    });
+    assert.equal(navigation.returnToEtfDca(), 'history');
+    assert.equal(calls.back, 1);
+    assert.deepEqual(calls.assign, []);
     assert.equal(calls.open, 0);
 }
 

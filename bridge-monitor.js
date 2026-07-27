@@ -175,6 +175,26 @@
         return root.Notification.permission || 'default';
     }
 
+    /**
+     * Maps notification permission and the existing saved preference to presentation text.
+     * This helper does not request permission or change notification behavior.
+     * @param {string} permission Browser Notification permission state.
+     * @param {boolean} preferenceEnabled Existing local notification preference.
+     * @returns {{status: string, label: string, actionable: boolean}} Read-only UI state.
+     */
+    function notificationUiState(permission, preferenceEnabled) {
+        if (permission === 'granted' && preferenceEnabled) {
+            return { status: 'Enabled', label: 'Notifications Enabled ✓', actionable: false };
+        }
+        if (permission === 'denied') {
+            return { status: 'Denied', label: 'Notifications Denied', actionable: false };
+        }
+        if (permission === 'unsupported') {
+            return { status: 'Unsupported', label: 'Notifications Unsupported', actionable: false };
+        }
+        return { status: 'Disabled', label: 'Enable Notifications', actionable: true };
+    }
+
     function notificationAllowed(previousState, currentState, notificationState, evaluatedAt) {
         if (currentState !== ENTRY_STATE || previousState === ENTRY_STATE) return false;
         const lastAt = Date.parse(notificationState?.lastNotifiedAt || '');
@@ -494,9 +514,10 @@
         const lifecycle = lifecycleFor(bridge, new Date());
         const result = bridge.monitorResult || null;
         const permission = notificationPermission();
-        const notificationStatus = permission === 'granted' && notificationsEnabled()
-            ? 'Enabled'
-            : permission === 'unsupported' ? 'Unsupported' : permission === 'denied' ? 'Denied' : 'Disabled';
+        const notificationUi = notificationUiState(permission, notificationsEnabled());
+        const notificationControl = notificationUi.actionable
+            ? `<button type="button" data-monitor-action="notify" class="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50">${notificationUi.label}</button>`
+            : `<button type="button" disabled aria-disabled="true" data-monitor-notification-status class="cursor-default rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">${notificationUi.label}</button>`;
         const pauseAction = lifecycle.status === 'PAUSED' ? 'resume' : 'pause';
         const activeControl = ['ACTIVE', 'PAUSED'].includes(lifecycle.status);
         container.innerHTML = `
@@ -510,10 +531,13 @@
                     <div><dt class="text-xs text-slate-500">Notifications</dt><dd data-monitor-field="notifications" class="mt-1 font-bold"></dd></div>
                     <div><dt class="text-xs text-slate-500">Last Notification</dt><dd data-monitor-field="last-notification" class="mt-1 font-bold"></dd></div>
                 </dl>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <button type="button" data-monitor-action="notify" class="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50">Enable Notifications</button>
-                    ${activeControl ? `<button type="button" data-monitor-action="${pauseAction}" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">${pauseAction === 'pause' ? 'Pause Monitor' : 'Resume Monitor'}</button>` : ''}
-                    ${activeControl ? '<button type="button" data-monitor-action="complete" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">End Monitor</button>' : ''}
+                <div class="mt-3">
+                    <div class="flex flex-wrap gap-2">
+                        ${notificationControl}
+                        ${activeControl ? `<button type="button" data-monitor-action="${pauseAction}" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">${pauseAction === 'pause' ? 'Pause Monitor' : 'Resume Monitor'}</button>` : ''}
+                        ${activeControl ? '<button type="button" data-monitor-action="complete" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">End Monitor</button>' : ''}
+                    </div>
+                    <p class="mt-2 text-xs text-slate-500">Notifies you when the assessment changes to ENTRY CONDITIONS MET.</p>
                 </div>
                 <p class="mt-3 text-xs text-slate-500">Monitoring requires this page to remain open. Mobile operating systems may suspend background pages.</p>
             </div>`;
@@ -522,7 +546,7 @@
             assessment: result?.assessmentState || 'Not evaluated',
             price: result?.currentPrice ?? 'Unavailable',
             evaluated: formatTime(result?.evaluatedAt),
-            notifications: notificationStatus,
+            notifications: notificationUi.status,
             'last-notification': formatTime(bridge.notificationState?.lastNotifiedAt)
         };
         Object.entries(values).forEach(([field, value]) => {
@@ -585,6 +609,7 @@
         DATA_UNAVAILABLE_SUSTAINED_MS,
         ENTRY_STATE,
         calculateExpiresAt,
+        notificationUiState,
         normalizeCompletedAssessment,
         reconcileLinkedLifecycle,
         captureCompletedAssessment,
