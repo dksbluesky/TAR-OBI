@@ -1,0 +1,48 @@
+name: Cleanup Workflow Runs
+
+on:
+  page_build:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Delete old workflow runs (keep latest 3)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keep = 3;
+
+            // Fetch all runs across all workflows and sort newest first.
+            const allRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              }
+            );
+            allRuns.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const toDelete = allRuns.slice(keep);
+            console.log(`Total runs: ${allRuns.length}, keeping ${keep}, deleting ${toDelete.length}`);
+
+            for (const run of toDelete) {
+              console.log(`Deleting ${run.name} #${run.run_number} (${run.created_at})`);
+              try {
+                await github.rest.actions.deleteWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                });
+              } catch (error) {
+                console.log(`Failed to delete run ${run.id}: ${error.message}`);
+              }
+            }
+
+            console.log('Done.');
