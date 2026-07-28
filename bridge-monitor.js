@@ -11,6 +11,12 @@
     const NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000;
     const DATA_UNAVAILABLE_SUSTAINED_MS = 5 * 60 * 1000;
     const ENTRY_STATE = 'ENTRY_CONDITIONS_MET';
+    const ENTRY_CONFIRMATION_REQUIRED = 2;
+    const ENTRY_CONFIRMATION_STATUS = Object.freeze({
+        NONE: 'NONE',
+        PENDING: 'PENDING',
+        CONFIRMED: 'CONFIRMED'
+    });
     const MARKET_CLOSE_HOUR = 13;
     const MARKET_CLOSE_MINUTE = 30;
     const ACTIVE_STATUS = 'ACTIVE';
@@ -195,13 +201,80 @@
         return { status: 'Disabled', label: 'Enable Notifications', actionable: true };
     }
 
-    function notificationAllowed(previousState, currentState, notificationState, evaluatedAt) {
-        if (currentState !== ENTRY_STATE || previousState === ENTRY_STATE) return false;
+    function notificationAllowed(previousStatus, currentStatus, notificationState, evaluatedAt) {
+        if (currentStatus !== ENTRY_CONFIRMATION_STATUS.CONFIRMED
+            || previousStatus === ENTRY_CONFIRMATION_STATUS.CONFIRMED) return false;
         const lastAt = Date.parse(notificationState?.lastNotifiedAt || '');
         const evaluatedMs = Date.parse(evaluatedAt);
         return !Number.isFinite(lastAt)
             || !Number.isFinite(evaluatedMs)
             || evaluatedMs - lastAt >= NOTIFICATION_COOLDOWN_MS;
+    }
+
+    /**
+     * Advances the notification-only entry confirmation state for one completed assessment.
+     * This helper does not alter or recalculate the raw TAR-OBI assessment.
+     * @param {object|null} previous Previously stored entry confirmation state.
+     * @param {string} assessmentState Latest normalized raw assessment state.
+     * @param {string} evaluatedAt Completed assessment timestamp.
+     * @returns {{status: string, consecutiveCount: number, confirmedAt: string|null}}
+     */
+    function advanceEntryConfirmation(previous, assessmentState, evaluatedAt) {
+        const prior = previous && typeof previous === 'object' ? previous : {};
+        if (assessmentState !== ENTRY_STATE) {
+            return {
+                ...prior,
+                status: ENTRY_CONFIRMATION_STATUS.NONE,
+                consecutiveCount: 0,
+                confirmedAt: null
+            };
+        }
+
+        const priorCount = prior.status === ENTRY_CONFIRMATION_STATUS.PENDING
+            ? Math.max(0, Math.min(ENTRY_CONFIRMATION_REQUIRED - 1, Number(prior.consecutiveCount) || 0))
+            : prior.status === ENTRY_CONFIRMATION_STATUS.CONFIRMED
+                ? ENTRY_CONFIRMATION_REQUIRED
+                : 0;
+        const consecutiveCount = Math.min(ENTRY_CONFIRMATION_REQUIRED, priorCount + 1);
+        const confirmed = consecutiveCount >= ENTRY_CONFIRMATION_REQUIRED;
+        return {
+            ...prior,
+            status: confirmed ? ENTRY_CONFIRMATION_STATUS.CONFIRMED : ENTRY_CONFIRMATION_STATUS.PENDING,
+            consecutiveCount,
+            confirmedAt: confirmed ? (prior.confirmedAt || evaluatedAt) : null
+        };
+    }
+
+    function initialEntryConfirmation(bridge) {
+        const existing = bridge?.notificationState?.entryConfirmation;
+        if (existing && typeof existing === 'object') return existing;
+        if (bridge?.monitorResult?.assessmentState !== ENTRY_STATE) {
+            return {
+                status: ENTRY_CONFIRMATION_STATUS.NONE,
+                consecutiveCount: 0,
+                confirmedAt: null
+            };
+        }
+        if (bridge?.notificationState?.lastNotifiedState === ENTRY_STATE) {
+            return {
+                status: ENTRY_CONFIRMATION_STATUS.CONFIRMED,
+                consecutiveCount: ENTRY_CONFIRMATION_REQUIRED,
+                confirmedAt: bridge.notificationState.lastNotifiedAt || bridge.monitorResult.evaluatedAt || null
+            };
+        }
+        return {
+            status: ENTRY_CONFIRMATION_STATUS.PENDING,
+            consecutiveCount: 1,
+            confirmedAt: null
+        };
+    }
+
+    function entryConfirmationLabel(confirmation) {
+        if (confirmation?.status === ENTRY_CONFIRMATION_STATUS.CONFIRMED) return 'Confirmed 2/2';
+        if (confirmation?.status === ENTRY_CONFIRMATION_STATUS.PENDING) {
+            return `Pending ${Math.max(1, Number(confirmation.consecutiveCount) || 1)}/2`;
+        }
+        return 'Not pending';
     }
 
     function showInPageAlert(result, message = 'Entry conditions are currently met.') {
@@ -303,7 +376,8 @@
             notificationState: {
                 lastNotifiedState: null,
                 lastNotifiedAt: null,
-                ...(current.notificationState || {})
+                ...(current.notificationState || {}),
+                entryConfirmation: initialEntryConfirmation(current)
             },
             extensions: { ...(current.extensions || {}) }
         };
@@ -317,7 +391,7 @@
      * The method revalidates bridge identity and lifecycle immediately before writing.
      * @param {object} snapshot Completed render snapshot from the existing refresh.
      * @param {Date|number|string} [now] Injectable clock for tests.
-     * @returns {{written: boolean, notified: boolean, reason?: string, result?: object}}
+     * @returns {{written: boolean, notified: boolean, confirmed?: boolean, reason?: string, result?: object}}
      */
     function captureCompletedAssessment(snapshot, now = new Date()) {
         const linked = bridgeApi?.getLinkedBridge?.();
@@ -376,14 +450,18 @@
             return { written: false, notified: false, reason: 'stale-assessment' };
         }
 
-        const shouldNotify = notificationAllowed(previousState, result.assessmentState, current.notificationState, result.evaluatedAt);
         const notificationState = {
             ...(current.notificationState || {}),
             lastNotifiedState: current.notificationState?.lastNotifiedState || null,
             lastNotifiedAt: current.notificationState?.lastNotifiedAt || null,
             dataUnavailableSince: current.notificationState?.dataUnavailableSince || null,
-            lastDataUnavailableNotifiedAt: current.notificationState?.lastDataUnavailableNotifiedAt || null
+            lastDataUnavailableNotifiedAt: current.notificationState?.lastDataUnavailableNotifiedAt || null,
+            entryConfirmation: initialEntryConfirmation(current)
         };
+        const previousConfirmation = notificationState.entryConfirmation;
+        const nextConfirmation = advanceEntryConfirmation(previousConfirmation, result.assessmentState, result.evaluatedAt);
+        const shouldNotify = notificationAllowed(previousConfirmation.status, nextConfirmation.status, notificationState, result.evaluatedAt);
+        notificationState.entryConfirmation = nextConfirmation;
         let sustainedUnavailable = false;
         if (result.assessmentState === 'DATA_UNAVAILABLE') {
             notificationState.dataUnavailableSince ||= result.evaluatedAt;
@@ -427,7 +505,13 @@
             );
         }
         refreshUi();
-        return { written: true, notified: shouldNotify, result };
+        return {
+            written: true,
+            notified: shouldNotify,
+            confirmed: nextConfirmation.status === ENTRY_CONFIRMATION_STATUS.CONFIRMED,
+            confirmation: nextConfirmation,
+            result
+        };
     }
 
     /**
@@ -513,6 +597,7 @@
         }
         const lifecycle = lifecycleFor(bridge, new Date());
         const result = bridge.monitorResult || null;
+        const entryConfirmation = initialEntryConfirmation(bridge);
         const permission = notificationPermission();
         const notificationUi = notificationUiState(permission, notificationsEnabled());
         const notificationControl = notificationUi.actionable
@@ -526,6 +611,7 @@
                 <dl class="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-3">
                     <div><dt class="text-xs text-slate-500">Lifecycle</dt><dd data-monitor-field="lifecycle" class="mt-1 font-bold"></dd></div>
                     <div><dt class="text-xs text-slate-500">Assessment</dt><dd data-monitor-field="assessment" class="mt-1 font-bold"></dd></div>
+                    <div><dt class="text-xs text-slate-500">Entry Confirmation</dt><dd data-monitor-field="entry-confirmation" class="mt-1 font-bold"></dd></div>
                     <div><dt class="text-xs text-slate-500">Current Price</dt><dd data-monitor-field="price" class="mt-1 font-mono font-bold"></dd></div>
                     <div><dt class="text-xs text-slate-500">Last Evaluated</dt><dd data-monitor-field="evaluated" class="mt-1 font-bold"></dd></div>
                     <div><dt class="text-xs text-slate-500">Notifications</dt><dd data-monitor-field="notifications" class="mt-1 font-bold"></dd></div>
@@ -537,13 +623,14 @@
                         ${activeControl ? `<button type="button" data-monitor-action="${pauseAction}" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">${pauseAction === 'pause' ? 'Pause Monitor' : 'Resume Monitor'}</button>` : ''}
                         ${activeControl ? '<button type="button" data-monitor-action="complete" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">End Monitor</button>' : ''}
                     </div>
-                    <p class="mt-2 text-xs text-slate-500">Notifies you when the assessment changes to ENTRY CONDITIONS MET.</p>
+                    <p class="mt-2 text-xs text-slate-500">Entry notification requires 2 consecutive completed ENTRY CONDITIONS MET assessments.</p>
                 </div>
                 <p class="mt-3 text-xs text-slate-500">Monitoring requires this page to remain open. Mobile operating systems may suspend background pages.</p>
             </div>`;
         const values = {
             lifecycle: lifecycle.status || 'ACTIVE',
             assessment: result?.assessmentState || 'Not evaluated',
+            'entry-confirmation': entryConfirmationLabel(entryConfirmation),
             price: result?.currentPrice ?? 'Unavailable',
             evaluated: formatTime(result?.evaluatedAt),
             notifications: notificationUi.status,
@@ -608,8 +695,11 @@
         NOTIFICATION_COOLDOWN_MS,
         DATA_UNAVAILABLE_SUSTAINED_MS,
         ENTRY_STATE,
+        ENTRY_CONFIRMATION_REQUIRED,
+        ENTRY_CONFIRMATION_STATUS,
         calculateExpiresAt,
         notificationUiState,
+        advanceEntryConfirmation,
         normalizeCompletedAssessment,
         reconcileLinkedLifecycle,
         captureCompletedAssessment,

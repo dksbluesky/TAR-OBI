@@ -30,6 +30,12 @@ const bridge = {
     notificationState: {
         lastNotifiedState: null,
         lastNotifiedAt: null,
+        entryConfirmation: {
+            status: 'PENDING',
+            consecutiveCount: 1,
+            confirmedAt: null,
+            futureConfirmationField: 'preserve'
+        },
         futureNotificationField: 'preserve'
     },
     extensions: { future: 'preserve' }
@@ -93,6 +99,9 @@ let updated = JSON.parse(storage.getItem(STORAGE_KEY));
 assert.equal(updated.notificationState.futureNotificationField, 'preserve');
 assert.equal(updated.notificationState.dataUnavailableSince, '2026-07-27T02:02:00.000Z');
 assert.equal(updated.notificationState.lastDataUnavailableNotifiedAt, '2026-07-27T02:07:00.000Z');
+assert.equal(updated.notificationState.entryConfirmation.status, 'NONE');
+assert.equal(updated.notificationState.entryConfirmation.consecutiveCount, 0);
+assert.equal(updated.notificationState.entryConfirmation.futureConfirmationField, 'preserve');
 assert.equal(updated.extensions.future, 'preserve');
 
 console.log('bridge monitor completed-boundary tests passed');

@@ -106,8 +106,10 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
 }
 
 {
-    const { container } = renderNotificationCase('default', false);
-    assert.match(container.innerHTML, /Notifies you when the assessment changes to ENTRY CONDITIONS MET\./);
+    const { container, fields } = renderNotificationCase('default', false);
+    assert.match(container.innerHTML, /Entry notification requires 2 consecutive completed ENTRY CONDITIONS MET assessments\./);
+    assert.match(container.innerHTML, /data-monitor-field="entry-confirmation"/);
+    assert.equal(fields.get('entry-confirmation').textContent, 'Not pending');
 }
 
 console.log('bridge monitor UI tests passed');

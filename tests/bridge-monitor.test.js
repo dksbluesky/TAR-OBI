@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const modulePath = require.resolve('../bridge-monitor.js');
 const STORAGE_KEY = 'etfDca.executionBridge.v1';
+const PREFERENCE_KEY = 'tarObi.executionBridge.notificationsEnabled.v1';
 
 function createStorage(entries = {}) {
     const values = new Map(Object.entries(entries));
@@ -65,11 +66,22 @@ function validSnapshot(overrides = {}) {
     };
 }
 
-function loadMonitor(bridge) {
-    const storage = createStorage({ [STORAGE_KEY]: JSON.stringify(bridge) });
+function loadMonitor(bridge, options = {}) {
+    const storage = createStorage({
+        [STORAGE_KEY]: JSON.stringify(bridge),
+        [PREFERENCE_KEY]: options.notificationsEnabled ? 'true' : 'false'
+    });
+    const notifications = [];
     global.localStorage = storage;
     global.addEventListener = () => {};
-    delete global.Notification;
+    if (options.notificationsEnabled) {
+        global.Notification = function Notification(title, notificationOptions) {
+            notifications.push({ title, options: notificationOptions });
+        };
+        global.Notification.permission = 'granted';
+    } else {
+        delete global.Notification;
+    }
     delete require.cache[modulePath];
     const monitor = require(modulePath);
     let linked = bridge;
@@ -84,8 +96,8 @@ function loadMonitor(bridge) {
             return linked;
         }
     };
-    monitor.mount({ bridgeApi });
-    return { monitor, storage, bridgeApi };
+    monitor.mount({ bridgeApi, alertContainer: options.alertContainer });
+    return { monitor, storage, bridgeApi, notifications };
 }
 
 function stored(storage) {
@@ -153,6 +165,51 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
 }
 
 {
+    const { monitor } = loadMonitor(validBridge());
+    let confirmation = monitor.advanceEntryConfirmation(null, 'WAIT_FOR_CONFIRMATION', '2026-07-27T02:01:00.000Z');
+    assert.deepEqual(confirmation, { status: 'NONE', consecutiveCount: 0, confirmedAt: null });
+    confirmation = monitor.advanceEntryConfirmation(confirmation, 'ENTRY_CONDITIONS_MET', '2026-07-27T02:02:00.000Z');
+    assert.deepEqual(confirmation, { status: 'PENDING', consecutiveCount: 1, confirmedAt: null });
+    confirmation = monitor.advanceEntryConfirmation(confirmation, 'ENTRY_CONDITIONS_MET', '2026-07-27T02:03:00.000Z');
+    assert.deepEqual(confirmation, {
+        status: 'CONFIRMED',
+        consecutiveCount: 2,
+        confirmedAt: '2026-07-27T02:03:00.000Z'
+    });
+    confirmation = monitor.advanceEntryConfirmation(confirmation, 'WAIT_FOR_PULLBACK', '2026-07-27T02:04:00.000Z');
+    assert.deepEqual(confirmation, { status: 'NONE', consecutiveCount: 0, confirmedAt: null });
+}
+
+{
+    const evaluatedAt = '2026-07-27T02:01:00.000Z';
+    const legacyEntryResult = {
+        assessmentState: 'ENTRY_CONDITIONS_MET',
+        evaluatedAt,
+        currentPrice: 235.5
+    };
+    const { storage } = loadMonitor(validBridge({
+        monitorResult: legacyEntryResult,
+        notificationState: {
+            lastNotifiedState: 'ENTRY_CONDITIONS_MET',
+            lastNotifiedAt: evaluatedAt
+        }
+    }));
+    assert.deepEqual(stored(storage).notificationState.entryConfirmation, {
+        status: 'CONFIRMED',
+        consecutiveCount: 2,
+        confirmedAt: evaluatedAt
+    });
+}
+
+{
+    const { storage } = loadMonitor(validBridge({
+        monitorResult: { assessmentState: 'ENTRY_CONDITIONS_MET', evaluatedAt: '2026-07-27T02:01:00.000Z' }
+    }));
+    assert.equal(stored(storage).notificationState.entryConfirmation.status, 'PENDING');
+    assert.equal(stored(storage).notificationState.entryConfirmation.consecutiveCount, 1);
+}
+
+{
     const { monitor, storage } = loadMonitor(validBridge());
     const wait = validSnapshot({ evaluatedAt: '2026-07-27T02:01:00.000Z' });
     assert.equal(monitor.captureCompletedAssessment(wait).notified, false);
@@ -160,13 +217,61 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
         evaluatedAt: time,
         assessment: { ...wait.assessment, state: 'ENTRY CONDITIONS MET', factors: ['Entry conditions met'] }
     });
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z')).notified, true);
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:03:00.000Z')).notified, false);
-    assert.equal(monitor.captureCompletedAssessment(validSnapshot({ evaluatedAt: '2026-07-27T02:04:00.000Z' })).notified, false);
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:05:00.000Z')).notified, false);
-    assert.equal(monitor.captureCompletedAssessment(validSnapshot({ evaluatedAt: '2026-07-27T02:12:01.000Z' })).notified, false);
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:12:02.000Z')).notified, true);
+    const firstEntry = monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z'));
+    assert.equal(firstEntry.notified, false);
+    assert.equal(firstEntry.confirmed, false);
+    assert.deepEqual(firstEntry.confirmation, { status: 'PENDING', consecutiveCount: 1, confirmedAt: null });
+    assert.equal(stored(storage).notificationState.lastNotifiedAt, null);
+
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z')).reason, 'stale-assessment');
+    assert.equal(stored(storage).notificationState.entryConfirmation.consecutiveCount, 1);
+    assert.equal(monitor.captureCompletedAssessment({ ...entry('2026-07-27T02:02:30.000Z'), complete: false }).reason, 'incomplete-assessment');
+    assert.equal(stored(storage).notificationState.entryConfirmation.consecutiveCount, 1);
+
+    const confirmed = monitor.captureCompletedAssessment(entry('2026-07-27T02:03:00.000Z'));
+    assert.equal(confirmed.notified, true);
+    assert.equal(confirmed.confirmed, true);
+    assert.equal(confirmed.confirmation.status, 'CONFIRMED');
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:04:00.000Z')).notified, false);
+
+    assert.equal(monitor.captureCompletedAssessment(validSnapshot({ evaluatedAt: '2026-07-27T02:05:00.000Z' })).notified, false);
+    assert.equal(stored(storage).notificationState.entryConfirmation.status, 'NONE');
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:06:00.000Z')).notified, false);
+    assert.equal(stored(storage).notificationState.entryConfirmation.status, 'PENDING');
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:07:00.000Z')).notified, false);
+    assert.equal(stored(storage).notificationState.entryConfirmation.status, 'CONFIRMED');
+
+    assert.equal(monitor.captureCompletedAssessment(validSnapshot({ evaluatedAt: '2026-07-27T02:13:01.000Z' })).notified, false);
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:13:02.000Z')).notified, false);
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:13:03.000Z')).notified, true);
     assert.equal(stored(storage).notificationState.lastNotifiedState, 'ENTRY_CONDITIONS_MET');
+}
+
+{
+    const alertFields = new Map();
+    const alertContainer = {
+        innerHTML: '',
+        classList: { add() {}, remove() {} },
+        querySelector(selector) {
+            if (!alertFields.has(selector)) alertFields.set(selector, { textContent: '', addEventListener() {} });
+            return alertFields.get(selector);
+        }
+    };
+    const { monitor, notifications } = loadMonitor(validBridge(), {
+        notificationsEnabled: true,
+        alertContainer
+    });
+    const entry = time => validSnapshot({
+        evaluatedAt: time,
+        assessment: { ...validSnapshot().assessment, state: 'ENTRY CONDITIONS MET' }
+    });
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:01:00.000Z')).notified, false);
+    assert.equal(notifications.length, 0);
+    assert.equal(alertContainer.innerHTML, '');
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z')).notified, true);
+    assert.equal(notifications.length, 1);
+    assert.match(notifications[0].title, /Entry Conditions Met/);
+    assert.match(alertContainer.innerHTML, /data-monitor-alert-title/);
 }
 
 {
