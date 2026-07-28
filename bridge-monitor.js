@@ -292,8 +292,17 @@
         return new Date(value).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
     }
 
-    function confirmedEntryPresentation(result) {
-        const ticker = bridgeApi?.getLinkedBridge?.()?.ticker || '';
+    function confirmedEntryPresentation(ticker, result) {
+        const sellerActive = result.tarState === 'Seller Active';
+        const belowVwap = result.vwapState === 'Below VWAP';
+        const caution = sellerActive && belowVwap
+            ? 'CAUTION — Seller Active / Below VWAP'
+            : sellerActive
+                ? 'CAUTION — Seller Active'
+                : belowVwap
+                    ? 'CAUTION — Below VWAP'
+                    : null;
+        const tone = sellerActive && belowVwap ? 'orange' : sellerActive || belowVwap ? 'amber' : 'green';
         const currentPrice = formatAlertPrice(result.currentPrice) || 'Unavailable';
         const preferredLow = formatAlertPrice(result.preferredEntryLow);
         const preferredHigh = formatAlertPrice(result.preferredEntryHigh);
@@ -302,11 +311,13 @@
         if (result.tarState) details.push(`TAR: ${result.tarState}`);
         if (result.obiState) details.push(`OBI: ${result.obiState}`);
         if (result.vwapState) details.push(`VWAP: ${result.vwapState}`);
-        details.push('Confirmation: 2/2 consecutive assessments');
+        details.push('Confirmation: 2/2');
         details.push(`Evaluated: ${alertTime(result.evaluatedAt)}`);
         return {
-            title: `${ticker} — ENTRY CONDITIONS CONFIRMED`,
-            message: 'Entry conditions were confirmed across 2 consecutive assessments.',
+            title: `${ticker} — ENTRY SETUP CONFIRMED`,
+            disclaimer: 'Setup confirmed, not a buy signal.',
+            caution,
+            tone,
             details
         };
     }
@@ -318,18 +329,40 @@
             message,
             details: [`Current price: ${result.currentPrice ?? 'Unavailable'} · Evaluated: ${alertTime(result.evaluatedAt)}`]
         };
+        const tones = {
+            green: {
+                wrapper: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+                details: 'text-emerald-700',
+                dismiss: 'hover:bg-emerald-100'
+            },
+            amber: {
+                wrapper: 'border-amber-300 bg-amber-50 text-amber-900',
+                details: 'text-amber-700',
+                dismiss: 'hover:bg-amber-100'
+            },
+            orange: {
+                wrapper: 'border-orange-300 bg-orange-50 text-orange-900',
+                details: 'text-orange-700',
+                dismiss: 'hover:bg-orange-100'
+            }
+        };
+        const tone = tones[content.tone] || tones.green;
         alertContainer.classList?.remove('hidden');
         alertContainer.innerHTML = `
-            <div class="flex items-start justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 shadow-sm">
+            <div class="flex items-start justify-between gap-3 rounded-xl border p-4 shadow-sm ${tone.wrapper}">
                 <div>
                     <p class="font-black" data-monitor-alert-title></p>
                     <p class="mt-1 text-sm" data-monitor-alert-message></p>
-                    <div class="mt-2 grid gap-1 text-xs text-emerald-700" data-monitor-alert-details></div>
+                    ${content.caution ? '<p class="mt-2 text-sm font-bold" data-monitor-alert-caution></p>' : ''}
+                    <div class="mt-2 grid gap-1 text-xs ${tone.details}" data-monitor-alert-details></div>
                 </div>
-                <button type="button" data-monitor-alert-dismiss class="rounded px-2 py-1 text-sm font-black hover:bg-emerald-100" aria-label="Dismiss notification">×</button>
+                <button type="button" data-monitor-alert-dismiss class="rounded px-2 py-1 text-sm font-black ${tone.dismiss}" aria-label="Dismiss notification">×</button>
             </div>`;
         alertContainer.querySelector('[data-monitor-alert-title]').textContent = content.title;
-        alertContainer.querySelector('[data-monitor-alert-message]').textContent = content.message;
+        alertContainer.querySelector('[data-monitor-alert-message]').textContent = content.disclaimer || content.message;
+        if (content.caution) {
+            alertContainer.querySelector('[data-monitor-alert-caution]').textContent = content.caution;
+        }
         const detailsContainer = alertContainer.querySelector('[data-monitor-alert-details]');
         detailsContainer.innerHTML = content.details
             .map((detail, index) => `<p data-monitor-alert-detail-line="${index}"></p>`)
@@ -352,14 +385,17 @@
         }
     }
 
-    function issueBrowserNotification(bridge, result) {
+    function issueBrowserNotification(bridge, result, presentation) {
         if (!notificationsEnabled() || notificationPermission() !== 'granted') return;
         try {
-            const preferred = result.preferredEntryLow !== null && result.preferredEntryHigh !== null
-                ? `${result.preferredEntryLow}–${result.preferredEntryHigh}`
-                : 'Unavailable';
-            new root.Notification(`${bridge.ticker} Entry Conditions Met`, {
-                body: `Entry conditions are currently met.\nCurrent Price: ${result.currentPrice ?? 'Unavailable'}\nPreferred Entry: ${preferred}\nTAR: ${result.tarState || 'Unavailable'}\nOBI: ${result.obiState || 'Unavailable'}\nVWAP: ${result.vwapState || 'Unavailable'}`,
+            const content = presentation || confirmedEntryPresentation(bridge.ticker, result);
+            const body = [
+                content.disclaimer,
+                ...(content.caution ? [content.caution] : []),
+                ...content.details.filter(detail => !detail.startsWith('Evaluated:'))
+            ].join('\n');
+            new root.Notification(`${bridge.ticker} Entry Setup Confirmed`, {
+                body,
                 tag: `tar-obi-entry-${bridge.bridgeId}`
             });
         } catch (error) {
@@ -538,8 +574,9 @@
 
         bridgeApi?.refreshLinkedBridge?.();
         if (shouldNotify) {
-            showInPageAlert(result, undefined, confirmedEntryPresentation(result));
-            issueBrowserNotification(updated, result);
+            const presentation = confirmedEntryPresentation(updated.ticker, result);
+            showInPageAlert(result, undefined, presentation);
+            issueBrowserNotification(updated, result, presentation);
         } else if (sustainedUnavailable) {
             showInPageAlert(result, 'Market data has remained unavailable for at least five minutes.');
             issueStatusNotification(
