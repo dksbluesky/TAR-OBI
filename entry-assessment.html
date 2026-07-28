@@ -311,8 +311,8 @@
         document.getElementById('refresh-button').disabled = true;
         try {
             const headers = { 'X-API-KEY': settings.apiKey };
-            const quoteRequest = fetch(`${API_BASE}/stock/intraday/quote/${settings.symbol}`, { headers });
-            const candleRequest = fetch(`${API_BASE}/stock/intraday/candles/${settings.symbol}?timeframe=5`, { headers })
+            const quoteRequest = fetch(`${API_BASE}/stock/intraday/quote/${settings.symbol}`, { headers, cache: 'no-store' });
+            const candleRequest = fetch(`${API_BASE}/stock/intraday/candles/${settings.symbol}?timeframe=5`, { headers, cache: 'no-store' })
                 .catch(error => { console.warn('[Entry Assessment] Candles unavailable', error); return null; });
             const [response, candleResponse] = await Promise.all([quoteRequest, candleRequest]);
             if (!response.ok) throw new Error(`Quote HTTP ${response.status}`);

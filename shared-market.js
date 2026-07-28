@@ -72,16 +72,16 @@
 
     function getMarketSession(quote, refreshMs, now = new Date()) {
         if (!quote) return 'unavailable';
-        if (quote.isClose) return 'closed';
-        const updatedMs = timestampToMs(quote.lastUpdated || quote.lastTrade?.time || quote.closeTime);
-        if (!updatedMs) return 'unavailable';
         const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short' }).formatToParts(now);
         const p = Object.fromEntries(parts.map(item => [item.type, item.value]));
         const today = `${p.year}-${p.month}-${p.day}`;
         const minute = Number(p.hour) * 60 + Number(p.minute);
         if (p.weekday === 'Sat' || p.weekday === 'Sun') return 'closed';
         if (minute < 540) return 'preopen';
-        if (quote.date !== today || minute >= 810) return 'closed';
+        if (minute >= 810) return 'closed';
+        const updatedMs = timestampToMs(quote.lastUpdated || quote.lastTrade?.time || quote.closeTime);
+        if (!updatedMs) return 'unavailable';
+        if (quote.date !== today || quote.isClose) return 'stale';
         return now.getTime() - updatedMs > Math.max(90000, refreshMs * 2 + 15000) ? 'stale' : 'live';
     }
 

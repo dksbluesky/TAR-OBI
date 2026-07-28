@@ -22,6 +22,37 @@ const base = {
     volumeQuality: 'Unavailable',
 };
 
+const openingNow = new Date('2026-07-28T01:01:00.000Z');
+const previousCloseQuote = {
+    date: '2026-07-27',
+    isClose: true,
+    lastUpdated: Date.parse('2026-07-27T05:30:00.000Z')
+};
+assert.equal(
+    MarketData.getMarketSession(previousCloseQuote, 30000, openingNow),
+    'stale',
+    'previous closed snapshot during Taiwan trading hours stays retryable'
+);
+assert.equal(
+    MarketData.getMarketSession({ ...previousCloseQuote, date: '2026-07-28' }, 30000, openingNow),
+    'stale',
+    'temporary isClose snapshot during Taiwan trading hours stays retryable'
+);
+assert.equal(
+    MarketData.getMarketSession({
+        date: '2026-07-28',
+        isClose: false,
+        lastUpdated: Date.parse('2026-07-28T01:00:50.000Z')
+    }, 30000, openingNow),
+    'live',
+    'fresh current-day opening quote is live'
+);
+assert.equal(
+    MarketData.getMarketSession(previousCloseQuote, 30000, new Date('2026-07-28T05:31:00.000Z')),
+    'closed',
+    'actual Taiwan post-close time remains closed'
+);
+
 function assess(overrides = {}) {
     return MarketData.calculateEntryAssessment({ ...base, ...overrides });
 }
