@@ -277,22 +277,66 @@
         return 'Not pending';
     }
 
-    function showInPageAlert(result, message = 'Entry conditions are currently met.') {
+    function formatAlertPrice(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const number = Number(value);
+        if (!Number.isFinite(number)) return null;
+        return number.toLocaleString('en-US', {
+            useGrouping: false,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 4
+        });
+    }
+
+    function alertTime(value) {
+        return new Date(value).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+    }
+
+    function confirmedEntryPresentation(result) {
+        const ticker = bridgeApi?.getLinkedBridge?.()?.ticker || '';
+        const currentPrice = formatAlertPrice(result.currentPrice) || 'Unavailable';
+        const preferredLow = formatAlertPrice(result.preferredEntryLow);
+        const preferredHigh = formatAlertPrice(result.preferredEntryHigh);
+        const details = [`Current Price: ${currentPrice}`];
+        if (preferredLow && preferredHigh) details.push(`Preferred Entry: ${preferredLow}–${preferredHigh}`);
+        if (result.tarState) details.push(`TAR: ${result.tarState}`);
+        if (result.obiState) details.push(`OBI: ${result.obiState}`);
+        if (result.vwapState) details.push(`VWAP: ${result.vwapState}`);
+        details.push('Confirmation: 2/2 consecutive assessments');
+        details.push(`Evaluated: ${alertTime(result.evaluatedAt)}`);
+        return {
+            title: `${ticker} — ENTRY CONDITIONS CONFIRMED`,
+            message: 'Entry conditions were confirmed across 2 consecutive assessments.',
+            details
+        };
+    }
+
+    function showInPageAlert(result, message = 'Entry conditions are currently met.', presentation = null) {
         if (!alertContainer) return;
-        const time = new Date(result.evaluatedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+        const content = presentation || {
+            title: `${bridgeApi?.getLinkedBridge?.()?.ticker || ''} — ${result.assessmentState}`,
+            message,
+            details: [`Current price: ${result.currentPrice ?? 'Unavailable'} · Evaluated: ${alertTime(result.evaluatedAt)}`]
+        };
         alertContainer.classList?.remove('hidden');
         alertContainer.innerHTML = `
             <div class="flex items-start justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 shadow-sm">
                 <div>
                     <p class="font-black" data-monitor-alert-title></p>
                     <p class="mt-1 text-sm" data-monitor-alert-message></p>
-                    <p class="mt-1 text-xs text-emerald-700" data-monitor-alert-detail></p>
+                    <div class="mt-2 grid gap-1 text-xs text-emerald-700" data-monitor-alert-details></div>
                 </div>
                 <button type="button" data-monitor-alert-dismiss class="rounded px-2 py-1 text-sm font-black hover:bg-emerald-100" aria-label="Dismiss notification">×</button>
             </div>`;
-        alertContainer.querySelector('[data-monitor-alert-title]').textContent = `${bridgeApi?.getLinkedBridge?.()?.ticker || ''} — ${result.assessmentState}`;
-        alertContainer.querySelector('[data-monitor-alert-message]').textContent = message;
-        alertContainer.querySelector('[data-monitor-alert-detail]').textContent = `Current price: ${result.currentPrice ?? 'Unavailable'} · Evaluated: ${time}`;
+        alertContainer.querySelector('[data-monitor-alert-title]').textContent = content.title;
+        alertContainer.querySelector('[data-monitor-alert-message]').textContent = content.message;
+        const detailsContainer = alertContainer.querySelector('[data-monitor-alert-details]');
+        detailsContainer.innerHTML = content.details
+            .map((detail, index) => `<p data-monitor-alert-detail-line="${index}"></p>`)
+            .join('');
+        content.details.forEach((detail, index) => {
+            detailsContainer.querySelector(`[data-monitor-alert-detail-line="${index}"]`).textContent = detail;
+        });
         alertContainer.querySelector('[data-monitor-alert-dismiss]')?.addEventListener('click', () => {
             alertContainer.innerHTML = '';
             alertContainer.classList?.add('hidden');
@@ -494,7 +538,7 @@
 
         bridgeApi?.refreshLinkedBridge?.();
         if (shouldNotify) {
-            showInPageAlert(result);
+            showInPageAlert(result, undefined, confirmedEntryPresentation(result));
             issueBrowserNotification(updated, result);
         } else if (sustainedUnavailable) {
             showInPageAlert(result, 'Market data has remained unavailable for at least five minutes.');

@@ -249,12 +249,23 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
 
 {
     const alertFields = new Map();
+    const fieldFor = selector => {
+        if (!alertFields.has(selector)) {
+            alertFields.set(selector, { textContent: '', innerHTML: '', addEventListener() {} });
+        }
+        return alertFields.get(selector);
+    };
+    const detailsContainer = {
+        innerHTML: '',
+        querySelector(selector) {
+            return fieldFor(selector);
+        }
+    };
     const alertContainer = {
         innerHTML: '',
         classList: { add() {}, remove() {} },
         querySelector(selector) {
-            if (!alertFields.has(selector)) alertFields.set(selector, { textContent: '', addEventListener() {} });
-            return alertFields.get(selector);
+            return selector === '[data-monitor-alert-details]' ? detailsContainer : fieldFor(selector);
         }
     };
     const { monitor, notifications } = loadMonitor(validBridge(), {
@@ -271,7 +282,24 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
     assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z')).notified, true);
     assert.equal(notifications.length, 1);
     assert.match(notifications[0].title, /Entry Conditions Met/);
-    assert.match(alertContainer.innerHTML, /data-monitor-alert-title/);
+    assert.equal(alertFields.get('[data-monitor-alert-title]').textContent, '006208 — ENTRY CONDITIONS CONFIRMED');
+    assert.equal(
+        alertFields.get('[data-monitor-alert-message]').textContent,
+        'Entry conditions were confirmed across 2 consecutive assessments.'
+    );
+    const detailLines = [...alertFields.entries()]
+        .filter(([selector]) => selector.startsWith('[data-monitor-alert-detail-line='))
+        .map(([, field]) => field.textContent);
+    assert.deepEqual(detailLines.slice(0, 6), [
+        'Current Price: 235.50',
+        'Preferred Entry: 235.25–235.60',
+        'TAR: Buyer Active',
+        'OBI: Bid Dominant',
+        'VWAP: Near VWAP',
+        'Confirmation: 2/2 consecutive assessments'
+    ]);
+    assert.match(detailLines[6], /^Evaluated: /);
+    assert.doesNotMatch(alertFields.get('[data-monitor-alert-title]').textContent, /ENTRY_CONDITIONS_MET/);
 }
 
 {
