@@ -479,7 +479,11 @@
         const raw = storageGet(STORAGE_KEY);
         const current = parseBridge(raw);
         if (!current) return { written: false, notified: false, reason: 'invalid-bridge' };
-        if (current.bridgeId !== linked.bridgeId) return { written: false, notified: false, reason: 'bridge-replaced' };
+        if (current.bridgeId !== linked.bridgeId) {
+            bridgeApi?.refreshLinkedBridge?.();
+            refreshUi();
+            return { written: false, notified: false, reason: 'bridge-replaced' };
+        }
         if (String(current.ticker).toUpperCase() !== String(snapshot?.ticker || '').toUpperCase()) {
             return { written: false, notified: false, reason: 'ticker-mismatch' };
         }

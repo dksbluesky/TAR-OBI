@@ -96,7 +96,11 @@ function loadMonitor(bridge, options = {}) {
             return linked;
         }
     };
-    monitor.mount({ bridgeApi, alertContainer: options.alertContainer });
+    monitor.mount({
+        bridgeApi,
+        alertContainer: options.alertContainer,
+        onUiRefresh: options.onUiRefresh
+    });
     return { monitor, storage, bridgeApi, notifications };
 }
 
@@ -120,10 +124,19 @@ function stored(storage) {
 }
 
 {
-    const { monitor, storage } = loadMonitor(validBridge());
-    storage.setItem(STORAGE_KEY, JSON.stringify(validBridge({ bridgeId: 'bridge-new' })));
+    let uiRefreshes = 0;
+    const { monitor, storage, bridgeApi } = loadMonitor(validBridge(), {
+        onUiRefresh() { uiRefreshes += 1; }
+    });
+    storage.setItem(STORAGE_KEY, JSON.stringify(validBridge({
+        bridgeId: 'bridge-new',
+        C1: { met: true, provisional: true }
+    })));
     assert.equal(monitor.captureCompletedAssessment(validSnapshot()).reason, 'bridge-replaced');
     assert.equal(stored(storage).bridgeId, 'bridge-new');
+    assert.equal(stored(storage).C1.met, true, 'replacement bridge context remains untouched');
+    assert.equal(bridgeApi.getLinkedBridge(), null, 'old TAR tab detaches from the replaced bridge');
+    assert.equal(uiRefreshes, 1, 'old TAR tab refreshes away its stale Execution Context');
 }
 
 {
