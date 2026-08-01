@@ -92,7 +92,7 @@
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Invalidation Level / 條件失效價</dt><dd id="invalidation-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Price / 現價</dt><dd id="current-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                 </dl>
-                <p class="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET means configured intraday criteria are currently satisfied. It does not guarantee future performance.</p>
+                <p class="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET remains the confirmed/right-side state. Left-side starter states describe execution quality for a small ETF_DCA starter allocation and do not trigger confirmed-entry notification logic.</p>
             </article>
 
             <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -183,6 +183,9 @@
 
     function render() {
         const settings = querySettings();
+        const linkedBridge = window.TarObiBridge?.refreshLinkedBridge?.()
+            || window.TarObiBridge?.getLinkedBridge?.()
+            || null;
         const tick = MarketData.inferTickSize(quoteData);
         const price = currentPrice();
         const bid = firstLevel('bids');
@@ -198,6 +201,15 @@
             entryBasis: document.getElementById('entry-basis').value,
             invalidationBasis: document.getElementById('invalidation-basis').value,
             volumeQuality: volumeQuality.quality,
+            executionContext: linkedBridge ? {
+                entryMode: linkedBridge.entryMode || 'confirmed',
+                starterEligible: linkedBridge.starterEligible === true,
+                starterAllocationPct: linkedBridge.starterAllocationPct ?? null,
+                starterExecuted: linkedBridge.starterExecuted === true,
+                starterRisk: linkedBridge.starterRisk || null,
+                activeZone: linkedBridge.activeZone || null,
+                invalidationLevel: linkedBridge.invalidationLevel ?? null
+            } : null,
         });
         const [marketText, marketClass] = sessionInfo(session);
         const badge = document.getElementById('market-badge');
@@ -209,17 +221,21 @@
 
         const stateMap = {
             'ENTRY CONDITIONS MET': ['進場條件成立', 'text-emerald-700'],
+            'LEFT-SIDE STARTER ELIGIBLE': ['左側第一筆可評估', 'text-amber-700'],
+            'LEFT-SIDE EXECUTION ACCEPTABLE': ['左側第一筆執行條件可接受', 'text-emerald-700'],
+            'HIGH-RISK LEFT-SIDE ENTRY': ['左側進場風險偏高', 'text-red-700'],
             'WAIT FOR PULLBACK': ['等待回落', 'text-amber-700'],
             'WAIT FOR CONFIRMATION': ['等待確認', 'text-blue-700'],
             'DO NOT ENTER': ['暫不進場', 'text-red-700'],
             'DATA UNAVAILABLE': ['資料不足', 'text-slate-700'],
         };
         let displayState = assessment.state;
-        let displayZh = stateMap[displayState][0];
+        const statePresentation = stateMap[displayState] || stateMap['DATA UNAVAILABLE'];
+        let displayZh = statePresentation[0];
         if (session === 'preopen') { displayState = 'WAIT FOR MARKET OPEN'; displayZh = '等待開盤'; }
         const stateEl = document.getElementById('assessment-state');
         stateEl.textContent = displayState;
-        stateEl.className = `mt-3 text-2xl font-black ${stateMap[assessment.state][1]}`;
+        stateEl.className = `mt-3 text-2xl font-black ${statePresentation[1]}`;
         document.getElementById('assessment-zh').textContent = displayZh;
         document.getElementById('confidence').textContent = `Confidence: ${assessment.confidence}`;
         document.getElementById('closed-note').classList.toggle('hidden', session !== 'closed');
@@ -250,14 +266,20 @@
         const pullbackSection = document.getElementById('pullback-section');
         const pullbackRequired = document.getElementById('pullback-required');
         const showPullback = assessment.state === 'WAIT FOR PULLBACK' && Number.isFinite(entryDistance);
-        const noPullback = assessment.state === 'ENTRY CONDITIONS MET';
+        const noPullback = [
+            'ENTRY CONDITIONS MET',
+            'LEFT-SIDE STARTER ELIGIBLE',
+            'LEFT-SIDE EXECUTION ACCEPTABLE'
+        ].includes(assessment.state);
         pullbackSection.classList.toggle('hidden', !showPullback && !noPullback);
         if (showPullback) {
             const pullbackAmount = Math.abs(entryDistance);
             const pullbackPct = Number.isFinite(price) && price > 0 ? pullbackAmount / price * 100 : null;
             pullbackRequired.textContent = `${formatPrice(pullbackAmount, tick)}${Number.isFinite(pullbackPct) ? ` (+${pullbackPct.toFixed(2)}%)` : ''}`;
         } else if (noPullback) {
-            pullbackRequired.textContent = 'No pullback required';
+            pullbackRequired.textContent = assessment.state === 'ENTRY CONDITIONS MET'
+                ? 'No pullback required'
+                : 'Starter mode — no additional pullback requirement from this screen';
         } else {
             pullbackRequired.textContent = '';
         }
@@ -292,6 +314,11 @@
             evaluatedAt: timestamp ? new Date(timestamp).toISOString() : null,
             currentPrice: price,
             assessment,
+            entryMode: linkedBridge?.entryMode || 'confirmed',
+            starterEligible: linkedBridge?.starterEligible === true,
+            starterAllocationPct: linkedBridge?.starterAllocationPct ?? null,
+            starterExecuted: linkedBridge?.starterExecuted === true,
+            starterRisk: linkedBridge?.starterRisk || null,
             tarState: tar,
             obiState: obi,
             vwapState: vwapPosition,
