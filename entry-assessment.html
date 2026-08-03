@@ -142,17 +142,60 @@
     let refreshTimer = null;
     let acceptedTimestamp = null;
 
-    function querySettings() {
-        const params = new URLSearchParams(location.search);
-        const storedSymbol = (localStorage.getItem('fugle_symbol') || '2330').trim().toUpperCase();
-        const requestedSymbol = (params.get('symbol') || '').trim().toUpperCase();
-        if (requestedSymbol) window.TarObiBridge?.handleSymbolInput(requestedSymbol);
-        const linkedSymbol = window.TarObiBridge?.getLinkedBridge()?.ticker || '';
-        const symbol = (linkedSymbol || requestedSymbol || storedSymbol).trim().toUpperCase();
-        const source = (params.get('source') || 'fugle').toLowerCase();
-        const interval = Number(params.get('interval')) || Number(localStorage.getItem('fugle_interval')) || 30;
-        return { apiKey: localStorage.getItem('fugle_api_key') || '', symbol, source, interval: [10, 30, 60].includes(interval) ? interval : 30 };
-    }
+   function querySettings() {
+    const params = new URLSearchParams(location.search);
+
+    const storedSymbol = (
+        localStorage.getItem('fugle_symbol')
+        || '2330'
+    ).trim().toUpperCase();
+
+    const requestedSymbol = (
+        params.get('symbol')
+        || ''
+    ).trim().toUpperCase();
+
+    const linkedSymbol = (
+        window.TarObiBridge
+            ?.getLinkedBridge
+            ?.()
+            ?.ticker
+        || ''
+    ).trim().toUpperCase();
+
+    const symbol = (
+        linkedSymbol
+        || requestedSymbol
+        || storedSymbol
+    ).trim().toUpperCase();
+
+    const source = (
+        params.get('source')
+        || 'fugle'
+    ).toLowerCase();
+
+    const interval =
+        Number(params.get('interval'))
+        || Number(
+            localStorage.getItem('fugle_interval')
+        )
+        || 30;
+
+    return {
+        apiKey:
+            localStorage.getItem('fugle_api_key')
+            || '',
+
+        symbol,
+
+        source,
+
+        interval:
+            [10, 30, 60].includes(interval)
+                ? interval
+                : 30
+    };
+}
 
     function firstLevel(side) {
         const level = quoteData?.[side]?.[0];
@@ -202,7 +245,7 @@
             invalidationBasis: document.getElementById('invalidation-basis').value,
             volumeQuality: volumeQuality.quality,
             executionContext: linkedBridge ? {
-                entryMode: linkedBridge.entryMode || 'confirmed',
+                entryMode: linkedBridge.entryMode || 'pending',
                 starterEligible: linkedBridge.starterEligible === true,
                 starterAllocationPct: linkedBridge.starterAllocationPct ?? null,
                 starterExecuted: linkedBridge.starterExecuted === true,
@@ -314,7 +357,7 @@
             evaluatedAt: timestamp ? new Date(timestamp).toISOString() : null,
             currentPrice: price,
             assessment,
-            entryMode: linkedBridge?.entryMode || 'confirmed',
+            entryMode: linkedBridge?.entryMode || 'pending',
             starterEligible: linkedBridge?.starterEligible === true,
             starterAllocationPct: linkedBridge?.starterAllocationPct ?? null,
             starterExecuted: linkedBridge?.starterExecuted === true,
