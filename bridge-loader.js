@@ -401,22 +401,26 @@
      * @returns {object|null} Refreshed linked bridge, or null after replacement/removal.
      */
     function refreshLinkedBridge() {
-        if (!initialized || !linkedBridge) {
-            return linkedBridge;
-        }
+    initialize();
 
-        const bridgeId = linkedBridge.bridgeId;
-        const refreshed = readBridge();
+    const refreshed = readBridge();
 
-        linkedBridge = refreshed
-            && refreshed.bridgeId === bridgeId
-            && storageGet(DISMISSED_KEY) !== bridgeId
-            ? refreshed
-            : null;
-
-        return linkedBridge;
+    if (!refreshed) {
+        linkedBridge = null;
+        return null;
     }
 
+    if (
+        storageGet(DISMISSED_KEY)
+        === refreshed.bridgeId
+    ) {
+        linkedBridge = null;
+        return null;
+    }
+
+    linkedBridge = refreshed;
+    return linkedBridge;
+}
     /**
      * Returns the current TAR-OBI operating mode.
      * @returns {'linked'|'standalone'} Current operating mode.
