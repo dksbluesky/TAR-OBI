@@ -276,9 +276,12 @@
                 assessment.invalidation
             ),
 
-            entryMode: snapshot.entryMode === 'left_side_starter'
-                ? 'left_side_starter'
-                : 'confirmed',
+            entryMode:
+               snapshot.entryMode === 'left_side_starter'
+                       ? 'left_side_starter'
+                        : snapshot.entryMode === 'confirmed'
+                              ? 'confirmed'
+                              : 'pending',
 
             starterEligible:
                 snapshot.starterEligible === true,
@@ -1751,13 +1754,17 @@
             );
     }
 
-    function entryModeLabel(mode) {
-        return mode
-            === 'left_side_starter'
-            ? 'Left-Side Starter'
-            : 'Confirmed / Right-Side';
-    }
+   function entryModeLabel(mode) {
+          if (mode === 'left_side_starter') {
+             return 'Left-Side Starter';
+           }
 
+         if (mode === 'confirmed') {
+           return 'Confirmed / Right-Side';
+          }
+ 	
+          return 'Pending / Intraday Monitoring';
+  }
     function starterStatusLabel(
         bridge,
         result
@@ -2083,10 +2090,10 @@
 
             'entry-mode':
                 entryModeLabel(
-                    result?.entryMode
-                    || bridge.entryMode
-                ),
-
+                      bridge.entryMode
+                      || result?.entryMode
+                      || 'pending'
+                 ),
             'starter-status':
                 starterStatusLabel(
                     bridge,
@@ -2135,11 +2142,12 @@
                 }
             );
 
-        const starterMode =
-            (
-                result?.entryMode
-                || bridge.entryMode
-            ) === 'left_side_starter';
+       const starterMode =
+              (
+                    bridge.entryMode
+                    || result?.entryMode
+                    || 'pending'
+               ) === 'left_side_starter';;
 
         container
             .querySelectorAll(
