@@ -2147,7 +2147,7 @@
                     bridge.entryMode
                     || result?.entryMode
                     || 'pending'
-               ) === 'left_side_starter';;
+               ) === 'left_side_starter';
 
         container
             .querySelectorAll(
