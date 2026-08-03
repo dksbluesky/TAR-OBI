@@ -67,6 +67,9 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
             }
             if (!this.innerHTML.includes(selector.slice(1, -1))) return null;
             return { addEventListener() {} };
+        },
+        querySelectorAll() {
+            return [];
         }
     };
     monitor.renderControls(container);
@@ -80,27 +83,27 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
         label: 'Enable Notifications',
         actionable: true
     });
-    assert.match(container.innerHTML, /data-monitor-action="notify"[^>]*>Enable Notifications<\/button>/);
+    assert.match(container.innerHTML, /data-monitor-action="notify"[\s\S]*?>\s*Enable Notifications\s*<\/button>/);
     assert.equal(fields.get('notifications').textContent, 'Disabled');
 }
 
 {
     const { container, fields } = renderNotificationCase('granted', true);
-    assert.match(container.innerHTML, /disabled[^>]*>Notifications Enabled ✓<\/button>/);
+    assert.match(container.innerHTML, /disabled[\s\S]*?>\s*Notifications Enabled ✓\s*<\/button>/);
     assert.doesNotMatch(container.innerHTML, /data-monitor-action="notify"/);
     assert.equal(fields.get('notifications').textContent, 'Enabled');
 }
 
 {
     const { container, fields } = renderNotificationCase('denied', false);
-    assert.match(container.innerHTML, /disabled[^>]*>Notifications Denied<\/button>/);
+    assert.match(container.innerHTML, /disabled[\s\S]*?>\s*Notifications Denied\s*<\/button>/);
     assert.doesNotMatch(container.innerHTML, /data-monitor-action="notify"/);
     assert.equal(fields.get('notifications').textContent, 'Denied');
 }
 
 {
     const { container, fields } = renderNotificationCase('default', false, false);
-    assert.match(container.innerHTML, /disabled[^>]*>Notifications Unsupported<\/button>/);
+    assert.match(container.innerHTML, /disabled[\s\S]*?>\s*Notifications Unsupported\s*<\/button>/);
     assert.doesNotMatch(container.innerHTML, /data-monitor-action="notify"/);
     assert.equal(fields.get('notifications').textContent, 'Unsupported');
 }

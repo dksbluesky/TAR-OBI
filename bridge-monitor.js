@@ -1762,7 +1762,7 @@
          if (mode === 'confirmed') {
            return 'Confirmed / Right-Side';
           }
- 	
+
           return 'Pending / Intraday Monitoring';
   }
     function starterStatusLabel(

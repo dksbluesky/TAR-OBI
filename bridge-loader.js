@@ -56,6 +56,7 @@
         return value === undefined
             || value === null
             || value === 'confirmed'
+            || value === 'pending'
             || value === 'left_side_starter';
     }
 
@@ -135,9 +136,15 @@
     }
 
     function displayEntryMode(entryMode) {
-        return entryMode === 'left_side_starter'
-            ? 'Left-Side Starter / 左側第一筆'
-            : 'Confirmed / Right-Side / 右側確認';
+        if (entryMode === 'left_side_starter') {
+            return 'Left-Side Starter / 左側第一筆';
+        }
+
+        if (entryMode === 'confirmed') {
+            return 'Confirmed / Right-Side / 右側確認';
+        }
+
+        return 'Pending / Intraday Monitoring / 盤中監控';
     }
 
     function displayStarterStatus(bridge) {
@@ -401,26 +408,19 @@
      * @returns {object|null} Refreshed linked bridge, or null after replacement/removal.
      */
     function refreshLinkedBridge() {
-    initialize();
+        if (!initialized || !linkedBridge) return linkedBridge;
 
-    const refreshed = readBridge();
+        const bridgeId = linkedBridge.bridgeId;
+        const refreshed = readBridge();
 
-    if (!refreshed) {
-        linkedBridge = null;
-        return null;
+        linkedBridge = refreshed
+            && refreshed.bridgeId === bridgeId
+            && storageGet(DISMISSED_KEY) !== bridgeId
+            ? refreshed
+            : null;
+
+        return linkedBridge;
     }
-
-    if (
-        storageGet(DISMISSED_KEY)
-        === refreshed.bridgeId
-    ) {
-        linkedBridge = null;
-        return null;
-    }
-
-    linkedBridge = refreshed;
-    return linkedBridge;
-}
     /**
      * Returns the current TAR-OBI operating mode.
      * @returns {'linked'|'standalone'} Current operating mode.

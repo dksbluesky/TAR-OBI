@@ -34,6 +34,7 @@ function validBridge(overrides = {}) {
         preferredEntry: null,
         maximumEntryPrice: null,
         invalidationLevel: 232.5,
+        entryMode: 'pending',
         h1H2Status: { type: 'H2' },
         C1: { met: true },
         C2: { met: true },
@@ -55,6 +56,10 @@ assert.equal(consumer.validateBridge(validBridge()), true);
 assert.equal(consumer.validateBridge(validBridge({ version: '2.0' })), false);
 assert.equal(consumer.validateBridge(validBridge({ ticker: '' })), false);
 assert.equal(consumer.validateBridge(validBridge({ activeZone: { low: 240, high: 230 } })), false);
+assert.equal(consumer.validateBridge(validBridge({ entryMode: 'pending' })), true);
+assert.equal(consumer.validateBridge(validBridge({ entryMode: 'confirmed' })), true);
+assert.equal(consumer.validateBridge(validBridge({ entryMode: 'left_side_starter' })), true);
+assert.equal(consumer.validateBridge(validBridge({ entryMode: 'unsupported' })), false);
 assert.equal(consumer.initialize().mode, 'linked');
 
 const tickerInput = { value: '2330' };
@@ -103,13 +108,13 @@ let disconnected = false;
 consumer.renderContextPanel(panel, { onDisconnect() { disconnected = true; } });
 assert.doesNotMatch(panel.innerHTML, /<input|<select|contenteditable/i);
 assert.doesNotMatch(panel.innerHTML, /href="https:\/\/dksbluesky\.github\.io\/ETF_DCA-plan\/"/);
-assert.match(panel.innerHTML, /data-bridge-back[^>]*>Back to ETF_DCA-plan<\/button>/);
+assert.match(panel.innerHTML, /data-bridge-back[\s\S]*?>\s*Back to ETF_DCA-plan\s*<\/button>/);
 assert.match(panel.innerHTML, /lg:grid-cols-\[minmax\(0,35fr\)_minmax\(0,65fr\)\]/);
 assert.match(panel.innerHTML, /data-bridge-section="metadata"/);
 assert.match(panel.innerHTML, /data-bridge-section="setup-signals"/);
 assert.match(panel.innerHTML, /data-bridge-signal-summary/);
 [
-    'ticker', 'source', 'timeframe', 'zone-mode', 'active-zone',
+    'ticker', 'source', 'timeframe', 'zone-mode', 'entry-mode', 'active-zone',
     'setup', 'h-signal', 'c1', 'c2', 'c3', 'c4'
 ].forEach(field => {
     assert.match(panel.innerHTML, new RegExp(`data-bridge-field="${field}"`));
@@ -117,6 +122,7 @@ assert.match(panel.innerHTML, /data-bridge-signal-summary/);
 assert.doesNotMatch(panel.innerHTML, /data-bridge-(?:section|signal-summary)[^>]*\bhidden\b/);
 assert.equal(fields.get('ticker').textContent, '006208');
 assert.equal(fields.get('timeframe').textContent, '60m');
+assert.equal(fields.get('entry-mode').textContent, 'Pending / Intraday Monitoring / 盤中監控');
 assert.equal(fields.get('active-zone').textContent, '235.25 ~ 235.6');
 assert.equal(fields.get('h-signal').textContent, 'H2');
 assert.equal(fields.get('c1').textContent, '✓');

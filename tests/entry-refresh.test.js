@@ -21,5 +21,10 @@ assert.match(
     /getMarketSession\(quoteData,\s*settings\.interval\s*\*\s*1000\)\s*===\s*'closed'/,
     'refresh timer stops only after market-session classification reports closed'
 );
+assert.match(
+    html,
+    /const completedSnapshot = render\(\);\s*if \(completedRefresh\) window\.TarObiBridgeMonitor\?\.captureCompletedAssessment\(completedSnapshot\)/,
+    'a completed fetch renders first and then writes the completed assessment through the bridge monitor'
+);
 
 console.log('entry refresh tests passed');

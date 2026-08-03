@@ -25,6 +25,7 @@ function bridge(overrides = {}) {
         preferredEntry: null,
         maximumEntryPrice: null,
         invalidationLevel: null,
+        entryMode: 'pending',
         lifecycle: {
             status: 'ACTIVE',
             updatedAt: '2026-07-27T02:00:00.000Z',
@@ -48,13 +49,23 @@ const loader = require(modulePath);
 
 assert.equal(loader.validateBridge(bridge()), true);
 assert.equal(loader.initialize().mode, 'linked');
+assert.equal(loader.getLinkedBridge().entryMode, 'pending');
 
 storage.setItem(STORAGE_KEY, JSON.stringify(bridge({
+    entryMode: 'confirmed',
     lifecycle: { ...bridge().lifecycle, status: 'PAUSED' },
     monitorResult: { assessmentState: 'WAIT_FOR_PULLBACK', evaluatedAt: '2026-07-27T02:02:00.000Z' }
 })));
 assert.equal(loader.refreshLinkedBridge().lifecycle.status, 'PAUSED');
+assert.equal(loader.getLinkedBridge().entryMode, 'confirmed');
 assert.equal(loader.getLinkedBridge().monitorResult.assessmentState, 'WAIT_FOR_PULLBACK');
+
+storage.setItem(STORAGE_KEY, JSON.stringify(bridge({
+    entryMode: 'left_side_starter',
+    lifecycle: { ...bridge().lifecycle, status: 'COMPLETED' }
+})));
+assert.equal(loader.refreshLinkedBridge().lifecycle.status, 'COMPLETED');
+assert.equal(loader.getLinkedBridge().entryMode, 'left_side_starter');
 
 storage.setItem(STORAGE_KEY, JSON.stringify(bridge({ bridgeId: 'phase3-replacement' })));
 assert.equal(loader.refreshLinkedBridge(), null);
