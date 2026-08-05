@@ -23,8 +23,8 @@ assert.match(
 );
 assert.match(
     html,
-    /const completedSnapshot = render\(\);\s*if \(completedRefresh\) window\.TarObiBridgeMonitor\?\.captureCompletedAssessment\(completedSnapshot\)/,
-    'a completed fetch renders first and then writes the completed assessment through the bridge monitor'
+    /const completedSnapshot = render\(\);\s*if \(completedRefresh\) \{\s*const linked = window\.TarObiBridge\?\.getLinkedBridge\?\.\(\);\s*window\.TarObiAssessmentJournal\?\.recordCompletedAssessment\(completedSnapshot, linked\);\s*window\.TarObiBridgeMonitor\?\.captureCompletedAssessment\(completedSnapshot\);\s*\}/,
+    'a completed fetch renders first, journals the raw linked snapshot, and then writes it through the bridge monitor'
 );
 
 console.log('entry refresh tests passed');

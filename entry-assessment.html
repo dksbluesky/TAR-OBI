@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./shared-market.js"></script>
     <script src="./bridge-loader.js"></script>
+    <script src="./assessment-journal.js"></script>
     <script src="./bridge-monitor.js"></script>
     <style>body{font-family:Inter,sans-serif}.value-change{transition:color .15s ease}</style>
 </head>
@@ -356,6 +357,10 @@
             ticker: settings.symbol,
             evaluatedAt: timestamp ? new Date(timestamp).toISOString() : null,
             currentPrice: price,
+            preferredEntry: { low: assessment.lower, high: assessment.upper },
+            maximumEntryPrice: assessment.maximum,
+            invalidationLevel: assessment.invalidation,
+            marketSession: session,
             assessment,
             entryMode: linkedBridge?.entryMode || 'pending',
             starterEligible: linkedBridge?.starterEligible === true,
@@ -406,7 +411,11 @@
             fetching = false;
             document.getElementById('refresh-button').disabled = false;
             const completedSnapshot = render();
-            if (completedRefresh) window.TarObiBridgeMonitor?.captureCompletedAssessment(completedSnapshot);
+            if (completedRefresh) {
+                const linked = window.TarObiBridge?.getLinkedBridge?.();
+                window.TarObiAssessmentJournal?.recordCompletedAssessment(completedSnapshot, linked);
+                window.TarObiBridgeMonitor?.captureCompletedAssessment(completedSnapshot);
+            }
             if (MarketData.getMarketSession(quoteData, settings.interval * 1000) === 'closed') {
                 clearInterval(refreshTimer); refreshTimer = null;
             }
@@ -433,6 +442,12 @@
             window.TarObiBridge?.renderContextPanel(executionContext, {
                 renderMonitor(container) {
                     window.TarObiBridgeMonitor?.renderControls(container);
+                    const linked = window.TarObiBridge?.getLinkedBridge?.();
+                    if (linked) {
+                        const journal = document.createElement('div');
+                        container.appendChild(journal);
+                        window.TarObiAssessmentJournal?.renderPanel(journal, linked);
+                    }
                 },
                 onDisconnect() {
                     quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
