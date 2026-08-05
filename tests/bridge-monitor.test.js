@@ -284,9 +284,9 @@ function createAlertContainer() {
     return { alertContainer, alertFields };
 }
 
-function captureConfirmedAlert(tarState, vwapState) {
+function captureConfirmedAlert(tarState, vwapState, options = {}) {
     const { alertContainer, alertFields } = createAlertContainer();
-    const { monitor, notifications } = loadMonitor(validBridge(), {
+    const { monitor, notifications } = loadMonitor(validBridge(options.bridge), {
         notificationsEnabled: true,
         alertContainer
     });
@@ -294,6 +294,7 @@ function captureConfirmedAlert(tarState, vwapState) {
         evaluatedAt: time,
         assessment: { ...validSnapshot().assessment, state: 'ENTRY CONDITIONS MET' },
         tarState,
+        obiState: options.obiState || 'Bid Dominant',
         vwapState
     });
     assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:01:00.000Z')).notified, false);
@@ -319,11 +320,11 @@ for (const testCase of confirmedAlertCases) {
     assert.equal(alertFields.get('[data-monitor-alert-title]').textContent, '006208 — ENTRY SETUP CONFIRMED');
     assert.equal(
         alertFields.get('[data-monitor-alert-message]').textContent,
-        'Setup confirmed, not a buy signal.'
+        'Setup confirmed twice; not a buy signal or order instruction.'
     );
     assert.doesNotMatch(alertFields.get('[data-monitor-alert-title]').textContent, /ENTRY CONDITIONS CONFIRMED|ENTRY_CONDITIONS_MET/);
     assert.match(alertContainer.innerHTML, new RegExp(`border-${testCase.tone}-300`));
-    assert.match(notification.options.body, /^Setup confirmed, not a buy signal\./);
+    assert.match(notification.options.body, /^Setup confirmed twice; not a buy signal or order instruction\./);
     if (testCase.caution) {
         assert.equal(alertFields.get('[data-monitor-alert-caution]').textContent, testCase.caution);
         assert.match(notification.options.body, new RegExp(`\\n${testCase.caution.replace('/', '\\/')}\\n`));
@@ -334,17 +335,43 @@ for (const testCase of confirmedAlertCases) {
     const detailLines = [...alertFields.entries()]
         .filter(([selector]) => selector.startsWith('[data-monitor-alert-detail-line='))
         .map(([, field]) => field.textContent);
-    assert.deepEqual(detailLines.slice(0, 6), [
+    assert.deepEqual(detailLines.slice(0, 9), [
         'Current Price: 235.50',
         'Preferred Entry: 235.25–235.60',
+        'Preferred Entry Check: PASS — Current Price is inside range',
+        'ETF_DCA Active Zone: PASS — Current Price is inside 235.25–235.60',
         `TAR: ${testCase.tar}`,
         'OBI: Bid Dominant',
+        testCase.tar === 'Seller Active'
+            ? 'Market Evidence: MIXED — Seller Active TAR / Bid Dominant OBI'
+            : 'Market Evidence: ALIGNED OR NEUTRAL',
         `VWAP: ${testCase.vwap}`,
         'Confirmation: 2/2'
     ]);
-    assert.match(detailLines[6], /^Evaluated: /);
-    for (const expected of detailLines.slice(0, 6)) assert.match(notification.options.body, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(detailLines[9], /^Evaluated: /);
+    for (const expected of detailLines.slice(0, 9)) assert.match(notification.options.body, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.doesNotMatch(notification.options.body, /Evaluated:/);
+}
+
+{
+    const { alertFields, notification } = captureConfirmedAlert(
+        'Buyer Active',
+        'Above VWAP',
+        {
+            obiState: 'Ask Dominant',
+            bridge: { activeZone: { low: 230, high: 235.4 } }
+        }
+    );
+    assert.equal(
+        alertFields.get('[data-monitor-alert-caution]').textContent,
+        'CAUTION — Current Price is outside ETF_DCA Active Zone 230.00–235.40'
+    );
+    const detailLines = [...alertFields.entries()]
+        .filter(([selector]) => selector.startsWith('[data-monitor-alert-detail-line='))
+        .map(([, field]) => field.textContent);
+    assert.ok(detailLines.includes('ETF_DCA Active Zone: CAUTION — Current Price is outside 230.00–235.40'));
+    assert.ok(detailLines.includes('Market Evidence: MIXED — Buyer Active TAR / Ask Dominant OBI'));
+    assert.match(notification.options.body, /Current Price is outside ETF_DCA Active Zone/);
 }
 
 {

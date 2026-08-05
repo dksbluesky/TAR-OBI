@@ -601,29 +601,14 @@
 
     function confirmedEntryPresentation(
         ticker,
-        result
+        result,
+        bridge = null
     ) {
         const sellerActive =
             result.tarState === 'Seller Active';
 
         const belowVwap =
             result.vwapState === 'Below VWAP';
-
-        const caution =
-            sellerActive && belowVwap
-                ? 'CAUTION — Seller Active / Below VWAP'
-                : sellerActive
-                    ? 'CAUTION — Seller Active'
-                    : belowVwap
-                        ? 'CAUTION — Below VWAP'
-                        : null;
-
-        const tone =
-            sellerActive && belowVwap
-                ? 'orange'
-                : sellerActive || belowVwap
-                    ? 'amber'
-                    : 'green';
 
         const currentPrice =
             formatAlertPrice(result.currentPrice)
@@ -639,6 +624,57 @@
                 result.preferredEntryHigh
             );
 
+        const zoneLow =
+            formatAlertPrice(
+                bridge?.activeZone?.low
+            );
+
+        const zoneHigh =
+            formatAlertPrice(
+                bridge?.activeZone?.high
+            );
+
+        const validActiveZone =
+            zoneLow
+            && zoneHigh
+            && Number(bridge.activeZone.low)
+                <= Number(bridge.activeZone.high);
+
+        const insideActiveZone =
+            validActiveZone
+            && Number.isFinite(
+                Number(result.currentPrice)
+            )
+            && Number(result.currentPrice)
+                >= Number(bridge.activeZone.low) - 1e-9
+            && Number(result.currentPrice)
+                <= Number(bridge.activeZone.high) + 1e-9;
+
+        const marketCaution =
+            sellerActive && belowVwap
+                ? 'Seller Active / Below VWAP'
+                : sellerActive
+                    ? 'Seller Active'
+                    : belowVwap
+                        ? 'Below VWAP'
+                        : null;
+
+        const caution =
+            validActiveZone && !insideActiveZone
+                ? `CAUTION — Current Price is outside ETF_DCA Active Zone ${zoneLow}–${zoneHigh}${marketCaution ? ` / ${marketCaution}` : ''}`
+                : marketCaution
+                    ? `CAUTION — ${marketCaution}`
+                    : null;
+
+        const tone =
+            validActiveZone && !insideActiveZone
+                ? 'orange'
+                : sellerActive && belowVwap
+                    ? 'orange'
+                    : sellerActive || belowVwap
+                        ? 'amber'
+                        : 'green';
+
         const details = [
             `Current Price: ${currentPrice}`
         ];
@@ -650,7 +686,23 @@
             details.push(
                 `Preferred Entry: ${preferredLow}–${preferredHigh}`
             );
+
+            const insidePreferredEntry =
+                Number(result.currentPrice)
+                    >= Number(result.preferredEntryLow) - 1e-9
+                && Number(result.currentPrice)
+                    <= Number(result.preferredEntryHigh) + 1e-9;
+
+            details.push(
+                `Preferred Entry Check: ${insidePreferredEntry ? 'PASS — Current Price is inside range' : 'FAIL — Current Price is outside range'}`
+            );
         }
+
+        details.push(
+            validActiveZone
+                ? `ETF_DCA Active Zone: ${insideActiveZone ? 'PASS' : 'CAUTION'} — Current Price is ${insideActiveZone ? 'inside' : 'outside'} ${zoneLow}–${zoneHigh}`
+                : 'ETF_DCA Active Zone: UNAVAILABLE — linked zone cannot be evaluated'
+        );
 
         if (result.tarState) {
             details.push(
@@ -663,6 +715,22 @@
                 `OBI: ${result.obiState}`
             );
         }
+
+        const mixedEvidence =
+            (
+                result.tarState === 'Buyer Active'
+                && result.obiState === 'Ask Dominant'
+            )
+            || (
+                result.tarState === 'Seller Active'
+                && result.obiState === 'Bid Dominant'
+            );
+
+        details.push(
+            mixedEvidence
+                ? `Market Evidence: MIXED — ${result.tarState} TAR / ${result.obiState} OBI`
+                : 'Market Evidence: ALIGNED OR NEUTRAL'
+        );
 
         if (result.vwapState) {
             details.push(
@@ -681,14 +749,13 @@
                 `${ticker} — ENTRY SETUP CONFIRMED`,
 
             disclaimer:
-                'Setup confirmed, not a buy signal.',
+                'Setup confirmed twice; not a buy signal or order instruction.',
 
             caution,
             tone,
             details
         };
     }
-
     function showInPageAlert(
         result,
         message =
@@ -912,7 +979,8 @@
                 presentation
                 || confirmedEntryPresentation(
                     bridge.ticker,
-                    result
+                    result,
+                    bridge
                 );
 
             const body = [
@@ -1509,7 +1577,8 @@
             const presentation =
                 confirmedEntryPresentation(
                     updated.ticker,
-                    result
+                    result,
+                    updated
                 );
 
             showInPageAlert(
