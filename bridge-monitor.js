@@ -45,6 +45,7 @@
     let onUiRefresh = null;
     let controlsContainer = null;
     let storageListenerBound = false;
+    let mobileListenerBound = false;
     let observedLifecycle = null;
 
     function storageGet(key) {
@@ -332,6 +333,53 @@
         }
 
         return root.Notification.permission || 'default';
+    }
+
+    function deliverNotification(title, options) {
+        const mobileSupport = root.TarObiMobileSupport;
+        if (typeof mobileSupport?.showNotification === 'function') {
+            return Promise.resolve(
+                mobileSupport.showNotification(title, options)
+            ).catch(() => false);
+        }
+
+        try {
+            new root.Notification(title, options);
+            return Promise.resolve(true);
+        } catch (error) {
+            return Promise.resolve(false);
+        }
+    }
+
+    function screenWakeLockUiStatus(lifecycle) {
+        const mobileSupport = root.TarObiMobileSupport;
+        if (!mobileSupport) return 'Unsupported';
+        if (lifecycle?.status !== ACTIVE_STATUS) return 'Inactive';
+        if (root.document?.visibilityState === 'hidden') return 'Waiting for visible page';
+        return mobileSupport.screenWakeLockStatus?.() || 'Unsupported';
+    }
+
+    /**
+     * Synchronizes Android screen-awake support with the existing linked lifecycle.
+     * This helper does not change bridge state or assessment calculations.
+     * @returns {Promise<boolean>} Whether the requested platform state was applied.
+     */
+    async function syncMobileSupport() {
+        const mobileSupport = root.TarObiMobileSupport;
+        if (!mobileSupport) return false;
+
+        const bridge = bridgeApi?.getLinkedBridge?.();
+        const lifecycle = bridge ? lifecycleFor(bridge, new Date()) : null;
+        const shouldStayAwake = lifecycle?.status === ACTIVE_STATUS
+            && root.document?.visibilityState !== 'hidden';
+        const before = mobileSupport.screenWakeLockStatus?.();
+        const applied = shouldStayAwake
+            ? await mobileSupport.requestScreenWakeLock?.()
+            : await mobileSupport.releaseScreenWakeLock?.();
+        const after = mobileSupport.screenWakeLockStatus?.();
+
+        if (before !== after && controlsContainer) refreshUi();
+        return Boolean(applied);
     }
     /**
      * Maps notification permission and the existing saved preference
@@ -948,7 +996,7 @@
         }
 
         try {
-            new root.Notification(
+            void deliverNotification(
                 title,
                 {
                     body,
@@ -1000,7 +1048,7 @@
                 )
             ].join('\n');
 
-            new root.Notification(
+            void deliverNotification(
                 `${bridge.ticker} Entry Setup Confirmed`,
                 {
                     body,
@@ -1742,6 +1790,7 @@
                 ?.refreshLinkedBridge
                 ?.();
 
+            void syncMobileSupport();
             refreshUi();
         }
 
@@ -1784,6 +1833,16 @@
                     ? 'true'
                     : 'false'
             );
+
+            if (permission === 'granted') {
+                await deliverNotification(
+                    'TAR-OBI Notifications Enabled',
+                    {
+                        body: 'Android-compatible browser notifications are ready.',
+                        tag: 'tar-obi-notification-test'
+                    }
+                );
+            }
 
             refreshUi();
 
@@ -2083,6 +2142,17 @@
 
                     <div>
                         <dt class="text-xs text-slate-500">
+                            Screen Awake
+                        </dt>
+
+                        <dd
+                            data-monitor-field="screen-awake"
+                            class="mt-1 font-bold"
+                        ></dd>
+                    </div>
+
+                    <div>
+                        <dt class="text-xs text-slate-500">
                             Last Notification
                         </dt>
 
@@ -2186,6 +2256,9 @@
 
             notifications:
                 notificationUi.status,
+
+            'screen-awake':
+                screenWakeLockUiStatus(lifecycle),
 
             'last-notification':
                 formatTime(
@@ -2349,6 +2422,7 @@
                 nextStatus;
         }
 
+        void syncMobileSupport();
         refreshUi();
     }
 
@@ -2381,6 +2455,10 @@
             options.onUiRefresh
             || onUiRefresh;
 
+        void root.TarObiMobileSupport
+            ?.prepareNotifications
+            ?.();
+
         reconcileLinkedLifecycle();
 
         observedLifecycle =
@@ -2404,6 +2482,22 @@
                 handleStorageEvent
             );
         }
+
+        if (!mobileListenerBound) {
+            mobileListenerBound = true;
+            root.document?.addEventListener?.(
+                'visibilitychange',
+                () => void syncMobileSupport()
+            );
+            root.addEventListener?.(
+                'pagehide',
+                () => void root.TarObiMobileSupport
+                    ?.releaseScreenWakeLock
+                    ?.()
+            );
+        }
+
+        void syncMobileSupport();
     }
 
     return Object.freeze({
@@ -2423,6 +2517,7 @@
         captureCompletedAssessment,
         transitionLifecycle,
         enableNotifications,
+        syncMobileSupport,
         renderControls,
         mount
     });

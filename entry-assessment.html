@@ -8,6 +8,7 @@
     <script src="./shared-market.js"></script>
     <script src="./bridge-loader.js"></script>
     <script src="./assessment-journal.js"></script>
+    <script src="./mobile-support.js"></script>
     <script src="./bridge-monitor.js"></script>
     <style>body{font-family:Inter,sans-serif}.value-change{transition:color .15s ease}</style>
 </head>
@@ -451,6 +452,7 @@
                 },
                 onDisconnect() {
                     quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
+                    window.TarObiBridgeMonitor?.syncMobileSupport?.();
                     render();
                 }
             });
