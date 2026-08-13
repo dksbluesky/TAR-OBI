@@ -5,7 +5,7 @@ const modulePath = require.resolve('../bridge-monitor.js');
 const STORAGE_KEY = 'etfDca.executionBridge.v1';
 const PREFERENCE_KEY = 'tarObi.executionBridge.notificationsEnabled.v1';
 
-function bridge() {
+function bridge(overrides = {}) {
     return {
         version: '1.0',
         bridgeId: 'ui-bridge',
@@ -21,13 +21,15 @@ function bridge() {
         },
         monitorResult: null,
         notificationState: { lastNotifiedState: null, lastNotifiedAt: null },
-        extensions: {}
+        extensions: {},
+        ...overrides
     };
 }
 
-function renderNotificationCase(permission, preferenceEnabled, supported = true) {
+function renderNotificationCase(permission, preferenceEnabled, supported = true, bridgeOverrides = {}) {
+    const linkedBridge = bridge(bridgeOverrides);
     const values = new Map([
-        [STORAGE_KEY, JSON.stringify(bridge())],
+        [STORAGE_KEY, JSON.stringify(linkedBridge)],
         [PREFERENCE_KEY, preferenceEnabled ? 'true' : 'false']
     ]);
     global.localStorage = {
@@ -35,8 +37,11 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
         setItem(key, value) { values.set(key, String(value)); }
     };
     global.addEventListener = () => {};
+    const notifications = [];
     if (supported) {
-        global.Notification = function Notification() {};
+        global.Notification = function Notification(title, options) {
+            notifications.push({ title, options });
+        };
         global.Notification.permission = permission;
         global.Notification.requestPermission = async () => permission;
     } else {
@@ -44,7 +49,7 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
     }
     delete require.cache[modulePath];
     const monitor = require(modulePath);
-    let linked = bridge();
+    let linked = linkedBridge;
     monitor.mount({
         bridgeApi: {
             validateBridge(candidate) { return candidate?.bridgeId === 'ui-bridge'; },
@@ -73,7 +78,7 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
         }
     };
     monitor.renderControls(container);
-    return { monitor, container, fields };
+    return { monitor, container, fields, notifications };
 }
 
 {
@@ -137,5 +142,67 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
         fields.get('continuous-validity').textContent,
         'Unavailable ' + String.fromCharCode(8212) + ' Fugle quote unavailable'
     );
+}
+{
+    const noZoneBridge = {
+        activeZone: null,
+        monitorResult: {
+            assessmentState: 'ENTRY_CONDITIONS_MET',
+            currentPrice: 235.5,
+            evaluatedAt: '2026-07-27T02:00:00.000Z'
+        },
+        notificationState: {
+            lastNotifiedState: null,
+            lastNotifiedAt: null,
+            entryConfirmation: { status: 'CONFIRMED', consecutiveCount: 2, confirmedAt: '2026-07-27T02:00:00.000Z' },
+            continuousValidity: { status: 'LIVE', startedAt: '2026-07-27T01:59:00.000Z', durationSeconds: 30, elapsedSeconds: 60, liveAt: '2026-07-27T02:00:00.000Z' }
+        },
+        extensions: {
+            marketContextV1: {
+                context: 'range',
+                automaticZoneEligible: false,
+                invalidationLevel: null
+            }
+        }
+    };
+    const { monitor, container, fields, notifications } = renderNotificationCase('granted', true, true, noZoneBridge);
+    const expiredLabel = 'EXPIRED — no valid ETF_DCA Active Long Zone';
+    assert.equal(fields.get('lifecycle').textContent, 'ACTIVE');
+    assert.equal(fields.get('assessment').textContent, 'ENTRY_CONDITIONS_MET');
+    assert.equal(fields.get('entry-confirmation').textContent, expiredLabel);
+    assert.equal(fields.get('continuous-validity').textContent, expiredLabel);
+    assert.match(container.innerHTML, /Raw TAR-OBI Assessment is independent and is not an actionable linked signal while no valid ETF_DCA Active Long Zone is available\./);
+    assert.doesNotMatch(fields.get('continuous-validity').textContent, /Suggested Buy — LIVE/);
+
+    const captured = monitor.captureCompletedAssessment({
+        complete: true,
+        ticker: '006208',
+        evaluatedAt: '2026-07-27T02:01:00.000Z',
+        currentPrice: 235.5,
+        assessment: {
+            state: 'ENTRY CONDITIONS MET',
+            lower: null,
+            upper: null,
+            maximum: null,
+            invalidation: null,
+            wideSpread: false,
+            factors: ['Raw TAR-OBI entry conditions met'],
+            blockingReason: null
+        },
+        tarState: 'Buyer Active',
+        obiState: 'Bid Dominant',
+        vwapState: 'Near VWAP',
+        spreadState: 'ACCEPTABLE',
+        volumeQuality: 'NORMAL'
+    });
+    assert.equal(captured.written, true);
+    assert.equal(captured.notified, false);
+    assert.equal(captured.result.assessmentState, 'ENTRY_CONDITIONS_MET');
+    assert.equal(notifications.length, 0);
+    monitor.renderControls(container);
+    assert.equal(fields.get('lifecycle').textContent, 'ACTIVE');
+    assert.equal(fields.get('assessment').textContent, 'ENTRY_CONDITIONS_MET');
+    assert.equal(fields.get('entry-confirmation').textContent, expiredLabel);
+    assert.equal(fields.get('continuous-validity').textContent, expiredLabel);
 }
 console.log('bridge monitor UI tests passed');

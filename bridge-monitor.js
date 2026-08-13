@@ -432,10 +432,23 @@
         };
     }
 
+    function linkedZoneUnavailable(bridge) {
+        const zone = bridge?.activeZone;
+        const lowValue = zone?.low;
+        const highValue = zone?.high;
+        if (lowValue === null || lowValue === undefined || lowValue === '' || highValue === null || highValue === undefined || highValue === '') return true;
+        const low = Number(lowValue);
+        const high = Number(highValue);
+        if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high <= 0 || low > high) return true;
+        const context = bridge?.extensions?.marketContextV1;
+        if (!context) return false;
+        return context.context !== 'bullish' || context.automaticZoneEligible !== true;
+    }
     // Linked-zone gate only controls monitor confirmation. It never changes the raw TAR-OBI assessment.
     function linkedZoneGateEligible(bridge, result) {
+        if (linkedZoneUnavailable(bridge)) return false;
         const context = bridge?.extensions?.marketContextV1;
-        // Legacy bridge v1 objects predate the context extension and preserve prior behavior.
+        // Legacy bridge v1 objects with a valid zone preserve prior behavior.
         if (!context) return true;
         const zone = bridge?.activeZone;
         const price = Number(result?.currentPrice);
@@ -2107,6 +2120,13 @@
                 bridge
             );
 
+        const linkedZoneExpired =
+            linkedZoneUnavailable(
+                bridge
+            );
+
+        const linkedZoneExpiredLabel =
+            'EXPIRED — no valid ETF_DCA Active Long Zone';
         const permission =
             notificationPermission();
 
@@ -2284,6 +2304,11 @@
                         ></dd>
                     </div>
                 </dl>
+                ${
+                    linkedZoneExpired
+                        ? `<p data-monitor-zone-gate-note class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Raw TAR-OBI Assessment is independent and is not an actionable linked signal while no valid ETF_DCA Active Long Zone is available.</p>`
+                        : ''
+                }
 
                 <div class="mt-3">
                     <div class="flex flex-wrap gap-2">
@@ -2345,8 +2370,8 @@
                     ?.assessmentState
                 || 'Not evaluated',
 
-            'entry-confirmation': entryConfirmationLabel(entryConfirmation),
-            'continuous-validity': continuousValidityLabel(bridge.notificationState?.continuousValidity, result),
+            'entry-confirmation': linkedZoneExpired ? linkedZoneExpiredLabel : entryConfirmationLabel(entryConfirmation),
+            'continuous-validity': linkedZoneExpired ? linkedZoneExpiredLabel : continuousValidityLabel(bridge.notificationState?.continuousValidity, result),
 
             'entry-mode':
                 entryModeLabel(
