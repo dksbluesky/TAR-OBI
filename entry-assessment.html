@@ -414,8 +414,8 @@
             const completedSnapshot = render();
             if (completedRefresh) {
                 const linked = window.TarObiBridge?.getLinkedBridge?.();
-                window.TarObiAssessmentJournal?.recordCompletedAssessment(completedSnapshot, linked);
-                window.TarObiBridgeMonitor?.captureCompletedAssessment(completedSnapshot);
+                const monitorState = window.TarObiBridgeMonitor?.captureCompletedAssessment(completedSnapshot);
+                window.TarObiAssessmentJournal?.recordCompletedAssessment(completedSnapshot, linked, monitorState);
             }
             if (MarketData.getMarketSession(quoteData, settings.interval * 1000) === 'closed') {
                 clearInterval(refreshTimer); refreshTimer = null;

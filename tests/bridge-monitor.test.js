@@ -241,11 +241,14 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
     assert.equal(monitor.captureCompletedAssessment({ ...entry('2026-07-27T02:02:30.000Z'), complete: false }).reason, 'incomplete-assessment');
     assert.equal(stored(storage).notificationState.entryConfirmation.consecutiveCount, 1);
 
-    const confirmed = monitor.captureCompletedAssessment(entry('2026-07-27T02:03:00.000Z'));
+    const pending = monitor.captureCompletedAssessment(entry('2026-07-27T02:03:00.000Z'));
+    assert.equal(pending.notified, false);
+    assert.equal(pending.confirmed, false);
+    assert.equal(pending.continuousValidity.status, 'PENDING');
+    const confirmed = monitor.captureCompletedAssessment(entry('2026-07-27T02:04:00.000Z'));
     assert.equal(confirmed.notified, true);
     assert.equal(confirmed.confirmed, true);
-    assert.equal(confirmed.confirmation.status, 'CONFIRMED');
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:04:00.000Z')).notified, false);
+    assert.equal(confirmed.continuousValidity.status, 'LIVE');
 
     assert.equal(monitor.captureCompletedAssessment(validSnapshot({ evaluatedAt: '2026-07-27T02:05:00.000Z' })).notified, false);
     assert.equal(stored(storage).notificationState.entryConfirmation.status, 'NONE');
@@ -256,7 +259,8 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
 
     assert.equal(monitor.captureCompletedAssessment(validSnapshot({ evaluatedAt: '2026-07-27T02:13:01.000Z' })).notified, false);
     assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:13:02.000Z')).notified, false);
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:13:03.000Z')).notified, true);
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:13:03.000Z')).notified, false);
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:14:32.000Z')).notified, true);
     assert.equal(stored(storage).notificationState.lastNotifiedState, 'ENTRY_CONDITIONS_MET');
 }
 
@@ -300,7 +304,8 @@ function captureConfirmedAlert(tarState, vwapState, options = {}) {
     assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:01:00.000Z')).notified, false);
     assert.equal(notifications.length, 0);
     assert.equal(alertContainer.innerHTML, '');
-    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z')).notified, true);
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:00.000Z')).notified, false);
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:02:31.000Z')).notified, true);
     assert.equal(notifications.length, 1);
     assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:03:00.000Z')).notified, false);
     assert.equal(notifications.length, 1);

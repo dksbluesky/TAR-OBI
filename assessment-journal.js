@@ -52,9 +52,10 @@
      * Duplicate evaluation timestamps for the same bridge are ignored.
      * @param {object} snapshot Completed raw TAR-OBI assessment snapshot.
      * @param {object} bridge Current linked bridge.
+     * @param {object|null} [monitorState] Linked-monitor confirmation state, when available.
      * @returns {object|null} New journal entry, or null when standalone/incomplete/duplicate.
      */
-    function recordCompletedAssessment(snapshot, bridge) {
+    function recordCompletedAssessment(snapshot, bridge, monitorState = null) {
         if (!snapshot?.complete || !snapshot.evaluatedAt || !bridge?.bridgeId) return null;
         const store = readStore();
         const duplicate = store.entries.some(entry =>
@@ -83,6 +84,7 @@
             spreadState: snapshot.spreadState || null,
             volumeQuality: snapshot.volumeQuality || null,
             marketSession: snapshot.marketSession || null,
+            confirmationState: monitorState?.continuousValidity || null,
             setupContext: {
                 activeZone: bridge.activeZone || null,
                 zoneMode: bridge.zoneMode || null,
@@ -126,6 +128,7 @@
      * Renders a compact read-only list of completed linked-monitor assessments.
      * @param {HTMLElement} container Target element.
      * @param {object} bridge Current linked bridge.
+     * @param {object|null} [monitorState] Linked-monitor confirmation state, when available.
      * @returns {void}
      */
     function renderPanel(container, bridge) {

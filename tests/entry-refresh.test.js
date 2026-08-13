@@ -23,7 +23,7 @@ assert.match(
 );
 assert.match(
     html,
-    /const completedSnapshot = render\(\);\s*if \(completedRefresh\) \{\s*const linked = window\.TarObiBridge\?\.getLinkedBridge\?\.\(\);\s*window\.TarObiAssessmentJournal\?\.recordCompletedAssessment\(completedSnapshot, linked\);\s*window\.TarObiBridgeMonitor\?\.captureCompletedAssessment\(completedSnapshot\);\s*\}/,
+    /const completedSnapshot = render\(\);\s*if \(completedRefresh\) \{\s*const linked = window\.TarObiBridge\?\.getLinkedBridge\?\.\(\);\s*const monitorState = window\.TarObiBridgeMonitor\?\.captureCompletedAssessment\(completedSnapshot\);\s*window\.TarObiAssessmentJournal\?\.recordCompletedAssessment\(completedSnapshot, linked, monitorState\);\s*\}/,
     'a completed fetch renders first, journals the raw linked snapshot, and then writes it through the bridge monitor'
 );
 

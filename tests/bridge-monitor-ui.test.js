@@ -110,8 +110,10 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
 
 {
     const { container, fields } = renderNotificationCase('default', false);
-    assert.match(container.innerHTML, /Entry notification requires 2 consecutive completed ENTRY CONDITIONS MET assessments\./);
+    assert.match(container.innerHTML, /Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid bullish ETF_DCA Zone, and uninterrupted validity for the selected duration\. Any failed or stale condition resets the timer\./);
     assert.match(container.innerHTML, /data-monitor-field="entry-confirmation"/);
+    assert.match(container.innerHTML, /data-monitor-field="continuous-validity"/);
+    assert.match(container.innerHTML, /data-monitor-continuity/);
     assert.equal(fields.get('entry-confirmation').textContent, 'Not pending');
 }
 

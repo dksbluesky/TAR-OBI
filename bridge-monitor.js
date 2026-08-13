@@ -7,6 +7,8 @@
 
     const STORAGE_KEY = 'etfDca.executionBridge.v1';
     const NOTIFICATION_PREFERENCE_KEY = 'tarObi.executionBridge.notificationsEnabled.v1';
+    const CONTINUITY_DURATION_KEY = 'tarObi.executionBridge.continuousValiditySeconds.v1';
+    const DEFAULT_CONTINUITY_SECONDS = 90;
     const CONTRACT_VERSION = '1.0';
     const NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000;
     const DATA_UNAVAILABLE_SUSTAINED_MS = 5 * 60 * 1000;
@@ -430,6 +432,86 @@
         };
     }
 
+    // Linked-zone gate only controls monitor confirmation. It never changes the raw TAR-OBI assessment.
+    function linkedZoneGateEligible(bridge, result) {
+        const context = bridge?.extensions?.marketContextV1;
+        // Legacy bridge v1 objects predate the context extension and preserve prior behavior.
+        if (!context) return true;
+        const zone = bridge?.activeZone;
+        const price = Number(result?.currentPrice);
+        const invalidation = Number(context?.invalidationLevel);
+        return context?.context === 'bullish'
+            && context?.automaticZoneEligible === true
+            && Number.isFinite(price)
+            && Number.isFinite(Number(zone?.low))
+            && Number.isFinite(Number(zone?.high))
+            && price >= Number(zone.low) - 1e-9
+            && price <= Number(zone.high) + 1e-9
+            && (!Number.isFinite(invalidation) || price >= invalidation - 1e-9);
+    }
+    function continuityDurationSeconds() {
+        const value = Number(storageGet(CONTINUITY_DURATION_KEY));
+        return [30, 60, 90, 120].includes(value)
+            ? value
+            : DEFAULT_CONTINUITY_SECONDS;
+    }
+
+    /**
+     * Stores a new uninterrupted-validity duration and resets any in-progress
+     * confirmation window. Raw TAR-OBI assessments are not changed.
+     * @param {number|string} durationSeconds Requested supported duration.
+     * @returns {boolean} True when the selected duration was accepted.
+     */
+    function setContinuityDuration(durationSeconds) {
+        const duration = Number(durationSeconds);
+        if (![30, 60, 90, 120].includes(duration)) return false;
+        storageSet(CONTINUITY_DURATION_KEY, String(duration));
+        const raw = storageGet(STORAGE_KEY);
+        const current = parseBridge(raw);
+        if (!current) return true;
+        const updated = {
+            ...current,
+            notificationState: {
+                ...(current.notificationState || {}),
+                continuousValidity: {
+                    status: 'NONE',
+                    startedAt: null,
+                    durationSeconds: duration,
+                    elapsedSeconds: 0,
+                    confirmedAt: null
+                }
+            }
+        };
+        commitIfUnchanged(raw, updated);
+        bridgeApi?.refreshLinkedBridge?.();
+        return true;
+    }
+    function advanceContinuousValidity(previous, eligible, evaluatedAt) {
+        const prior = previous && typeof previous === 'object' ? previous : {};
+        const evaluatedMs = Date.parse(evaluatedAt);
+        const startedAt = eligible && Number.isFinite(evaluatedMs)
+            ? (prior.startedAt || evaluatedAt)
+            : null;
+        const durationSeconds = continuityDurationSeconds();
+        const elapsedSeconds = startedAt && Number.isFinite(evaluatedMs)
+            ? Math.max(0, Math.floor((evaluatedMs - Date.parse(startedAt)) / 1000))
+            : 0;
+        const live = eligible && elapsedSeconds >= durationSeconds;
+        return {
+            status: live ? 'LIVE' : eligible ? 'PENDING' : 'NONE',
+            startedAt,
+            durationSeconds,
+            elapsedSeconds,
+            liveAt: live ? (prior.liveAt || evaluatedAt) : null,
+            reason: eligible ? null : 'A required live condition failed.'
+        };
+    }
+
+    function continuousValidityLabel(validity) {
+        if (validity?.status === 'LIVE') return 'Suggested Buy — LIVE';
+        if (validity?.status === 'PENDING') return `Confirmation pending — ${validity.elapsedSeconds || 0} / ${validity.durationSeconds || DEFAULT_CONTINUITY_SECONDS} seconds`;
+        return 'Not pending';
+    }
     function notificationAllowed(
         previousStatus,
         currentStatus,
@@ -1516,24 +1598,24 @@
             notificationState
                 .entryConfirmation;
 
-        const nextConfirmation =
-            advanceEntryConfirmation(
-                previousConfirmation,
-                result.assessmentState,
-                result.evaluatedAt
-            );
+        const zoneGateEligible = linkedZoneGateEligible(current, result);
+        const continuousEligible = zoneGateEligible && result.assessmentState === ENTRY_STATE;
+        const previousContinuous = notificationState.continuousValidity || null;
+        const nextContinuous = advanceContinuousValidity(previousContinuous, continuousEligible, result.evaluatedAt);
+        const nextConfirmation = advanceEntryConfirmation(
+            previousConfirmation,
+            continuousEligible ? result.assessmentState : 'WAIT_FOR_CONFIRMATION',
+            result.evaluatedAt
+        );
 
-        const shouldNotify =
-            notificationAllowed(
-                previousConfirmation.status,
-                nextConfirmation.status,
-                notificationState,
-                result.evaluatedAt
-            );
+        const priorNotificationAt = Date.parse(notificationState.lastNotifiedAt || '');
+        const shouldNotify = nextContinuous.status === 'LIVE'
+            && previousContinuous?.status !== 'LIVE'
+            && (!Number.isFinite(priorNotificationAt)
+                || Date.parse(result.evaluatedAt) - priorNotificationAt >= NOTIFICATION_COOLDOWN_MS);
 
-        notificationState
-            .entryConfirmation =
-                nextConfirmation;
+        notificationState.entryConfirmation = nextConfirmation;
+        notificationState.continuousValidity = nextContinuous;
 
         let sustainedUnavailable =
             false;
@@ -1661,9 +1743,8 @@
             written: true,
             notified: shouldNotify,
 
-            confirmed:
-                nextConfirmation.status
-                    === ENTRY_CONFIRMATION_STATUS.CONFIRMED,
+            confirmed: nextContinuous.status === 'LIVE',
+            continuousValidity: nextContinuous,
 
             confirmation:
                 nextConfirmation,
@@ -2075,6 +2156,9 @@
                     </div>
 
                     <div>
+                        <dt class="text-xs text-slate-500">Live Confirmation</dt>
+                        <dd data-monitor-field="continuous-validity" class="mt-1 font-bold"></dd>
+                    </div>                    <div>
                         <dt class="text-xs text-slate-500">
                             Entry Mode
                         </dt>
@@ -2165,6 +2249,7 @@
 
                 <div class="mt-3">
                     <div class="flex flex-wrap gap-2">
+                        <label class="text-xs text-slate-600">Valid for <select data-monitor-continuity class="ml-1 rounded border border-slate-300 bg-white px-1 py-1 font-bold"><option value="30">30s</option><option value="60">60s</option><option value="90">90s</option><option value="120">120s</option></select></label>
                         ${notificationControl}
 
                         ${
@@ -2202,7 +2287,7 @@
                     </div>
 
                     <p class="mt-2 text-xs text-slate-500">
-                        Entry notification requires 2 consecutive completed ENTRY CONDITIONS MET assessments. Left-side starter states never advance or trigger the 2/2 confirmation notification.
+                        Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid bullish ETF_DCA Zone, and uninterrupted validity for the selected duration. Any failed or stale condition resets the timer.
                     </p>
                 </div>
 
@@ -2222,10 +2307,8 @@
                     ?.assessmentState
                 || 'Not evaluated',
 
-            'entry-confirmation':
-                entryConfirmationLabel(
-                    entryConfirmation
-                ),
+            'entry-confirmation': entryConfirmationLabel(entryConfirmation),
+            'continuous-validity': continuousValidityLabel(bridge.notificationState?.continuousValidity),
 
             'entry-mode':
                 entryModeLabel(
@@ -2306,6 +2389,14 @@
                 }
             );
 
+        const durationControl = container.querySelector('[data-monitor-continuity]');
+        if (durationControl) {
+            durationControl.value = String(continuityDurationSeconds());
+            durationControl.addEventListener('change', () => {
+                setContinuityDuration(durationControl.value);
+                refreshUi();
+            });
+        }
         container
             .querySelector(
                 '[data-monitor-action="notify"]'
@@ -2508,10 +2599,16 @@
         DATA_UNAVAILABLE_SUSTAINED_MS,
         ENTRY_STATE,
         ENTRY_CONFIRMATION_REQUIRED,
+        CONTINUITY_DURATION_KEY,
+        DEFAULT_CONTINUITY_SECONDS,
         ENTRY_CONFIRMATION_STATUS,
         calculateExpiresAt,
         notificationUiState,
         advanceEntryConfirmation,
+        continuityDurationSeconds,
+        setContinuityDuration,
+        advanceContinuousValidity,
+        linkedZoneGateEligible,
         normalizeCompletedAssessment,
         reconcileLinkedLifecycle,
         captureCompletedAssessment,
