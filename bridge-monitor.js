@@ -449,6 +449,21 @@
             && price <= Number(zone.high) + 1e-9
             && (!Number.isFinite(invalidation) || price >= invalidation - 1e-9);
     }
+    // A temporary price exit pauses Suggested Buy confirmation only. It does
+    // not alter the linked bridge lifecycle or the raw TAR-OBI assessment.
+    function priceOutsideBridgedZone(bridge, result) {
+        const context = bridge?.extensions?.marketContextV1;
+        if (!context) return false;
+        const zone = bridge?.activeZone;
+        const price = Number(result?.currentPrice);
+        const low = Number(zone?.low);
+        const high = Number(zone?.high);
+        return Number.isFinite(price)
+            && Number.isFinite(low)
+            && Number.isFinite(high)
+            && (price < low - 1e-9 || price > high + 1e-9);
+    }
+
     function continuityDurationSeconds() {
         const value = Number(storageGet(CONTINUITY_DURATION_KEY));
         return [30, 60, 90, 120].includes(value)
@@ -507,9 +522,29 @@
         };
     }
 
-    function continuousValidityLabel(validity) {
+    function expiredContinuousValidity() {
+        return {
+            status: 'EXPIRED',
+            startedAt: null,
+            durationSeconds: continuityDurationSeconds(),
+            elapsedSeconds: 0,
+            liveAt: null,
+            reason: 'price outside bridged Zone'
+        };
+    }
+
+    function continuousValidityLabel(validity, result) {
+        if (result?.assessmentState === 'DATA_UNAVAILABLE') {
+            const reason = String(
+                result.summary
+                || result.blockingReason
+                || 'Required live/assessment data unavailable.'
+            ).trim();
+            return `Unavailable — ${reason}`;
+        }
         if (validity?.status === 'LIVE') return 'Suggested Buy — LIVE';
         if (validity?.status === 'PENDING') return `Confirmation pending — ${validity.elapsedSeconds || 0} / ${validity.durationSeconds || DEFAULT_CONTINUITY_SECONDS} seconds`;
+        if (validity?.status === 'EXPIRED' && validity?.reason === 'price outside bridged Zone') return 'EXPIRED — price outside bridged Zone';
         return 'Not pending';
     }
     function notificationAllowed(
@@ -1599,9 +1634,12 @@
                 .entryConfirmation;
 
         const zoneGateEligible = linkedZoneGateEligible(current, result);
+        const outsideBridgedZone = priceOutsideBridgedZone(current, result);
         const continuousEligible = zoneGateEligible && result.assessmentState === ENTRY_STATE;
         const previousContinuous = notificationState.continuousValidity || null;
-        const nextContinuous = advanceContinuousValidity(previousContinuous, continuousEligible, result.evaluatedAt);
+        const nextContinuous = outsideBridgedZone
+            ? expiredContinuousValidity()
+            : advanceContinuousValidity(previousContinuous, continuousEligible, result.evaluatedAt);
         const nextConfirmation = advanceEntryConfirmation(
             previousConfirmation,
             continuousEligible ? result.assessmentState : 'WAIT_FOR_CONFIRMATION',
@@ -2308,7 +2346,7 @@
                 || 'Not evaluated',
 
             'entry-confirmation': entryConfirmationLabel(entryConfirmation),
-            'continuous-validity': continuousValidityLabel(bridge.notificationState?.continuousValidity),
+            'continuous-validity': continuousValidityLabel(bridge.notificationState?.continuousValidity, result),
 
             'entry-mode':
                 entryModeLabel(
@@ -2609,6 +2647,7 @@
         setContinuityDuration,
         advanceContinuousValidity,
         linkedZoneGateEligible,
+        priceOutsideBridgedZone,
         normalizeCompletedAssessment,
         reconcileLinkedLifecycle,
         captureCompletedAssessment,

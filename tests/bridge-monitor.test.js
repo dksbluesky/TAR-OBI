@@ -264,6 +264,45 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
     assert.equal(stored(storage).notificationState.lastNotifiedState, 'ENTRY_CONDITIONS_MET');
 }
 
+{
+    const linkedBridge = validBridge({
+        extensions: {
+            marketContextV1: {
+                context: 'bullish',
+                automaticZoneEligible: true,
+                invalidationLevel: 234.8
+            }
+        }
+    });
+    const { monitor, storage } = loadMonitor(linkedBridge);
+    const entry = (evaluatedAt, currentPrice) => validSnapshot({
+        evaluatedAt,
+        currentPrice,
+        assessment: {
+            ...validSnapshot().assessment,
+            state: 'ENTRY CONDITIONS MET',
+            factors: ['Entry conditions met']
+        }
+    });
+
+    const initial = monitor.captureCompletedAssessment(entry('2026-07-27T02:00:00.000Z', 235.5));
+    assert.equal(initial.continuousValidity.status, 'PENDING');
+
+    const outside = monitor.captureCompletedAssessment(entry('2026-07-27T02:00:30.000Z', 235.7));
+    assert.equal(outside.continuousValidity.status, 'EXPIRED');
+    assert.equal(outside.continuousValidity.reason, 'price outside bridged Zone');
+    assert.equal(outside.continuousValidity.startedAt, null);
+    assert.equal(outside.continuousValidity.elapsedSeconds, 0);
+    assert.equal(stored(storage).lifecycle.status, 'ACTIVE', 'temporary price exit keeps the linked monitor active');
+
+    const reentered = monitor.captureCompletedAssessment(entry('2026-07-27T02:01:00.000Z', 235.5));
+    assert.equal(reentered.continuousValidity.status, 'PENDING');
+    assert.equal(reentered.continuousValidity.startedAt, '2026-07-27T02:01:00.000Z', 're-entry starts a fresh timer');
+
+    const live = monitor.captureCompletedAssessment(entry('2026-07-27T02:02:30.000Z', 235.5));
+    assert.equal(live.continuousValidity.status, 'LIVE');
+    assert.equal(live.continuousValidity.liveAt, '2026-07-27T02:02:30.000Z');
+}
 function createAlertContainer() {
     const alertFields = new Map();
     const fieldFor = selector => {

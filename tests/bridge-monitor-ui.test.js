@@ -117,4 +117,25 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true)
     assert.equal(fields.get('entry-confirmation').textContent, 'Not pending');
 }
 
+{
+    const { monitor, container, fields } = renderNotificationCase('default', false);
+    const captured = monitor.captureCompletedAssessment({
+        complete: true,
+        ticker: '006208',
+        evaluatedAt: '2026-07-27T02:00:00.000Z',
+        currentPrice: 235.5,
+        assessment: {
+            state: 'DATA UNAVAILABLE',
+            factors: ['Fugle quote unavailable'],
+            blockingReason: null
+        }
+    });
+    assert.equal(captured.written, true);
+    monitor.renderControls(container);
+    assert.equal(fields.get('assessment').textContent, 'DATA_UNAVAILABLE');
+    assert.equal(
+        fields.get('continuous-validity').textContent,
+        'Unavailable ' + String.fromCharCode(8212) + ' Fugle quote unavailable'
+    );
+}
 console.log('bridge monitor UI tests passed');
