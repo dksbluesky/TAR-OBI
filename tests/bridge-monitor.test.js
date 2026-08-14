@@ -303,6 +303,31 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
     assert.equal(live.continuousValidity.status, 'LIVE');
     assert.equal(live.continuousValidity.liveAt, '2026-07-27T02:02:30.000Z');
 }
+{
+    const manualBridge = validBridge({
+        zoneMode: 'manual_override',
+        extensions: {
+            marketContextV1: {
+                context: 'unclear',
+                automaticZoneEligible: false,
+                manualOverride: true,
+                invalidationLevel: 234.8
+            }
+        }
+    });
+    const { monitor, notifications } = loadMonitor(manualBridge, { notificationsEnabled: true });
+    const entry = evaluatedAt => validSnapshot({
+        evaluatedAt,
+        currentPrice: 235.5,
+        assessment: { ...validSnapshot().assessment, state: 'ENTRY CONDITIONS MET' }
+    });
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:00:00.000Z')).continuousValidity.status, 'PENDING');
+    assert.equal(monitor.captureCompletedAssessment(entry('2026-07-27T02:01:00.000Z')).notified, false);
+    const live = monitor.captureCompletedAssessment(entry('2026-07-27T02:02:30.000Z'));
+    assert.equal(live.continuousValidity.status, 'LIVE');
+    assert.equal(live.notified, true, 'a manual Active Zone may notify after TAR-OBI confirmation');
+    assert.equal(notifications.length, 1);
+}
 function createAlertContainer() {
     const alertFields = new Map();
     const fieldFor = selector => {

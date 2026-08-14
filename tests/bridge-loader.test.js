@@ -127,6 +127,14 @@ assert.equal(fields.get('active-zone').textContent, '235.25 ~ 235.6');
 assert.equal(fields.get('h-signal').textContent, 'H2');
 assert.equal(fields.get('c1').textContent, '✓');
 assert.equal(fields.get('c3').textContent, 'Pending');
+storage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({
+    bridgeId: 'bridge-manual',
+    zoneMode: 'manual_override',
+    extensions: { marketContextV1: { context: 'unclear', automaticZoneEligible: false, manualOverride: true } }
+})));
+consumer = loadConsumer(storage);
+consumer.renderContextPanel(panel, { onDisconnect() { disconnected = true; } });
+assert.equal(fields.get('zone-mode').textContent, 'Manual Active Zone — user override; ETF_DCA automatic confirmation unavailable');
 disconnectButton.click();
 assert.equal(disconnected, true);
 assert.equal(consumer.getMode(), 'standalone');

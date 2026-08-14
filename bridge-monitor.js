@@ -442,7 +442,8 @@
         if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high <= 0 || low > high) return true;
         const context = bridge?.extensions?.marketContextV1;
         if (!context) return false;
-        return context.context !== 'bullish' || context.automaticZoneEligible !== true;
+        const manualOverride = bridge?.zoneMode === 'manual_override' && context.manualOverride === true;
+        return !manualOverride && (context.context !== 'bullish' || context.automaticZoneEligible !== true);
     }
     // Linked-zone gate only controls monitor confirmation. It never changes the raw TAR-OBI assessment.
     function linkedZoneGateEligible(bridge, result) {
@@ -453,8 +454,8 @@
         const zone = bridge?.activeZone;
         const price = Number(result?.currentPrice);
         const invalidation = Number(context?.invalidationLevel);
-        return context?.context === 'bullish'
-            && context?.automaticZoneEligible === true
+        const manualOverride = bridge?.zoneMode === 'manual_override' && context?.manualOverride === true;
+        return (manualOverride || (context?.context === 'bullish' && context?.automaticZoneEligible === true))
             && Number.isFinite(price)
             && Number.isFinite(Number(zone?.low))
             && Number.isFinite(Number(zone?.high))
@@ -2350,7 +2351,7 @@
                     </div>
 
                     <p class="mt-2 text-xs text-slate-500">
-                        Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid bullish ETF_DCA Zone, and uninterrupted validity for the selected duration. Any failed or stale condition resets the timer.
+                        Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid linked Active Zone (automatically confirmed or an explicit Manual Active Zone override), and uninterrupted validity for the selected duration. Any failed or stale condition resets the timer.
                     </p>
                 </div>
 

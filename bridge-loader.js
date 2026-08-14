@@ -743,7 +743,7 @@
                 bridge.marketLevelTimeframe,
                 bridge.marketTimeframe
             ),
-            'zone-mode': displayValue(bridge.zoneMode),
+            'zone-mode': bridge.zoneMode === 'manual_override' ? 'Manual Active Zone — user override; ETF_DCA automatic confirmation unavailable' : displayValue(bridge.zoneMode),
             'entry-mode': displayEntryMode(bridge.entryMode),
             'starter-status': displayStarterStatus(bridge),
             'starter-allocation': displayStarterAllocation(
