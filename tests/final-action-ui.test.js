@@ -47,6 +47,12 @@ assert.equal(
     'DO_NOT_ENTER',
     'the existing blocking state remains DO NOT ENTER'
 );
+assert.equal(monitor.signalModeLabel('ENTRY CONDITIONS MET'), 'RIGHT — CONFIRMED');
+assert.equal(monitor.signalModeLabel('LEFT-SIDE STARTER ELIGIBLE'), 'LEFT — STARTER');
+assert.equal(monitor.signalModeLabel('LEFT-SIDE EXECUTION ACCEPTABLE'), 'LEFT — STARTER');
+assert.equal(monitor.signalModeLabel('HIGH-RISK LEFT-SIDE ENTRY'), 'LEFT — STARTER');
+assert.equal(monitor.signalModeLabel('WAIT FOR CONFIRMATION'), 'NO ENTRY MODE');
+assert.equal(monitor.signalModeLabel('DO NOT ENTER'), 'NO ENTRY MODE');
 const noLinkedZone = monitor.finalActionContext(null, 'ENTRY CONDITIONS MET', 29.1, 'closed');
 assert.equal(noLinkedZone.action, 'DO_NOT_ENTER');
 assert.equal(noLinkedZone.reason, 'No valid Active Zone');
@@ -67,6 +73,9 @@ assert.equal(invalidated.zoneInvalid, true, 'only the linked ETF_DCA invalidatio
 const html = fs.readFileSync(path.join(__dirname, '..', 'entry-assessment.html'), 'utf8');
 assert.match(html, /id="final-action"/);
 assert.match(html, /id="final-action-zone-warning"/);
+assert.match(html, /SIGNAL MODE/);
+assert.match(html, /id="signal-mode"/);
+assert.match(html, /TarObiBridgeMonitor\?\.signalModeLabel\?\.\(assessment\.state\)/);
 assert.match(html, /TarObiBridgeMonitor\?\.finalActionContext\?\.\(linkedBridge, assessment\.state, price, session\)/);
 assert.match(html, /TAR-OBI Assessment Invalidation/);
 assert.match(html, /ETF_DCA Zone Invalidation/);

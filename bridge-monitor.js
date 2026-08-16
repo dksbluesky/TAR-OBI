@@ -483,6 +483,20 @@
      * linked-monitor state. It does not alter assessment, confirmation, or
      * notification behavior.
      */
+    /**
+     * Formats the existing assessment state for the UI only. It does not
+     * create entry conditions or change Final Action/monitor behavior.
+     */
+    function signalModeLabel(assessmentState) {
+        const state = normalizeState(assessmentState);
+        if (state === ENTRY_STATE) return 'RIGHT — CONFIRMED';
+        if ([
+            'LEFT_SIDE_STARTER_ELIGIBLE',
+            'LEFT_SIDE_EXECUTION_ACCEPTABLE',
+            'HIGH_RISK_LEFT_SIDE_ENTRY'
+        ].includes(state)) return 'LEFT — STARTER';
+        return 'NO ENTRY MODE';
+    }
     function finalActionContext(bridge, assessmentState, currentPrice, marketSession) {
         const normalizedAssessment = normalizeState(assessmentState);
         const linked = Boolean(bridge);
@@ -2751,6 +2765,7 @@
         linkedZoneGateEligible,
         priceOutsideBridgedZone,
         finalActionContext,
+        signalModeLabel,
         normalizeCompletedAssessment,
         reconcileLinkedLifecycle,
         captureCompletedAssessment,

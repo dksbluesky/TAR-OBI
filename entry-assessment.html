@@ -67,6 +67,8 @@
                     <p class="text-xs font-black tracking-wider text-slate-500">FINAL ACTION / 現在怎麼做</p>
                     <h2 id="final-action-title" class="mt-2 text-2xl font-black text-slate-700">WAIT</h2>
                     <p id="final-action-reason" class="mt-1 text-sm font-bold text-slate-600">Waiting for assessment data.</p>
+                    <p class="mt-3 text-xs font-black tracking-wider text-slate-500">SIGNAL MODE</p>
+                    <p id="signal-mode" class="mt-1 text-sm font-black text-slate-700">NO ENTRY MODE</p>
                     <p id="final-action-zone-warning" class="mt-3 hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-black text-red-700">ZONE INVALID — DO NOT ENTER</p>
                     <dl id="final-action-details" class="mt-4 grid grid-cols-2 gap-3 text-sm"></dl>
                 </section>
@@ -271,6 +273,7 @@
         titleEl.textContent = title;
         titleEl.className = `mt-2 text-2xl font-black ${color}`;
         document.getElementById('final-action-reason').textContent = finalActionReason(assessment, presentation);
+        document.getElementById('signal-mode').textContent = window.TarObiBridgeMonitor?.signalModeLabel?.(assessment.state) || 'NO ENTRY MODE';
         document.getElementById('final-action-zone-warning').classList.toggle('hidden', !presentation.zoneInvalid);
 
         const zone = linkedBridge?.activeZone;
