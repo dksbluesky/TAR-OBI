@@ -483,10 +483,10 @@
      * linked-monitor state. It does not alter assessment, confirmation, or
      * notification behavior.
      */
-    function finalActionContext(bridge, assessmentState, currentPrice) {
+    function finalActionContext(bridge, assessmentState, currentPrice, marketSession) {
         const normalizedAssessment = normalizeState(assessmentState);
         const linked = Boolean(bridge);
-        const noValidZone = linked && linkedZoneUnavailable(bridge);
+        const noValidZone = linkedZoneUnavailable(bridge);
         const zoneInvalidation = optionalNumber(bridge?.invalidationLevel);
         const zoneInvalid = linked
             && !noValidZone
@@ -511,6 +511,17 @@
                 action: 'DO_NOT_ENTER',
                 reason: 'ZONE INVALID',
                 zoneInvalid: true,
+                zoneInvalidation,
+                linked,
+                live
+            });
+        }
+
+        if (marketSession && marketSession !== 'live') {
+            return Object.freeze({
+                action: 'WAIT',
+                reason: 'Closed-session result — not a live entry assessment.',
+                zoneInvalid: false,
                 zoneInvalidation,
                 linked,
                 live

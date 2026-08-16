@@ -258,9 +258,9 @@
         }));
     }
 
-    function renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable) {
-        const fallback = { action: assessment.state === 'DO NOT ENTER' ? 'DO_NOT_ENTER' : assessment.state === 'ENTRY CONDITIONS MET' ? 'BUY_NOW' : 'WAIT', reason: null, zoneInvalid: false, zoneInvalidation: null, linked: Boolean(linkedBridge) };
-        const presentation = window.TarObiBridgeMonitor?.finalActionContext?.(linkedBridge, assessment.state, price) || fallback;
+    function renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable, session) {
+        const fallback = { action: 'DO_NOT_ENTER', reason: 'No valid Active Zone', zoneInvalid: false, zoneInvalidation: null, linked: Boolean(linkedBridge) };
+        const presentation = window.TarObiBridgeMonitor?.finalActionContext?.(linkedBridge, assessment.state, price, session) || fallback;
         const labels = {
             BUY_NOW: ['🟢 BUY NOW', 'text-emerald-700'],
             WAIT: ['🟡 WAIT', 'text-amber-700'],
@@ -350,7 +350,7 @@
         document.getElementById('closed-note').classList.toggle('hidden', session !== 'closed');
 
         const pricesActionable = !['stale', 'unavailable'].includes(session);
-        renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable);
+        renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable, session);
         document.getElementById('entry-range').textContent = pricesActionable && Number.isFinite(assessment.lower) ? `${formatPrice(assessment.lower, tick)}–${formatPrice(assessment.upper, tick)}` : 'Unavailable / 資料不足';
         const distanceEl = document.getElementById('entry-distance');
         const hasPreferredRange = pricesActionable && Number.isFinite(price) && Number.isFinite(assessment.lower) && Number.isFinite(assessment.upper);

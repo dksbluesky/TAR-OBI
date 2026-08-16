@@ -47,6 +47,14 @@ assert.equal(
     'DO_NOT_ENTER',
     'the existing blocking state remains DO NOT ENTER'
 );
+const noLinkedZone = monitor.finalActionContext(null, 'ENTRY CONDITIONS MET', 29.1, 'closed');
+assert.equal(noLinkedZone.action, 'DO_NOT_ENTER');
+assert.equal(noLinkedZone.reason, 'No valid Active Zone');
+assert.equal(noLinkedZone.zoneInvalid, false, 'an absent linked zone is not invalidation');
+
+const closedSession = monitor.finalActionContext(bridge(), 'ENTRY CONDITIONS MET', 29.1, 'closed');
+assert.equal(closedSession.action, 'WAIT');
+assert.match(closedSession.reason, /Closed-session result/);
 const noZone = monitor.finalActionContext(bridge({ activeZone: null }), 'ENTRY CONDITIONS MET', 29.1);
 assert.equal(noZone.action, 'DO_NOT_ENTER');
 assert.equal(noZone.reason, 'No valid Active Zone');
@@ -59,7 +67,7 @@ assert.equal(invalidated.zoneInvalid, true, 'only the linked ETF_DCA invalidatio
 const html = fs.readFileSync(path.join(__dirname, '..', 'entry-assessment.html'), 'utf8');
 assert.match(html, /id="final-action"/);
 assert.match(html, /id="final-action-zone-warning"/);
-assert.match(html, /TarObiBridgeMonitor\?\.finalActionContext\?\.\(linkedBridge, assessment\.state, price\)/);
+assert.match(html, /TarObiBridgeMonitor\?\.finalActionContext\?\.\(linkedBridge, assessment\.state, price, session\)/);
 assert.match(html, /TAR-OBI Assessment Invalidation/);
 assert.match(html, /ETF_DCA Zone Invalidation/);
 console.log('final action UI tests passed');
