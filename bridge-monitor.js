@@ -478,6 +478,71 @@
             && (price < low - 1e-9 || price > high + 1e-9);
     }
 
+    /**
+     * Produces display-only Final Action context from existing assessment and
+     * linked-monitor state. It does not alter assessment, confirmation, or
+     * notification behavior.
+     */
+    function finalActionContext(bridge, assessmentState, currentPrice) {
+        const normalizedAssessment = normalizeState(assessmentState);
+        const linked = Boolean(bridge);
+        const noValidZone = linked && linkedZoneUnavailable(bridge);
+        const zoneInvalidation = optionalNumber(bridge?.invalidationLevel);
+        const zoneInvalid = linked
+            && !noValidZone
+            && Number.isFinite(Number(currentPrice))
+            && zoneInvalidation !== null
+            && Number(currentPrice) < zoneInvalidation - 1e-9;
+        const live = bridge?.notificationState?.continuousValidity?.status === 'LIVE';
+
+        if (noValidZone) {
+            return Object.freeze({
+                action: 'DO_NOT_ENTER',
+                reason: 'No valid Active Zone',
+                zoneInvalid: false,
+                zoneInvalidation,
+                linked,
+                live
+            });
+        }
+
+        if (zoneInvalid) {
+            return Object.freeze({
+                action: 'DO_NOT_ENTER',
+                reason: 'ZONE INVALID',
+                zoneInvalid: true,
+                zoneInvalidation,
+                linked,
+                live
+            });
+        }
+
+        if (linked && normalizedAssessment === ENTRY_STATE && !live) {
+            return Object.freeze({
+                action: 'WAIT',
+                reason: 'Waiting for the existing linked confirmation to reach Suggested Buy — LIVE.',
+                zoneInvalid: false,
+                zoneInvalidation,
+                linked,
+                live
+            });
+        }
+
+        const action = normalizedAssessment === ENTRY_STATE
+            ? 'BUY_NOW'
+            : normalizedAssessment === 'DO_NOT_ENTER'
+                ? 'DO_NOT_ENTER'
+                : 'WAIT';
+
+        return Object.freeze({
+            action,
+            reason: null,
+            zoneInvalid: false,
+            zoneInvalidation,
+            linked,
+            live
+        });
+    }
     function continuityDurationSeconds() {
         const value = Number(storageGet(CONTINUITY_DURATION_KEY));
         return [30, 60, 90, 120].includes(value)
@@ -2674,6 +2739,7 @@
         advanceContinuousValidity,
         linkedZoneGateEligible,
         priceOutsideBridgedZone,
+        finalActionContext,
         normalizeCompletedAssessment,
         reconcileLinkedLifecycle,
         captureCompletedAssessment,
