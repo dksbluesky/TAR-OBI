@@ -10,6 +10,11 @@
     <script src="./assessment-journal.js"></script>
     <script src="./mobile-support.js"></script>
     <script src="./bridge-monitor.js"></script>
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./notification-service-worker.js').catch(() => {}));</script>
     <style>body{font-family:Inter,sans-serif}.value-change{transition:color .15s ease}</style>
 </head>
 <body class="bg-slate-50 text-slate-900">

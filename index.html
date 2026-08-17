@@ -10,8 +10,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#2563eb">
-    <link rel="apple-touch-icon" href="https://placehold.co/180x180/2563EB/FFFFFF?text=DK">
-    <link rel="shortcut icon" href="https://placehold.co/64x64/2563EB/FFFFFF?text=DK">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <link rel="shortcut icon" href="./icons/icon-192.png">
+    <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./notification-service-worker.js').catch(() => {}));</script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         input[type='number']::-webkit-inner-spin-button,
