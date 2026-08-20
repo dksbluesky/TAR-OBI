@@ -77,6 +77,6 @@ assert.match(html, /SIGNAL MODE/);
 assert.match(html, /id="signal-mode"/);
 assert.match(html, /TarObiBridgeMonitor\?\.signalModeLabel\?\.\(assessment\.state\)/);
 assert.match(html, /TarObiBridgeMonitor\?\.finalActionContext\?\.\(linkedBridge, assessment\.state, price, session\)/);
-assert.match(html, /TAR-OBI Assessment Invalidation/);
+assert.doesNotMatch(html, /TAR-OBI Assessment Invalidation/);
 assert.match(html, /ETF_DCA Zone Invalidation/);
 console.log('final action UI tests passed');

@@ -291,8 +291,7 @@
             ['Preferred Entry', preferred],
             ['Maximum Entry', pricesActionable ? formatPrice(assessment.maximum, tick) : 'Unavailable'],
             ['Active Zone', hasZone ? `${formatPrice(Number(zone.low), tick)}–${formatPrice(Number(zone.high), tick)}` : 'Unavailable'],
-            ['Zone Source', zoneSource],
-            ['TAR-OBI Assessment Invalidation', pricesActionable ? formatPrice(assessment.invalidation, tick) : 'Unavailable']
+            ['Zone Source', zoneSource]
         ];
         if (hasZone && presentation.zoneInvalidation !== null) rows.push(['ETF_DCA Zone Invalidation', formatPrice(presentation.zoneInvalidation, tick)]);
         if (presentation.action === 'DO_NOT_ENTER' || presentation.zoneInvalid) rows.push(['Current Price', priceValue]);
