@@ -289,9 +289,6 @@
             starterEligible:
                 snapshot.starterEligible === true,
 
-            starterAllocationPct: optionalNumber(
-                snapshot.starterAllocationPct
-            ),
 
             starterExecuted:
                 snapshot.starterExecuted === true,
@@ -2141,20 +2138,7 @@
         return 'Not Eligible';
     }
 
-    function starterAllocationLabel(
-        bridge,
-        result
-    ) {
-        const value =
-            optionalNumber(
-                result?.starterAllocationPct
-                ?? bridge?.starterAllocationPct
-            );
 
-        return value === null
-            ? 'Unavailable'
-            : `${value}%`;
-    }
 
     function refreshUi() {
         if (
@@ -2329,16 +2313,6 @@
                         ></dd>
                     </div>
 
-                    <div data-monitor-starter>
-                        <dt class="text-xs text-slate-500">
-                            Starter Allocation
-                        </dt>
-
-                        <dd
-                            data-monitor-field="starter-allocation"
-                            class="mt-1 font-bold"
-                        ></dd>
-                    </div>
 
                     <div>
                         <dt class="text-xs text-slate-500">
@@ -2476,11 +2450,6 @@
                     result
                 ),
 
-            'starter-allocation':
-                starterAllocationLabel(
-                    bridge,
-                    result
-                ),
 
             price:
                 result?.currentPrice

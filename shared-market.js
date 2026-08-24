@@ -1391,7 +1391,7 @@
                     null;
 
                 factors.push(
-                    '– ETF_DCA starter is eligible; right-side confirmation is not required for this small starter allocation'
+                    '– Left-side starter is eligible; right-side confirmation is not required for this possible left-side entry'
                 );
             }
 

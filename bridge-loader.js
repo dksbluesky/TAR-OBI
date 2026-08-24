@@ -66,15 +66,7 @@
             || typeof value === 'boolean';
     }
 
-    function validStarterAllocation(value) {
-        if (value === undefined || value === null) return true;
 
-        const number = Number(value);
-
-        return Number.isFinite(number)
-            && number >= 0
-            && number <= 100;
-    }
 
     function validStarterRisk(value) {
         return value === undefined
@@ -159,13 +151,7 @@
         return 'Not Eligible / 不符合';
     }
 
-    function displayStarterAllocation(value) {
-        const number = Number(value);
 
-        return Number.isFinite(number)
-            ? `${number}%`
-            : 'Unavailable';
-    }
 
     function displayStarterRisk(risk) {
         if (!risk || typeof risk !== 'object') {
@@ -332,10 +318,6 @@
         }
 
         if (!validOptionalBoolean(bridge.starterEligible)) {
-            return false;
-        }
-
-        if (!validStarterAllocation(bridge.starterAllocationPct)) {
             return false;
         }
 
@@ -609,16 +591,6 @@
                                 ></dd>
                             </div>
 
-                            <div>
-                                <dt class="text-slate-500">
-                                    Starter Allocation
-                                </dt>
-
-                                <dd
-                                    data-bridge-field="starter-allocation"
-                                    class="mt-1 font-bold text-slate-800"
-                                ></dd>
-                            </div>
 
                             <div class="col-span-2">
                                 <dt class="text-slate-500">
@@ -746,9 +718,7 @@
             'zone-mode': bridge.zoneMode === 'manual_override' ? 'Manual Active Zone — user override; ETF_DCA automatic confirmation unavailable' : displayValue(bridge.zoneMode),
             'entry-mode': displayEntryMode(bridge.entryMode),
             'starter-status': displayStarterStatus(bridge),
-            'starter-allocation': displayStarterAllocation(
-                bridge.starterAllocationPct
-            ),
+
             'starter-risk': displayStarterRisk(
                 bridge.starterRisk
             ),

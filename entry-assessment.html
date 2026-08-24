@@ -108,7 +108,7 @@
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Invalidation Level / 條件失效價</dt><dd id="invalidation-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Price / 現價</dt><dd id="current-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                 </dl>
-                <p class="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET remains the confirmed/right-side state. Left-side starter states describe execution quality for a small ETF_DCA starter allocation and do not trigger confirmed-entry notification logic.</p>
+                <p class="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET remains the confirmed/right-side state. Left-side starter states describe execution quality for a possible left-side entry and do not trigger confirmed-entry notification logic.</p>
             </article>
 
             <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -320,7 +320,6 @@
             executionContext: linkedBridge ? {
                 entryMode: linkedBridge.entryMode || 'pending',
                 starterEligible: linkedBridge.starterEligible === true,
-                starterAllocationPct: linkedBridge.starterAllocationPct ?? null,
                 starterExecuted: linkedBridge.starterExecuted === true,
                 starterRisk: linkedBridge.starterRisk || null,
                 activeZone: linkedBridge.activeZone || null,
@@ -437,7 +436,6 @@
             assessment,
             entryMode: linkedBridge?.entryMode || 'pending',
             starterEligible: linkedBridge?.starterEligible === true,
-            starterAllocationPct: linkedBridge?.starterAllocationPct ?? null,
             starterExecuted: linkedBridge?.starterExecuted === true,
             starterRisk: linkedBridge?.starterRisk || null,
             tarState: tar,
