@@ -31,7 +31,6 @@ function bridge(overrides = {}) {
         invalidationLevel: 217,
         entryMode: 'pending',
         starterEligible: false,
-        starterAllocationPct: null,
         starterExecuted: false,
         starterRisk: null,
         lifecycle: {
@@ -135,6 +134,7 @@ loader.renderContextPanel(panel, {
 assert.equal(panel.hidden, false);
 assert.equal(monitorRenders, 1, 'one context render creates one attached monitor slot');
 assert.equal(fields.get('entry-mode').textContent, 'Pending / Intraday Monitoring / 盤中監控');
+assert.equal(fields.has('starter-allocation'), false, 'Starter Allocation is not rendered in linked TAR-OBI UI');
 
 assert.equal(monitor.transitionLifecycle('COMPLETED', '2026-08-03T01:02:00.000Z'), true);
 assert.equal(loader.refreshLinkedBridge().lifecycle.status, 'COMPLETED');
@@ -145,5 +145,6 @@ loader.renderContextPanel(panel, {
 });
 assert.equal(panel.hidden, false, 'completed context panel remains visible');
 assert.equal(fields.get('entry-mode').textContent, 'Pending / Intraday Monitoring / 盤中監控');
+assert.equal(fields.has('starter-allocation'), false, 'Starter Allocation is not rendered in linked TAR-OBI UI');
 
 console.log('linked bridge persistence tests passed');
