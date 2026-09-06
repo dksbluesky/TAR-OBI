@@ -115,11 +115,19 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true,
 
 {
     const { container, fields } = renderNotificationCase('default', false);
-    assert.match(container.innerHTML, /Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid linked Active Zone \(automatically confirmed or an explicit Manual Active Zone override\), and uninterrupted validity for the selected duration\. Any failed or stale condition resets the timer\./);
+    assert.match(container.innerHTML, /The timer advances only when a new completed assessment is received while this page remains active; any failed or stale condition resets it\./);
     assert.match(container.innerHTML, /data-monitor-field="entry-confirmation"/);
     assert.match(container.innerHTML, /data-monitor-field="continuous-validity"/);
     assert.match(container.innerHTML, /data-monitor-continuity/);
     assert.equal(fields.get('entry-confirmation').textContent, 'Not pending');
+}
+
+{
+    const { fields } = renderNotificationCase('default', false, true, {
+        extensions: { sourceContextUpdatedAt: '2000-01-01T00:00:00.000Z' }
+    });
+    assert.equal(fields.get('entry-confirmation').textContent, 'ETF CONTEXT STALE — reopen or refresh ETF_DCA-plan');
+    assert.equal(fields.get('continuous-validity').textContent, 'ETF CONTEXT STALE — reopen or refresh ETF_DCA-plan');
 }
 
 {

@@ -10,6 +10,7 @@
     let serviceWorkerRequest = null;
     let wakeLockSentinel = null;
     let wakeLockRequest = null;
+    let wakeLockGeneration = 0;
 
     /**
      * Registers the notification service worker when the browser supports it.
@@ -87,9 +88,21 @@
         const wakeLock = root.navigator?.wakeLock;
         if (!wakeLock || typeof wakeLock.request !== 'function') return false;
 
+        const requestGeneration = ++wakeLockGeneration;
         wakeLockRequest = Promise.resolve()
             .then(() => wakeLock.request('screen'))
-            .then(sentinel => {
+            .then(async sentinel => {
+                if (
+                    requestGeneration !== wakeLockGeneration
+                    || root.document?.visibilityState === 'hidden'
+                ) {
+                    try {
+                        await sentinel?.release?.();
+                    } catch (error) {
+                        // A cancelled request must not affect monitor state.
+                    }
+                    return false;
+                }
                 wakeLockSentinel = sentinel || null;
                 wakeLockSentinel?.addEventListener?.('release', () => {
                     wakeLockSentinel = null;
@@ -109,6 +122,7 @@
      * @returns {Promise<boolean>} Whether no active wake lock remains.
      */
     async function releaseScreenWakeLock() {
+        wakeLockGeneration += 1;
         const sentinel = wakeLockSentinel;
         wakeLockSentinel = null;
         if (!sentinel || sentinel.released) return true;

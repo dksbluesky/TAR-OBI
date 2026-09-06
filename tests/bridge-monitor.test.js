@@ -67,7 +67,7 @@ function validSnapshot(overrides = {}) {
 }
 
 function loadMonitor(bridge, options = {}) {
-    const storage = createStorage({
+    const storage = options.storage || createStorage({
         [STORAGE_KEY]: JSON.stringify(bridge),
         [PREFERENCE_KEY]: options.notificationsEnabled ? 'true' : 'false'
     });
@@ -102,6 +102,26 @@ function loadMonitor(bridge, options = {}) {
         onUiRefresh: options.onUiRefresh
     });
     return { monitor, storage, bridgeApi, notifications };
+}
+
+{
+    const initialBridge = validBridge();
+    const sharedStorage = createStorage({
+        [STORAGE_KEY]: JSON.stringify(initialBridge),
+        [PREFERENCE_KEY]: 'false'
+    });
+    const firstPage = loadMonitor(initialBridge, { storage: sharedStorage });
+    const firstSessionId = stored(sharedStorage).lifecycle.monitorSessionId;
+    const reloadedBridge = stored(sharedStorage);
+    loadMonitor(reloadedBridge, { storage: sharedStorage });
+    const secondSessionId = stored(sharedStorage).lifecycle.monitorSessionId;
+
+    assert.notEqual(secondSessionId, firstSessionId, 'reload claims a new monitor session');
+    assert.equal(
+        firstPage.monitor.captureCompletedAssessment(validSnapshot()).reason,
+        'inactive-linked-session',
+        'a delayed response from the old page cannot overwrite the reloaded monitor'
+    );
 }
 
 function stored(storage) {
@@ -302,6 +322,35 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
     const live = monitor.captureCompletedAssessment(entry('2026-07-27T02:02:30.000Z', 235.5));
     assert.equal(live.continuousValidity.status, 'LIVE');
     assert.equal(live.continuousValidity.liveAt, '2026-07-27T02:02:30.000Z');
+}
+{
+    const linkedBridge = validBridge({
+        extensions: {
+            sourceContextUpdatedAt: '2026-07-27T02:00:00.000Z',
+            marketContextV1: {
+                context: 'bullish',
+                automaticZoneEligible: true,
+                invalidationLevel: 234.8
+            }
+        }
+    });
+    const { monitor } = loadMonitor(linkedBridge);
+    const entry = evaluatedAt => validSnapshot({
+        evaluatedAt,
+        currentPrice: 235.5,
+        assessment: {
+            ...validSnapshot().assessment,
+            state: 'ENTRY CONDITIONS MET',
+            factors: ['Entry conditions met']
+        }
+    });
+
+    assert.equal(monitor.sourceContextStale(linkedBridge, '2026-07-27T02:01:30.000Z'), false);
+    assert.equal(monitor.sourceContextStale(linkedBridge, '2026-07-27T02:01:31.000Z'), true);
+    const stale = monitor.captureCompletedAssessment(entry('2026-07-27T02:01:31.000Z'));
+    assert.equal(stale.continuousValidity.status, 'STALE');
+    assert.equal(stale.confirmed, false);
+    assert.equal(stale.notified, false);
 }
 {
     const manualBridge = validBridge({

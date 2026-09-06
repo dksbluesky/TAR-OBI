@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const modulePath = require.resolve('../bridge-monitor.js');
+const modulePath = require.resolve('./bridge-monitor.js');
 const STORAGE_KEY = 'etfDca.executionBridge.v1';
 const PREFERENCE_KEY = 'tarObi.executionBridge.notificationsEnabled.v1';
 

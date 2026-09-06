@@ -12,6 +12,7 @@
     const CONTRACT_VERSION = '1.0';
     const NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000;
     const DATA_UNAVAILABLE_SUSTAINED_MS = 5 * 60 * 1000;
+    const SOURCE_CONTEXT_STALE_MS = 90 * 1000;
     const ENTRY_STATE = 'ENTRY_CONDITIONS_MET';
     const ENTRY_CONFIRMATION_REQUIRED = 2;
     const ENTRY_CONFIRMATION_STATUS = Object.freeze({
@@ -442,9 +443,19 @@
         const manualOverride = bridge?.zoneMode === 'manual_override' && context.manualOverride === true;
         return !manualOverride && (context.context !== 'bullish' || context.automaticZoneEligible !== true);
     }
+    function sourceContextStale(bridge, now = Date.now()) {
+        const updatedAt = bridge?.extensions?.sourceContextUpdatedAt;
+        if (!updatedAt) return false;
+        const updatedMs = Date.parse(updatedAt);
+        const nowMs = now instanceof Date ? now.getTime() : Date.parse(now) || Number(now);
+        return !Number.isFinite(updatedMs)
+            || !Number.isFinite(nowMs)
+            || nowMs - updatedMs > SOURCE_CONTEXT_STALE_MS;
+    }
     // Linked-zone gate only controls monitor confirmation. It never changes the raw TAR-OBI assessment.
     function linkedZoneGateEligible(bridge, result) {
         if (linkedZoneUnavailable(bridge)) return false;
+        if (sourceContextStale(bridge, result?.evaluatedAt)) return false;
         const context = bridge?.extensions?.marketContextV1;
         // Legacy bridge v1 objects with a valid zone preserve prior behavior.
         if (!context) return true;
@@ -498,6 +509,7 @@
         const normalizedAssessment = normalizeState(assessmentState);
         const linked = Boolean(bridge);
         const noValidZone = linkedZoneUnavailable(bridge);
+        const staleSourceContext = sourceContextStale(bridge);
         const zoneInvalidation = optionalNumber(bridge?.invalidationLevel);
         const zoneInvalid = linked
             && !noValidZone
@@ -514,6 +526,16 @@
                 zoneInvalidation,
                 linked,
                 live
+            });
+        }
+        if (staleSourceContext) {
+            return Object.freeze({
+                action: 'WAIT',
+                reason: 'ETF CONTEXT STALE',
+                zoneInvalid: false,
+                zoneInvalidation,
+                linked,
+                live: false
             });
         }
 
@@ -633,6 +655,16 @@
             reason: 'price outside bridged Zone'
         };
     }
+    function staleContinuousValidity() {
+        return {
+            status: 'STALE',
+            startedAt: null,
+            durationSeconds: continuityDurationSeconds(),
+            elapsedSeconds: 0,
+            liveAt: null,
+            reason: 'ETF CONTEXT STALE'
+        };
+    }
 
     function continuousValidityLabel(validity, result) {
         if (result?.assessmentState === 'DATA_UNAVAILABLE') {
@@ -646,6 +678,7 @@
         if (validity?.status === 'LIVE') return 'Suggested Buy — LIVE';
         if (validity?.status === 'PENDING') return `Confirmation pending — ${validity.elapsedSeconds || 0} / ${validity.durationSeconds || DEFAULT_CONTINUITY_SECONDS} seconds`;
         if (validity?.status === 'EXPIRED' && validity?.reason === 'price outside bridged Zone') return 'EXPIRED — price outside bridged Zone';
+        if (validity?.status === 'STALE') return 'ETF CONTEXT STALE — waiting for ETF_DCA-plan';
         return 'Not pending';
     }
     function notificationAllowed(
@@ -1735,10 +1768,13 @@
                 .entryConfirmation;
 
         const zoneGateEligible = linkedZoneGateEligible(current, result);
+        const staleSourceContext = sourceContextStale(current, result.evaluatedAt);
         const outsideBridgedZone = priceOutsideBridgedZone(current, result);
         const continuousEligible = zoneGateEligible && result.assessmentState === ENTRY_STATE;
         const previousContinuous = notificationState.continuousValidity || null;
-        const nextContinuous = outsideBridgedZone
+        const nextContinuous = staleSourceContext
+            ? staleContinuousValidity()
+            : outsideBridgedZone
             ? expiredContinuousValidity()
             : advanceContinuousValidity(previousContinuous, continuousEligible, result.evaluatedAt);
         const nextConfirmation = advanceEntryConfirmation(
@@ -2199,9 +2235,12 @@
             linkedZoneUnavailable(
                 bridge
             );
+        const staleSourceContext = sourceContextStale(bridge);
 
         const linkedZoneExpiredLabel =
             'EXPIRED — no valid ETF_DCA Active Long Zone';
+        const staleSourceContextLabel =
+            'ETF CONTEXT STALE — reopen or refresh ETF_DCA-plan';
         const permission =
             notificationPermission();
 
@@ -2415,7 +2454,7 @@
                     </div>
 
                     <p class="mt-2 text-xs text-slate-500">
-                        Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid linked Active Zone (automatically confirmed or an explicit Manual Active Zone override), and uninterrupted validity for the selected duration. Any failed or stale condition resets the timer.
+                        Suggested Buy — LIVE requires the existing completed TAR-OBI conditions, a valid linked Active Zone (automatically confirmed or an explicit Manual Active Zone override), and uninterrupted validity for the selected duration. The timer advances only when a new completed assessment is received while this page remains active; any failed or stale condition resets it.
                     </p>
                 </div>
 
@@ -2435,8 +2474,8 @@
                     ?.assessmentState
                 || 'Not evaluated',
 
-            'entry-confirmation': linkedZoneExpired ? linkedZoneExpiredLabel : entryConfirmationLabel(entryConfirmation),
-            'continuous-validity': linkedZoneExpired ? linkedZoneExpiredLabel : continuousValidityLabel(bridge.notificationState?.continuousValidity, result),
+            'entry-confirmation': linkedZoneExpired ? linkedZoneExpiredLabel : staleSourceContext ? staleSourceContextLabel : entryConfirmationLabel(entryConfirmation),
+            'continuous-validity': linkedZoneExpired ? linkedZoneExpiredLabel : staleSourceContext ? staleSourceContextLabel : continuousValidityLabel(bridge.notificationState?.continuousValidity, result),
 
             'entry-mode':
                 entryModeLabel(
@@ -2720,6 +2759,7 @@
         CONTRACT_VERSION,
         NOTIFICATION_COOLDOWN_MS,
         DATA_UNAVAILABLE_SUSTAINED_MS,
+        SOURCE_CONTEXT_STALE_MS,
         ENTRY_STATE,
         ENTRY_CONFIRMATION_REQUIRED,
         CONTINUITY_DURATION_KEY,
@@ -2732,6 +2772,7 @@
         setContinuityDuration,
         advanceContinuousValidity,
         linkedZoneGateEligible,
+        sourceContextStale,
         priceOutsideBridgedZone,
         finalActionContext,
         signalModeLabel,

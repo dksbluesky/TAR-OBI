@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const modulePath = require.resolve('../mobile-support.js');
+const modulePath = require.resolve('./mobile-support.js');
 
 function setGlobal(name, value) {
     Object.defineProperty(global, name, {
@@ -98,6 +98,41 @@ function loadSupport() {
         const support = loadSupport();
         assert.equal(await support.requestScreenWakeLock(), false);
         assert.equal(requests, 0);
+    }
+
+    {
+        let resolveRequest;
+        let released = false;
+        const sentinel = {
+            released: false,
+            addEventListener() {},
+            async release() {
+                this.released = true;
+                released = true;
+            }
+        };
+        const documentState = { visibilityState: 'visible' };
+        setGlobal('document', documentState);
+        setGlobal('navigator', {
+            wakeLock: {
+                request() {
+                    return new Promise(resolve => {
+                        resolveRequest = resolve;
+                    });
+                }
+            }
+        });
+
+        const support = loadSupport();
+        const pending = support.requestScreenWakeLock();
+        await Promise.resolve();
+        documentState.visibilityState = 'hidden';
+        await support.releaseScreenWakeLock();
+        resolveRequest(sentinel);
+
+        assert.equal(await pending, false, 'a hidden page cannot retain a late wake-lock grant');
+        assert.equal(released, true, 'late wake-lock grant is released immediately');
+        assert.equal(support.screenWakeLockStatus(), 'Available');
     }
 
     console.log('mobile support tests passed');
