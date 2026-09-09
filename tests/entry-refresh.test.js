@@ -18,8 +18,18 @@ assert.match(
 );
 assert.match(
     html,
-    /getMarketSession\(quoteData,\s*settings\.interval\s*\*\s*1000\)\s*===\s*'closed'/,
-    'refresh timer stops only after market-session classification reports closed'
+    /ensureRefreshTimer\(MarketData\.getMarketSession\(quoteData,\s*settings\.interval\s*\*\s*1000\)\)/,
+    'each completed request adjusts the refresh timer for the current market session'
+);
+assert.match(
+    html,
+    /const delay = session === 'closed' \? 60000 : querySettings\(\)\.interval \* 1000/,
+    'closed sessions continue polling once per minute while live sessions use the configured interval'
+);
+assert.match(
+    html,
+    /ensureRefreshTimer\('unavailable'\)/,
+    'page setup always starts a refresh timer that can detect the next market open'
 );
 assert.match(
     html,

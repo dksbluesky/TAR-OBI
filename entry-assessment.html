@@ -156,6 +156,7 @@
     let candleData = null;
     let fetching = false;
     let refreshTimer = null;
+    let refreshDelay = null;
     let acceptedTimestamp = null;
 
    function querySettings() {
@@ -487,10 +488,16 @@
                 const monitorState = window.TarObiBridgeMonitor?.captureCompletedAssessment(completedSnapshot);
                 window.TarObiAssessmentJournal?.recordCompletedAssessment(completedSnapshot, linked, monitorState);
             }
-            if (MarketData.getMarketSession(quoteData, settings.interval * 1000) === 'closed') {
-                clearInterval(refreshTimer); refreshTimer = null;
-            }
+            ensureRefreshTimer(MarketData.getMarketSession(quoteData, settings.interval * 1000));
         }
+    }
+
+    function ensureRefreshTimer(session) {
+        const delay = session === 'closed' ? 60000 : querySettings().interval * 1000;
+        if (refreshTimer && refreshDelay === delay) return;
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshDelay = delay;
+        refreshTimer = setInterval(fetchData, delay);
     }
 
     function setup() {
@@ -534,7 +541,7 @@
         });
         renderBridgeContext();
         render(); fetchData();
-        refreshTimer = setInterval(fetchData, querySettings().interval * 1000);
+        ensureRefreshTimer('unavailable');
         document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });
         window.addEventListener('storage', event => { if (event.key === REFRESH_REQUEST_KEY && event.newValue) fetchData(); });
     }

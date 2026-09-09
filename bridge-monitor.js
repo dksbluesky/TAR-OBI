@@ -1362,6 +1362,40 @@
             && now.getTime() >= expires;
     }
 
+    function rollActiveLifecycleForward(bridge, now) {
+        const lifecycle = lifecycleFor(bridge, now);
+        return {
+            ...bridge,
+            lifecycle: {
+                ...lifecycle,
+                status: lifecycle.status,
+                updatedAt: isoNow(now),
+                expiresAt: calculateExpiresAt(now),
+                reason: null,
+                previousSessionClosedAt: lifecycle.expiresAt || null
+            },
+            monitorResult: null,
+            notificationState: {
+                ...(bridge.notificationState || {}),
+                dataUnavailableSince: null,
+                lastDataUnavailableNotifiedAt: null,
+                entryConfirmation: {
+                    status: ENTRY_CONFIRMATION_STATUS.NONE,
+                    consecutiveCount: 0,
+                    confirmedAt: null
+                },
+                continuousValidity: {
+                    status: 'NONE',
+                    startedAt: null,
+                    durationSeconds: continuityDurationSeconds(),
+                    elapsedSeconds: 0,
+                    liveAt: null,
+                    reason: 'New trading session requires fresh confirmation.'
+                }
+            }
+        };
+    }
+
     function commitIfUnchanged(
         raw,
         bridge
@@ -1413,14 +1447,10 @@
             )
             && isExpired(lifecycle, clock)
         ) {
-            lifecycle = {
-                ...lifecycle,
-                status: 'EXPIRED',
-                updatedAt: isoNow(clock),
-                reason:
-                    lifecycle.reason
-                    || 'Monitoring period ended at the Taiwan market close.'
-            };
+            const rolled = rollActiveLifecycleForward(current, clock);
+            lifecycle = rolled.lifecycle;
+            current.monitorResult = rolled.monitorResult;
+            current.notificationState = rolled.notificationState;
         }
 
         const updated = {
@@ -1593,69 +1623,32 @@
         }
 
         if (
+            ['ACTIVE', 'PAUSED'].includes(
+                lifecycle.status
+            )
+            &&
             isExpired(
                 lifecycle,
                 clock
             )
         ) {
-            const expired = {
-                ...current,
-
-                lifecycle: {
-                    ...lifecycle,
-                    status: 'EXPIRED',
-                    updatedAt: isoNow(clock),
-
-                    reason:
-                        lifecycle.reason
-                        || 'Monitoring period ended at the Taiwan market close.'
-                }
-            };
-
-            const expiredStored =
+            const rolled = rollActiveLifecycleForward(current, clock);
+            const rolledStored =
                 commitIfUnchanged(
                     raw,
-                    expired
+                    rolled
                 );
 
             bridgeApi
                 ?.refreshLinkedBridge
                 ?.();
 
-            if (expiredStored) {
-                const result =
-                    expired.monitorResult
-                    || {
-                        assessmentState:
-                            'EXPIRED',
-
-                        currentPrice:
-                            null,
-
-                        evaluatedAt:
-                            expired
-                                .lifecycle
-                                .updatedAt
-                    };
-
-                showInPageAlert(
-                    result,
-                    'The linked monitor has expired.'
-                );
-
-                issueStatusNotification(
-                    `${expired.ticker} Monitor Expired`,
-                    'The linked monitor reached its Taiwan trading-day expiration.',
-                    `tar-obi-expired-${expired.bridgeId}`
-                );
-            }
-
             refreshUi();
 
             return {
                 written: false,
                 notified: false,
-                reason: 'expired'
+                reason: rolledStored ? 'session-rolled' : 'concurrent-update'
             };
         }
 
@@ -2766,6 +2759,7 @@
         DEFAULT_CONTINUITY_SECONDS,
         ENTRY_CONFIRMATION_STATUS,
         calculateExpiresAt,
+        rollActiveLifecycleForward,
         notificationUiState,
         advanceEntryConfirmation,
         continuityDurationSeconds,

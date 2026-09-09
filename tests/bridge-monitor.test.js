@@ -174,13 +174,38 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
 }
 
 {
-    const { monitor, storage } = loadMonitor(validBridge({
-        lifecycle: { ...validBridge().lifecycle, expiresAt: '2026-07-27T02:05:00.000Z' }
+    const bridge = validBridge();
+    const { monitor, storage, bridgeApi } = loadMonitor(bridge);
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+        ...stored(storage),
+        lifecycle: { ...stored(storage).lifecycle, expiresAt: '2026-07-27T02:05:00.000Z' }
     }));
+    bridgeApi.refreshLinkedBridge();
     const result = monitor.captureCompletedAssessment(validSnapshot(), '2026-07-27T02:10:00.000Z');
-    assert.equal(result.reason, 'expired');
-    assert.equal(stored(storage).lifecycle.status, 'EXPIRED');
+    assert.equal(result.reason, 'session-rolled');
+    assert.equal(stored(storage).lifecycle.status, 'ACTIVE');
+    assert.equal(stored(storage).lifecycle.expiresAt, '2026-07-27T05:30:00.000Z');
+    assert.equal(stored(storage).lifecycle.previousSessionClosedAt, '2026-07-27T02:05:00.000Z');
+    assert.equal(stored(storage).notificationState.entryConfirmation.status, 'NONE');
+    assert.equal(stored(storage).notificationState.continuousValidity.status, 'NONE');
     assert.equal(stored(storage).monitorResult, null);
+}
+
+{
+    const bridge = validBridge({
+        lifecycle: { ...validBridge().lifecycle, status: 'PAUSED', expiresAt: '2026-07-24T05:30:00.000Z' },
+        monitorResult: validSnapshot(),
+        notificationState: {
+            entryConfirmation: { status: 'CONFIRMED', consecutiveCount: 2, confirmedAt: '2026-07-24T03:00:00.000Z' },
+            continuousValidity: { status: 'LIVE', startedAt: '2026-07-24T02:58:30.000Z', elapsedSeconds: 90 }
+        }
+    });
+    const rolled = loadMonitor(bridge).monitor.rollActiveLifecycleForward(bridge, new Date('2026-07-27T02:10:00.000Z'));
+    assert.equal(rolled.lifecycle.status, 'PAUSED', 'cross-day rollover preserves an explicit pause');
+    assert.equal(rolled.lifecycle.expiresAt, '2026-07-27T05:30:00.000Z');
+    assert.equal(rolled.monitorResult, null, 'a prior-day assessment is never carried forward');
+    assert.deepEqual(rolled.notificationState.entryConfirmation, { status: 'NONE', consecutiveCount: 0, confirmedAt: null });
+    assert.equal(rolled.notificationState.continuousValidity.status, 'NONE');
 }
 
 {
