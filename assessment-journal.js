@@ -32,12 +32,8 @@
     function meaningfulSignature(entry) {
         return JSON.stringify({
             assessmentState: entry.assessmentState,
-            confidence: entry.confidence,
-            tarState: entry.tarState,
-            obiState: entry.obiState,
-            vwapState: entry.vwapState,
-            spreadState: entry.spreadState,
-            volumeQuality: entry.volumeQuality,
+            confirmationStatus: entry.confirmationState?.status || null,
+            confirmationReason: entry.confirmationState?.reason || null,
             marketSession: entry.marketSession
         });
     }

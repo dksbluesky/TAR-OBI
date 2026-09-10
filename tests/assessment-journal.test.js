@@ -42,6 +42,14 @@ assert.strictEqual(journal.recordCompletedAssessment({
     evaluatedAt: '2026-08-05T01:00:10.000Z',
     currentPrice: 237.1
 }, bridge), null, 'price-only refresh inside heartbeat window must be ignored');
+assert.strictEqual(journal.recordCompletedAssessment({
+    ...snapshot,
+    evaluatedAt: '2026-08-05T01:00:10.000Z',
+    tarState: 'Balanced',
+    obiState: 'Balanced',
+    vwapState: 'Near VWAP',
+    assessment: { state: 'WAIT FOR PULLBACK', confidence: 'Medium' }
+}, bridge), null, 'component fluctuations inside heartbeat window must be retained by the next heartbeat, not as separate records');
 assert.strictEqual(journal.listEntries({ bridgeId: 'bridge-1' }).length, 1);
 
 const next = journal.recordCompletedAssessment({
@@ -52,11 +60,18 @@ const next = journal.recordCompletedAssessment({
 assert.strictEqual(next.assessmentState, 'WAIT FOR CONFIRMATION');
 assert.strictEqual(journal.listEntries({ bridgeId: 'bridge-1' })[0].assessmentState, 'WAIT FOR CONFIRMATION');
 
+const confirmationChange = journal.recordCompletedAssessment({
+    ...snapshot,
+    evaluatedAt: '2026-08-05T01:00:20.000Z',
+    assessment: { state: 'WAIT FOR CONFIRMATION', confidence: 'Medium' }
+}, bridge, { continuousValidity: { status: 'CONFIRMING', reason: 'confirmation window started' } });
+assert.ok(confirmationChange, 'confirmation-state changes must be recorded immediately');
+
 const heartbeat = journal.recordCompletedAssessment({
     ...snapshot,
-    evaluatedAt: '2026-08-05T01:15:10.000Z',
+    evaluatedAt: '2026-08-05T01:15:20.000Z',
     assessment: { state: 'WAIT FOR CONFIRMATION', confidence: 'Medium' }
-}, bridge);
+}, bridge, { continuousValidity: { status: 'CONFIRMING', reason: 'confirmation window started' } });
 assert.ok(heartbeat, 'unchanged state is retained as a 15-minute heartbeat');
 
 console.log('assessment-journal tests passed');
