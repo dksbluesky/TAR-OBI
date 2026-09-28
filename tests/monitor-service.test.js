@@ -1,0 +1,163 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const http = require('node:http');
+const os = require('node:os');
+const path = require('node:path');
+const { createHttpServer, createMonitorService } = require('../monitor-service.js');
+
+const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'tar-obi-monitor-'));
+const stateFile = path.join(temporaryDirectory, 'state.json');
+let clock = new Date('2026-07-27T02:00:00.000Z');
+let snapshotTime = clock.toISOString();
+let snapshotPrice = 235.5;
+const pushes = [];
+
+function bridge() {
+    return {
+        version: '1.0',
+        bridgeId: 'bridge-001',
+        ticker: '006208',
+        createdAt: '2026-07-27T02:00:00.000Z',
+        sourceApplication: 'ETF_DCA-plan',
+        marketTimeframe: '1d',
+        activeZone: { low: 235.25, high: 235.6 },
+        invalidationLevel: 234.8,
+        lifecycle: { status: 'ACTIVE', updatedAt: clock.toISOString(), expiresAt: '2099-07-27T05:30:00.000Z' },
+        notificationState: {},
+        extensions: {
+            sourceContextUpdatedAt: '2099-07-27T02:00:00.000Z',
+            marketContextV1: { context: 'bullish', automaticZoneEligible: true }
+        }
+    };
+}
+
+function snapshot(record) {
+    return {
+        complete: true,
+        ticker: record.bridge.ticker,
+        evaluatedAt: snapshotTime,
+        currentPrice: snapshotPrice,
+        preferredEntry: { low: 235.25, high: 235.6 },
+        maximumEntryPrice: 235.65,
+        invalidationLevel: 234.8,
+        marketSession: 'live',
+        assessment: {
+            state: 'ENTRY CONDITIONS MET',
+            lower: 235.25,
+            upper: 235.6,
+            maximum: 235.65,
+            invalidation: 234.8,
+            wideSpread: false,
+            factors: ['Entry conditions met'],
+            blockingReason: null
+        },
+        tarState: 'Buyer Active',
+        obiState: 'Bid Dominant',
+        vwapState: 'Near VWAP',
+        spreadState: 'ACCEPTABLE',
+        volumeQuality: 'NORMAL'
+    };
+}
+
+function serviceOptions(overrides = {}) {
+    return {
+        stateFile,
+        controlToken: 'control-token',
+        fugleApiKey: 'fugle-key',
+        telegramToken: 'telegram-token',
+        telegramChatId: 'chat-id',
+        now: () => new Date(clock),
+        buildSnapshotImpl: snapshot,
+        sendTelegramImpl: async (_fetch, _config, text) => { pushes.push(text); return { ok: true }; },
+        fetchImpl: async () => ({ ok: true, json: async () => ({}) }),
+        ...overrides
+    };
+}
+
+async function request(port, method, target, body) {
+    return new Promise((resolve, reject) => {
+        const request = http.request({
+            host: '127.0.0.1',
+            port,
+            method,
+            path: target,
+            headers: { Authorization: 'Bearer control-token', 'Content-Type': 'application/json' }
+        }, response => {
+            const chunks = [];
+            response.on('data', chunk => chunks.push(chunk));
+            response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+        });
+        request.on('error', reject);
+        if (body) request.write(JSON.stringify(body));
+        request.end();
+    });
+}
+
+(async () => {
+    const service = createMonitorService(serviceOptions());
+    service.putMonitor(bridge(), { entryBasis: 'combined', invalidationBasis: 'match', interval: 10 });
+    assert.equal(service.state.monitors['bridge-001'].bridge.lifecycle.status, 'ACTIVE', 'Start stores an active monitor');
+    assert.equal(service.lifecycle('bridge-001', 'pause').bridge.lifecycle.status, 'PAUSED');
+    assert.equal(service.lifecycle('bridge-001', 'resume').bridge.lifecycle.status, 'ACTIVE');
+
+    const first = await service.evaluate('bridge-001', { quote: {}, candles: null });
+    assert.equal(first.bridge.notificationState.continuousValidity.status, 'PENDING');
+    assert.equal(pushes.length, 0);
+
+    clock = new Date('2026-07-27T02:01:31.000Z');
+    snapshotTime = clock.toISOString();
+    const live = await service.evaluate('bridge-001', { quote: {}, candles: null });
+    assert.equal(live.event, 'LIVE');
+    assert.equal(live.pushed, true);
+    assert.equal(pushes.length, 1, 'PENDING to LIVE attempts exactly one Telegram push');
+
+    await service.evaluate('bridge-001', { quote: {}, candles: null });
+    assert.equal(pushes.length, 1, 'unchanged state does not duplicate Telegram push');
+
+    clock = new Date('2026-07-27T02:02:00.000Z');
+    snapshotTime = clock.toISOString();
+    snapshotPrice = 236;
+    const expired = await service.evaluate('bridge-001', { quote: {}, candles: null });
+    assert.equal(expired.event, 'EXPIRED');
+    assert.equal(pushes.length, 2, 'LIVE to EXPIRED attempts exactly one Telegram push');
+
+    service.lifecycle('bridge-001', 'pause');
+    const restarted = createMonitorService(serviceOptions());
+    assert.equal(restarted.state.monitors['bridge-001'].bridge.lifecycle.status, 'PAUSED', 'restart recovers the persisted monitor');
+    restarted.lifecycle('bridge-001', 'resume');
+    assert.equal(restarted.state.monitors['bridge-001'].bridge.lifecycle.status, 'ACTIVE');
+    restarted.lifecycle('bridge-001', 'end');
+    assert.equal(restarted.state.monitors['bridge-001'].bridge.lifecycle.status, 'COMPLETED', 'End completes the monitor');
+
+    const smokeState = path.join(temporaryDirectory, 'smoke-state.json');
+    pushes.length = 0;
+    snapshotPrice = 235.5;
+    clock = new Date('2026-07-27T02:00:00.000Z');
+    snapshotTime = clock.toISOString();
+    const smoke = createMonitorService(serviceOptions({ stateFile: smokeState }));
+    const server = createHttpServer(smoke);
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const port = server.address().port;
+    const started = await request(port, 'PUT', '/api/monitors/bridge-001', { ...bridge(), settings: { interval: 10 } });
+    assert.equal(started.status, 200, 'HTTP Start accepts the existing bridge');
+    await smoke.evaluate('bridge-001', { quote: {}, candles: null });
+    clock = new Date('2026-07-27T02:01:31.000Z');
+    snapshotTime = clock.toISOString();
+    await smoke.evaluate('bridge-001', { quote: {}, candles: null });
+    assert.equal(pushes.length, 1, 'end-to-end HTTP start, service evaluation, transition and Telegram path completes');
+    const tarPage = await request(port, 'GET', '/TAR-OBI/entry-assessment.html');
+    const etfPage = await request(port, 'GET', '/ETF_DCA-plan/index.html');
+    assert.equal(tarPage.status, 200, 'service hosts TAR-OBI for the Android browser');
+    assert.equal(etfPage.status, 200, 'service hosts ETF_DCA on the same origin');
+    await new Promise(resolve => server.close(resolve));
+
+    console.log('monitor service lifecycle test passed');
+    console.log('monitor service restart/recovery test passed');
+    console.log('Telegram transition deduplication test passed');
+    console.log('browser-independent end-to-end smoke test passed');
+})().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+});

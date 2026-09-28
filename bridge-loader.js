@@ -203,10 +203,14 @@
         try {
             if (!root.location) return 'unavailable';
 
+            const target = String(root.location.protocol || '').toLowerCase() === 'http:'
+                ? `${root.location.origin}/ETF_DCA-plan/`
+                : ETF_DCA_URL;
+
             if (typeof root.location.assign === 'function') {
-                root.location.assign(ETF_DCA_URL);
+                root.location.assign(target);
             } else {
-                root.location.href = ETF_DCA_URL;
+                root.location.href = target;
             }
 
             return 'fallback';

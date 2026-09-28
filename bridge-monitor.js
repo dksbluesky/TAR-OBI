@@ -2040,6 +2040,8 @@
                 ?.();
 
             void syncMobileSupport();
+            const remoteAction = nextStatus === 'COMPLETED' ? 'end' : nextStatus.toLowerCase();
+            void root.TarObiBackgroundMonitor?.setLifecycle?.(current.bridgeId, remoteAction);
             refreshUi();
         }
 
@@ -2452,7 +2454,7 @@
                 </div>
 
                 <p class="mt-3 text-xs text-slate-500">
-                    Monitoring requires this page to remain open. Mobile operating systems may suspend background pages.
+                    Browser-only monitoring requires this page to remain open. Configure the Always-On Background Monitor below to continue after the page is suspended or closed.
                 </p>
             </div>
         `;
@@ -2593,6 +2595,8 @@
                     'COMPLETED'
                 )
             );
+
+        root.TarObiBackgroundMonitor?.render?.(container, bridge);
     }
 
     function handleStorageEvent(event) {

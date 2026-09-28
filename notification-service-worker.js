@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'tar-obi-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v1`;
+const CACHE_NAME = `${CACHE_PREFIX}v2`;
 const PWA_ASSETS = [
     './manifest.webmanifest',
     './icons/icon-192.png',
@@ -44,4 +44,23 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('notificationclick', event => {
     event.notification.close();
+    const target = event.notification.data?.url || './entry-assessment.html';
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
+            const existing = windows.find(client => client.url === new URL(target, self.location.href).href);
+            return existing ? existing.focus() : clients.openWindow(target);
+        })
+    );
+});
+
+self.addEventListener('push', event => {
+    let payload = {};
+    try { payload = event.data?.json() || {}; } catch (_error) { payload = {}; }
+    event.waitUntil(self.registration.showNotification(payload.title || 'TAR-OBI Monitor', {
+        body: payload.body || 'A background monitor update is available.',
+        tag: payload.tag || 'tar-obi-background-monitor',
+        data: { url: payload.url || './entry-assessment.html', eventId: payload.eventId || null },
+        icon: './icons/icon-192.png',
+        badge: './icons/icon-192.png'
+    }));
 });
