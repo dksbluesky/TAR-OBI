@@ -7,10 +7,15 @@
 
     const URL_KEY = 'tarObi.backgroundMonitor.url.v1';
     const TOKEN_KEY = 'tarObi.backgroundMonitor.token.v1';
+    let panelExpanded = false;
 
     const storage = () => root.localStorage;
     const read = key => storage()?.getItem(key) || '';
-    const cleanUrl = value => String(value || '').trim().replace(/\/+$/, '');
+    const cleanUrl = value => {
+        const normalized = String(value || '').replace(/\s+/g, '').replace(/\/+$/, '');
+        if (!normalized || /^https?:\/\//i.test(normalized)) return normalized;
+        return `http://${normalized}`;
+    };
     const configured = () => Boolean(cleanUrl(read(URL_KEY)) && read(TOKEN_KEY));
     const escapeHtml = value => String(value || '').replace(/[&<>"']/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -77,6 +82,9 @@
                 </div>
                 <p class="mt-2 text-xs text-slate-500">The Mac continues Fugle monitoring and sends meaningful transitions through Telegram after this page closes. It is assessment support only, not a buy signal or order instruction.</p>
             </details>`;
+        const details = wrapper.querySelector('[data-background-monitor-details]');
+        details.open = panelExpanded;
+        details.addEventListener('toggle', () => { panelExpanded = details.open; });
         container.appendChild(wrapper);
         const statusElement = wrapper.querySelector('[data-background-status]');
         const show = (message, error = false) => {

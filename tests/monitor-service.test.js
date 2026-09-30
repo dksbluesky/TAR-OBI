@@ -76,18 +76,18 @@ function serviceOptions(overrides = {}) {
     };
 }
 
-async function request(port, method, target, body) {
+async function request(port, method, target, body, headers = {}) {
     return new Promise((resolve, reject) => {
         const request = http.request({
             host: '127.0.0.1',
             port,
             method,
             path: target,
-            headers: { Authorization: 'Bearer control-token', 'Content-Type': 'application/json' }
+            headers: { Authorization: 'Bearer control-token', 'Content-Type': 'application/json', ...headers }
         }, response => {
             const chunks = [];
             response.on('data', chunk => chunks.push(chunk));
-            response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+            response.on('end', () => resolve({ status: response.statusCode, headers: response.headers, body: Buffer.concat(chunks).toString('utf8') }));
         });
         request.on('error', reject);
         if (body) request.write(JSON.stringify(body));
@@ -140,15 +140,34 @@ async function request(port, method, target, body) {
     const server = createHttpServer(smoke);
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const port = server.address().port;
+    const preflight = await request(port, 'OPTIONS', '/api/monitors/bridge-001', undefined, {
+        Origin: 'https://dksbluesky.github.io',
+        'Access-Control-Request-Method': 'PUT',
+        'Access-Control-Request-Headers': 'authorization,content-type'
+    });
+    assert.equal(preflight.status, 204, 'GitHub Pages API preflight is accepted');
+    assert.equal(preflight.headers['access-control-allow-origin'], 'https://dksbluesky.github.io');
+    assert.match(preflight.headers['access-control-allow-methods'], /PUT/);
+    assert.match(preflight.headers['access-control-allow-headers'], /Authorization/);
+    const blockedPreflight = await request(port, 'OPTIONS', '/api/monitors/bridge-001', undefined, {
+        Origin: 'https://untrusted.example',
+        'Access-Control-Request-Method': 'PUT'
+    });
+    assert.equal(blockedPreflight.status, 403, 'unlisted web origins are rejected');
     const started = await request(port, 'PUT', '/api/monitors/bridge-001', { ...bridge(), settings: { interval: 10 } });
     assert.equal(started.status, 200, 'HTTP Start accepts the existing bridge');
+    const crossOriginStatus = await request(port, 'GET', '/api/monitors/bridge-001', undefined, {
+        Origin: 'https://dksbluesky.github.io'
+    });
+    assert.equal(crossOriginStatus.status, 200);
+    assert.equal(crossOriginStatus.headers['access-control-allow-origin'], 'https://dksbluesky.github.io');
     await smoke.evaluate('bridge-001', { quote: {}, candles: null });
     clock = new Date('2026-07-27T02:01:31.000Z');
     snapshotTime = clock.toISOString();
     await smoke.evaluate('bridge-001', { quote: {}, candles: null });
     assert.equal(pushes.length, 1, 'end-to-end HTTP start, service evaluation, transition and Telegram path completes');
     const tarPage = await request(port, 'GET', '/TAR-OBI/entry-assessment.html');
-    const etfPage = await request(port, 'GET', '/ETF_DCA-plan/index.html');
+    const etfPage = await request(port, 'GET', '/ETF_DCA-plan/');
     assert.equal(tarPage.status, 200, 'service hosts TAR-OBI for the Android browser');
     assert.equal(etfPage.status, 200, 'service hosts ETF_DCA on the same origin');
     await new Promise(resolve => server.close(resolve));

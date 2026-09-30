@@ -8,6 +8,7 @@ const ROOT = __dirname;
 const ETF_ROOT = path.resolve(ROOT, '..', 'ETF_DCA-plan');
 const STORAGE_KEY = 'etfDca.executionBridge.v1';
 const DEFAULT_STATE_FILE = path.join(ROOT, '.tar-obi-monitor-state.json');
+const ALLOWED_ORIGINS = new Set(['https://dksbluesky.github.io']);
 
 function loadDotEnv(file = path.join(ROOT, '.env')) {
     if (!fs.existsSync(file)) return;
@@ -305,6 +306,7 @@ function safeStaticPath(urlPath) {
     let base = ROOT;
     let relative = decoded;
     if (decoded === '/') relative = '/TAR-OBI/index.html';
+    if (decoded === '/ETF_DCA-plan/') relative = '/ETF_DCA-plan/index.html';
     if (relative.startsWith('/ETF_DCA-plan/')) {
         base = ETF_ROOT;
         relative = relative.slice('/ETF_DCA-plan'.length);
@@ -318,6 +320,23 @@ function safeStaticPath(urlPath) {
 function createHttpServer(service) {
     return http.createServer(async (request, response) => {
         try {
+            const origin = request.headers.origin;
+            if (origin && ALLOWED_ORIGINS.has(origin)) {
+                response.setHeader('Access-Control-Allow-Origin', origin);
+                response.setHeader('Vary', 'Origin');
+            }
+            if (request.method === 'OPTIONS') {
+                if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+                    response.writeHead(403).end();
+                    return;
+                }
+                response.writeHead(204, {
+                    'Access-Control-Allow-Methods': 'GET, HEAD, PUT, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+                    'Access-Control-Max-Age': '600'
+                }).end();
+                return;
+            }
             const url = new URL(request.url, 'http://localhost');
             const match = url.pathname.match(/^\/api\/monitors\/([^/]+)(?:\/([^/]+))?$/);
             if (url.pathname === '/api/config' && request.method === 'GET') {
