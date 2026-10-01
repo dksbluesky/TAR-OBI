@@ -104,24 +104,80 @@ async function request(port, method, target, body, headers = {}) {
 
     const first = await service.evaluate('bridge-001', { quote: {}, candles: null });
     assert.equal(first.bridge.notificationState.continuousValidity.status, 'PENDING');
-    assert.equal(pushes.length, 0);
+    assert.equal(first.event, 'STARTED');
+    assert.equal(first.pushed, true);
+    assert.equal(pushes.length, 1, 'the first evaluation sends one startup status message');
+    assert.match(pushes[0], /TAR-OBI MONITOR STARTED/);
+    assert.match(pushes[0], /Live Confirmation: PENDING/);
+    assert.match(pushes[0], /Bridged Active Zone: 235\.25–235\.6/);
 
     clock = new Date('2026-07-27T02:01:31.000Z');
     snapshotTime = clock.toISOString();
     const live = await service.evaluate('bridge-001', { quote: {}, candles: null });
     assert.equal(live.event, 'LIVE');
     assert.equal(live.pushed, true);
-    assert.equal(pushes.length, 1, 'PENDING to LIVE attempts exactly one Telegram push');
+    assert.equal(pushes.length, 2, 'PENDING to LIVE attempts exactly one Telegram push');
 
     await service.evaluate('bridge-001', { quote: {}, candles: null });
-    assert.equal(pushes.length, 1, 'unchanged state does not duplicate Telegram push');
+    assert.equal(pushes.length, 2, 'unchanged state does not duplicate Telegram push');
 
     clock = new Date('2026-07-27T02:02:00.000Z');
     snapshotTime = clock.toISOString();
     snapshotPrice = 236;
     const expired = await service.evaluate('bridge-001', { quote: {}, candles: null });
     assert.equal(expired.event, 'EXPIRED');
-    assert.equal(pushes.length, 2, 'LIVE to EXPIRED attempts exactly one Telegram push');
+    assert.equal(pushes.length, 3, 'LIVE to EXPIRED attempts exactly one Telegram push');
+
+    clock = new Date('2026-07-27T02:03:00.000Z');
+    snapshotTime = clock.toISOString();
+    snapshotPrice = 235.5;
+    service.putMonitor({
+        ...bridge(),
+        bridgeId: 'bridge-outside-zone',
+        activeZone: { low: 236, high: 237 }
+    });
+    const initialExpired = await service.evaluate('bridge-outside-zone', { quote: {}, candles: null });
+    assert.equal(initialExpired.bridge.notificationState.continuousValidity.status, 'EXPIRED');
+    assert.equal(initialExpired.event, 'STARTED');
+    assert.equal(initialExpired.pushed, true, 'an initially expired monitor reports its startup status');
+    assert.match(pushes.at(-1), /TAR-OBI MONITOR STARTED/);
+    assert.match(pushes.at(-1), /Live Confirmation: EXPIRED — price outside bridged Zone/);
+    assert.match(pushes.at(-1), /Bridged Active Zone: 236–237/);
+    await service.evaluate('bridge-outside-zone', { quote: {}, candles: null });
+    assert.equal(pushes.length, 4, 'repeated EXPIRED polling does not duplicate the startup message');
+
+    const incompleteService = createMonitorService(serviceOptions({
+        stateFile: path.join(temporaryDirectory, 'incomplete-state.json'),
+        buildSnapshotImpl: record => ({ complete: false, ticker: record.bridge.ticker })
+    }));
+    incompleteService.putMonitor({ ...bridge(), bridgeId: 'bridge-incomplete' });
+    const incomplete = await incompleteService.evaluate('bridge-incomplete', { quote: {}, candles: null });
+    assert.equal(incomplete.capture.written, false);
+    assert.equal(incomplete.event, null, 'an incomplete first assessment does not send a startup alert');
+    assert.equal(incompleteService.state.monitors['bridge-incomplete'].bridge.monitorResult ?? null, null);
+    incompleteService.config.buildSnapshotImpl = snapshot;
+    const completed = await incompleteService.evaluate('bridge-incomplete', { quote: {}, candles: null });
+    assert.equal(completed.event, 'STARTED', 'the first complete assessment sends the deferred startup alert');
+
+    let deliveryAttempts = 0;
+    const retryService = createMonitorService(serviceOptions({
+        stateFile: path.join(temporaryDirectory, 'retry-state.json'),
+        sendTelegramImpl: async () => {
+            deliveryAttempts += 1;
+            if (deliveryAttempts === 1) throw new Error('Telegram unavailable');
+            return { ok: true };
+        }
+    }));
+    retryService.putMonitor({ ...bridge(), bridgeId: 'bridge-retry' });
+    await assert.rejects(
+        retryService.evaluate('bridge-retry', { quote: {}, candles: null }),
+        /Telegram unavailable/
+    );
+    assert.equal(retryService.state.monitors['bridge-retry'].bridge.monitorResult ?? null, null);
+    const retried = await retryService.evaluate('bridge-retry', { quote: {}, candles: null });
+    assert.equal(retried.event, 'STARTED', 'a failed startup alert remains eligible for retry');
+    assert.equal(retried.pushed, true);
+    assert.equal(deliveryAttempts, 2);
 
     service.lifecycle('bridge-001', 'pause');
     const restarted = createMonitorService(serviceOptions());
@@ -165,7 +221,7 @@ async function request(port, method, target, body, headers = {}) {
     clock = new Date('2026-07-27T02:01:31.000Z');
     snapshotTime = clock.toISOString();
     await smoke.evaluate('bridge-001', { quote: {}, candles: null });
-    assert.equal(pushes.length, 1, 'end-to-end HTTP start, service evaluation, transition and Telegram path completes');
+    assert.equal(pushes.length, 2, 'end-to-end HTTP start sends the startup status and later LIVE transition');
     const tarPage = await request(port, 'GET', '/TAR-OBI/entry-assessment.html');
     const etfPage = await request(port, 'GET', '/ETF_DCA-plan/');
     assert.equal(tarPage.status, 200, 'service hosts TAR-OBI for the Android browser');

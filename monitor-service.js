@@ -142,9 +142,10 @@ function writeState(file, state) {
     fs.renameSync(temporary, file);
 }
 
-function transitionEvent(previous, next) {
+function transitionEvent(previous, next, initialEvaluation = false) {
     const before = previous?.notificationState?.continuousValidity?.status || 'NONE';
     const after = next?.notificationState?.continuousValidity?.status || 'NONE';
+    if (initialEvaluation) return 'STARTED';
     if (after === 'LIVE' && before !== 'LIVE') return 'LIVE';
     if (before === 'LIVE' && after === 'EXPIRED') return 'EXPIRED';
     return null;
@@ -152,15 +153,26 @@ function transitionEvent(previous, next) {
 
 function telegramText(event, bridge) {
     const result = bridge.monitorResult || {};
+    const validity = bridge.notificationState?.continuousValidity || {};
     const range = result.preferredEntry;
     const rangeText = Number.isFinite(Number(range?.low)) && Number.isFinite(Number(range?.high))
         ? `${range.low}–${range.high}`
         : 'Unavailable';
+    const zone = bridge.activeZone;
+    const zoneText = Number.isFinite(Number(zone?.low)) && Number.isFinite(Number(zone?.high))
+        ? `${zone.low}–${zone.high}`
+        : 'Unavailable';
+    const liveStatus = validity.reason
+        ? `${validity.status || 'NONE'} — ${validity.reason}`
+        : validity.status || 'NONE';
     return [
-        `TAR-OBI ${event}`,
+        event === 'STARTED' ? 'TAR-OBI MONITOR STARTED' : `TAR-OBI ${event}`,
         `Ticker: ${bridge.ticker}`,
+        `Live Confirmation: ${liveStatus}`,
         `Price: ${result.currentPrice ?? 'Unavailable'}`,
+        `Bridged Active Zone: ${zoneText}`,
         `Preferred Entry: ${rangeText}`,
+        `Assessment: ${result.assessmentState || 'Unavailable'}`,
         `TAR: ${result.tarState || 'Unavailable'}`,
         `OBI: ${result.obiState || 'Unavailable'}`,
         `VWAP: ${result.vwapState || 'Unavailable'}`,
@@ -249,6 +261,7 @@ function createMonitorService(options = {}) {
         const record = state.monitors[id];
         if (!record || record.bridge.lifecycle?.status !== 'ACTIVE') return { skipped: true };
         const previous = jsonClone(record.bridge);
+        const initialEvaluation = !previous.monitorResult?.evaluatedAt;
         const data = market || await fetchMarket(record);
         const snapshot = config.buildSnapshotImpl(record, data.quote, data.candles);
         serviceStorage.useBridge(record.bridge);
@@ -257,12 +270,24 @@ function createMonitorService(options = {}) {
         const capture = bridgeMonitor.captureCompletedAssessment(snapshot, config.now());
         record.bridge = serviceStorage.getBridge();
         record.updatedAt = config.now().toISOString();
-        const event = transitionEvent(previous, record.bridge);
+        const event = transitionEvent(
+            previous,
+            record.bridge,
+            initialEvaluation && capture.written && Boolean(record.bridge.monitorResult?.evaluatedAt)
+        );
         let pushed = false;
         if (event) {
             const eventId = `${event}:${record.bridge.monitorResult?.evaluatedAt || record.updatedAt}`;
             if (!record.pushedEvents.includes(eventId)) {
-                await config.sendTelegramImpl(config.fetchImpl, config, telegramText(event, record.bridge));
+                try {
+                    await config.sendTelegramImpl(config.fetchImpl, config, telegramText(event, record.bridge));
+                } catch (error) {
+                    if (event === 'STARTED') {
+                        record.bridge = previous;
+                        activeRecord = null;
+                    }
+                    throw error;
+                }
                 record.pushedEvents.push(eventId);
                 pushed = true;
             }
