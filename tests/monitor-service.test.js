@@ -233,6 +233,11 @@ async function request(port, method, target, body, headers = {}) {
     assert.equal(blockedPreflight.status, 403, 'unlisted web origins are rejected');
     const started = await request(port, 'PUT', '/api/monitors/bridge-001', { ...bridge(), settings: { interval: 10 } });
     assert.equal(started.status, 200, 'HTTP Start accepts the existing bridge');
+    const current = await request(port, 'GET', '/api/monitors/current');
+    assert.equal(current.status, 200, 'authenticated clients can restore the current active bridge');
+    assert.equal(JSON.parse(current.body).bridge.lifecycle.status, 'ACTIVE');
+    const unauthorizedCurrent = await request(port, 'GET', '/api/monitors/current', undefined, { Authorization: 'Bearer wrong-token' });
+    assert.equal(unauthorizedCurrent.status, 401, 'current monitor restore requires the private control token');
     const crossOriginStatus = await request(port, 'GET', '/api/monitors/bridge-001', undefined, {
         Origin: 'https://dksbluesky.github.io'
     });

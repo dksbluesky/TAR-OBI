@@ -380,6 +380,23 @@ function createHttpServer(service) {
                 response.end(JSON.stringify({ notification: 'telegram', telegramConfigured: Boolean(service.config.telegramToken && service.config.telegramChatId) }));
                 return;
             }
+            if (url.pathname === '/api/monitors/current' && request.method === 'GET') {
+                if (request.headers.authorization !== `Bearer ${service.config.controlToken}`) {
+                    response.writeHead(401).end('Unauthorized');
+                    return;
+                }
+                const current = Object.values(service.state.monitors)
+                    .filter(record => record.bridge?.lifecycle?.status === 'ACTIVE')
+                    .sort((left, right) => Date.parse(right.bridge.createdAt || right.updatedAt || '')
+                        - Date.parse(left.bridge.createdAt || left.updatedAt || ''))[0];
+                if (!current) {
+                    response.writeHead(404, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'No active monitor' }));
+                    return;
+                }
+                response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+                    .end(JSON.stringify({ bridge: current.bridge }));
+                return;
+            }
             if (match) {
                 if (request.headers.authorization !== `Bearer ${service.config.controlToken}`) {
                     response.writeHead(401).end('Unauthorized');

@@ -387,6 +387,22 @@
         initialize();
         return linkedBridge;
     }
+    /**
+     * Restores an authenticated server bridge into this app's local storage context.
+     * @param {object} bridge Validated v1 execution bridge.
+     * @returns {{mode: string, bridge: object}|null} Linked mode or null for invalid data.
+     */
+    function linkBridge(bridge) {
+        if (!validateBridge(bridge)) return null;
+        storageSet(STORAGE_KEY, JSON.stringify(bridge));
+        if (storageGet(DISMISSED_KEY) === bridge.bridgeId) {
+            storageSet(DISMISSED_KEY, '');
+        }
+        initialized = true;
+        linkedBridge = bridge;
+        return modeSnapshot();
+    }
+
 
     /**
      * Re-reads the shared bridge for the current linked session.
@@ -485,7 +501,12 @@
 
         if (!bridge) {
             container.innerHTML = '';
-            container.classList?.add('hidden');
+            if (typeof options.renderStandalone === 'function') {
+                container.classList?.remove('hidden');
+                options.renderStandalone(container);
+            } else {
+                container.classList?.add('hidden');
+            }
             return;
         }
 
@@ -791,6 +812,7 @@
         readBridge,
         initialize,
         getLinkedBridge,
+        linkBridge,
         refreshLinkedBridge,
         returnToEtfDca,
         getMode,

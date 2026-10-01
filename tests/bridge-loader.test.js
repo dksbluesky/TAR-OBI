@@ -158,5 +158,16 @@ assert.equal(consumer.initialize().mode, 'standalone');
 assert.equal(consumer.populateLinkedTicker(standaloneInput), null);
 assert.equal(standaloneInput.value, '2330');
 assert.equal(emptyStorage.values.size, 0);
+const restoredPanel = { innerHTML: '', hidden: true, classList: null };
+restoredPanel.classList = { add() { restoredPanel.hidden = true; }, remove() { restoredPanel.hidden = false; } };
+let standaloneRendererCalled = false;
+consumer.renderContextPanel(restoredPanel, { renderStandalone(container) { standaloneRendererCalled = true; container.innerHTML = 'Restore monitor'; } });
+assert.equal(standaloneRendererCalled, true);
+assert.equal(restoredPanel.hidden, false, 'the standalone restore option makes the context section visible');
+assert.equal(restoredPanel.innerHTML, 'Restore monitor');
+const restored = consumer.linkBridge(validBridge({ bridgeId: 'bridge-restored' }));
+assert.equal(restored.mode, 'linked');
+assert.equal(consumer.getLinkedBridge().bridgeId, 'bridge-restored');
+assert.equal(JSON.parse(emptyStorage.getItem('etfDca.executionBridge.v1')).bridgeId, 'bridge-restored');
 
 console.log('bridge loader tests passed');

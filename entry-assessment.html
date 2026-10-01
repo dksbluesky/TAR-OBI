@@ -519,6 +519,14 @@
         document.getElementById('refresh-button').addEventListener('click', fetchData);
         const renderBridgeContext = () => {
             window.TarObiBridge?.renderContextPanel(executionContext, {
+                renderStandalone(container) {
+                    window.TarObiBackgroundMonitor?.renderRestorePanel(container, () => {
+                        quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
+                        renderBridgeContext();
+                        render();
+                        fetchData();
+                    });
+                },
                 renderMonitor(container) {
                     window.TarObiBridgeMonitor?.renderControls(container);
                     const linked = window.TarObiBridge?.getLinkedBridge?.();
