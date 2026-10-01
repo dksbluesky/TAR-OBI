@@ -7,6 +7,7 @@ const path = require('node:path');
 const ROOT = __dirname;
 const ETF_ROOT = path.resolve(ROOT, '..', 'ETF_DCA-plan');
 const STORAGE_KEY = 'etfDca.executionBridge.v1';
+const STARTED_PENDING_EVENT = 'STARTED_PENDING';
 const DEFAULT_STATE_FILE = path.join(ROOT, '.tar-obi-monitor-state.json');
 const ALLOWED_ORIGINS = new Set(['https://dksbluesky.github.io']);
 
@@ -214,11 +215,15 @@ function createMonitorService(options = {}) {
     function putMonitor(bridge, settings = {}) {
         if (!bridge?.bridgeId || !bridge?.ticker) throw new Error('A valid linked bridge is required.');
         const existing = state.monitors[bridge.bridgeId] || {};
+        const pushedEvents = existing.pushedEvents || [];
+        if (!state.monitors[bridge.bridgeId] && !pushedEvents.includes(STARTED_PENDING_EVENT)) {
+            pushedEvents.push(STARTED_PENDING_EVENT);
+        }
         state.monitors[bridge.bridgeId] = {
             ...existing,
             bridge: jsonClone(bridge),
             settings: { ...(existing.settings || {}), ...settings },
-            pushedEvents: existing.pushedEvents || [],
+            pushedEvents,
             updatedAt: config.now().toISOString()
         };
         save();
@@ -270,10 +275,13 @@ function createMonitorService(options = {}) {
         const capture = bridgeMonitor.captureCompletedAssessment(snapshot, config.now());
         record.bridge = serviceStorage.getBridge();
         record.updatedAt = config.now().toISOString();
+        const startupPending = record.pushedEvents.includes(STARTED_PENDING_EVENT);
         const event = transitionEvent(
             previous,
             record.bridge,
-            initialEvaluation && capture.written && Boolean(record.bridge.monitorResult?.evaluatedAt)
+            (initialEvaluation || startupPending)
+                && capture.written
+                && Boolean(record.bridge.monitorResult?.evaluatedAt)
         );
         let pushed = false;
         if (event) {
@@ -287,6 +295,9 @@ function createMonitorService(options = {}) {
                         activeRecord = null;
                     }
                     throw error;
+                }
+                if (event === 'STARTED') {
+                    record.pushedEvents = record.pushedEvents.filter(item => item !== STARTED_PENDING_EVENT);
                 }
                 record.pushedEvents.push(eventId);
                 pushed = true;

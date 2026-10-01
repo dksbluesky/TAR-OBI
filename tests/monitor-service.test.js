@@ -179,6 +179,27 @@ async function request(port, method, target, body, headers = {}) {
     assert.equal(retried.pushed, true);
     assert.equal(deliveryAttempts, 2);
 
+    const preEvaluatedService = createMonitorService(serviceOptions({ stateFile: path.join(temporaryDirectory, 'pre-evaluated-state.json') }));
+    preEvaluatedService.putMonitor({
+        ...bridge(),
+        bridgeId: 'bridge-pre-evaluated',
+        monitorResult: { evaluatedAt: '2026-07-27T01:59:00.000Z' }
+    });
+    const preEvaluated = await preEvaluatedService.evaluate('bridge-pre-evaluated', { quote: {}, candles: null });
+    assert.equal(preEvaluated.event, 'STARTED', 'a newly submitted bridge sends startup status even if ETF_DCA supplied an earlier monitorResult');
+
+    const legacyStateFile = path.join(temporaryDirectory, 'legacy-state.json');
+    fs.writeFileSync(legacyStateFile, JSON.stringify({ monitors: {
+        'bridge-legacy': {
+            bridge: { ...bridge(), bridgeId: 'bridge-legacy', monitorResult: { evaluatedAt: '2026-07-27T01:59:00.000Z' } },
+            settings: {},
+            pushedEvents: []
+        }
+    } }));
+    const legacyService = createMonitorService(serviceOptions({ stateFile: legacyStateFile }));
+    const legacy = await legacyService.evaluate('bridge-legacy', { quote: {}, candles: null });
+    assert.equal(legacy.event, null, 'loading an older already-evaluated monitor does not fabricate a new startup alert');
+
     service.lifecycle('bridge-001', 'pause');
     const restarted = createMonitorService(serviceOptions());
     assert.equal(restarted.state.monitors['bridge-001'].bridge.lifecycle.status, 'PAUSED', 'restart recovers the persisted monitor');
