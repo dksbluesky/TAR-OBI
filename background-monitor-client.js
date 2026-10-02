@@ -204,7 +204,11 @@
             }
         });
         if (configured()) {
-            syncMonitor(bridge).then(() => status(bridge.bridgeId)).then(remote => {
+            const restoredConsumer = read(RESTORED_BRIDGE_KEY) === bridge.bridgeId;
+            const connect = restoredConsumer
+                ? status(bridge.bridgeId)
+                : syncMonitor(bridge).then(() => status(bridge.bridgeId));
+            connect.then(remote => {
                 show(remote ? `SERVER ${remote.lifecycle?.status || 'CONNECTED'} · ${remote.serverState?.confirmation?.status || 'NONE'}` : 'Configured — monitor not started on server', !remote);
             }).catch(error => show(error.message, true));
         }

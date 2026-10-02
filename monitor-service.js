@@ -127,6 +127,18 @@ function buildSnapshot(record, quote, candles) {
     };
 }
 
+function bridgeFreshness(bridge) {
+    const sourceUpdated = Date.parse(bridge?.extensions?.sourceContextUpdatedAt || '');
+    const created = Date.parse(bridge?.createdAt || '');
+    return [Number.isFinite(sourceUpdated) ? sourceUpdated : 0, Number.isFinite(created) ? created : 0];
+}
+
+function compareBridgeFreshness(left, right) {
+    const leftFreshness = bridgeFreshness(left);
+    const rightFreshness = bridgeFreshness(right);
+    return leftFreshness[0] - rightFreshness[0] || leftFreshness[1] - rightFreshness[1];
+}
+
 function readState(file) {
     try {
         const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -214,6 +226,22 @@ function createMonitorService(options = {}) {
 
     function putMonitor(bridge, settings = {}) {
         if (!bridge?.bridgeId || !bridge?.ticker) throw new Error('A valid linked bridge is required.');
+        const competing = Object.values(state.monitors)
+            .filter(record => record.bridge?.bridgeId !== bridge.bridgeId
+                && record.bridge?.ticker === bridge.ticker
+                && record.bridge?.lifecycle?.status === 'ACTIVE');
+        const fresher = competing.sort((left, right) => compareBridgeFreshness(right.bridge, left.bridge))[0];
+        if (fresher && compareBridgeFreshness(fresher.bridge, bridge) > 0) return fresher;
+        const replacedAt = config.now().toISOString();
+        competing.forEach(record => {
+            record.bridge.lifecycle = {
+                ...(record.bridge.lifecycle || {}),
+                status: 'COMPLETED',
+                updatedAt: replacedAt,
+                completedAt: replacedAt
+            };
+            record.updatedAt = replacedAt;
+        });
         const existing = state.monitors[bridge.bridgeId] || {};
         const pushedEvents = existing.pushedEvents || [];
         if (!state.monitors[bridge.bridgeId] && !pushedEvents.includes(STARTED_PENDING_EVENT)) {
@@ -387,8 +415,7 @@ function createHttpServer(service) {
                 }
                 const current = Object.values(service.state.monitors)
                     .filter(record => record.bridge?.lifecycle?.status === 'ACTIVE')
-                    .sort((left, right) => Date.parse(right.bridge.createdAt || right.updatedAt || '')
-                        - Date.parse(left.bridge.createdAt || left.updatedAt || ''))[0];
+                    .sort((left, right) => compareBridgeFreshness(right.bridge, left.bridge))[0];
                 if (!current) {
                     response.writeHead(404, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'No active monitor' }));
                     return;

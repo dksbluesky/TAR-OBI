@@ -99,6 +99,19 @@ async function request(port, method, target, body, headers = {}) {
     const service = createMonitorService(serviceOptions());
     service.putMonitor(bridge(), { entryBasis: 'combined', invalidationBasis: 'match', interval: 10 });
     assert.equal(service.state.monitors['bridge-001'].bridge.lifecycle.status, 'ACTIVE', 'Start stores an active monitor');
+
+    const guardStateFile = path.join(temporaryDirectory, 'guard-state.json');
+    const guardService = createMonitorService(serviceOptions({ stateFile: guardStateFile }));
+    const freshBridge = { ...bridge(), bridgeId: 'bridge-fresh', extensions: { ...bridge().extensions, sourceContextUpdatedAt: '2026-07-27T02:00:00.000Z' } };
+    const staleBridge = { ...bridge(), bridgeId: 'bridge-stale', createdAt: '2026-07-27T02:05:00.000Z', extensions: { ...bridge().extensions, sourceContextUpdatedAt: '2026-07-27T01:55:00.000Z' } };
+    guardService.putMonitor(freshBridge);
+    const staleResult = guardService.putMonitor(staleBridge);
+    assert.equal(staleResult.bridge.bridgeId, 'bridge-fresh', 'an older mobile bridge cannot replace the fresher active source bridge');
+    assert.equal(guardService.state.monitors['bridge-stale'], undefined, 'a rejected stale bridge is not activated');
+    const newestBridge = { ...bridge(), bridgeId: 'bridge-newest', extensions: { ...bridge().extensions, sourceContextUpdatedAt: '2026-07-27T02:01:00.000Z' } };
+    guardService.putMonitor(newestBridge);
+    assert.equal(guardService.state.monitors['bridge-fresh'].bridge.lifecycle.status, 'COMPLETED', 'a genuinely fresher bridge supersedes the prior active monitor');
+    assert.equal(guardService.state.monitors['bridge-newest'].bridge.lifecycle.status, 'ACTIVE');
     assert.equal(service.lifecycle('bridge-001', 'pause').bridge.lifecycle.status, 'PAUSED');
     assert.equal(service.lifecycle('bridge-001', 'resume').bridge.lifecycle.status, 'ACTIVE');
 
