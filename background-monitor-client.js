@@ -7,7 +7,9 @@
 
     const URL_KEY = 'tarObi.backgroundMonitor.url.v1';
     const TOKEN_KEY = 'tarObi.backgroundMonitor.token.v1';
+    const RESTORED_BRIDGE_KEY = 'tarObi.backgroundMonitor.restoredBridgeId.v1';
     let panelExpanded = false;
+    let currentSyncTimer = null;
 
     const storage = () => root.localStorage;
     const read = key => storage()?.getItem(key) || '';
@@ -78,7 +80,43 @@
         if (!root.TarObiBridge?.linkBridge?.(bridge)) {
             throw new Error('The monitor service returned an invalid linked bridge.');
         }
+        storage()?.setItem(RESTORED_BRIDGE_KEY, bridge.bridgeId);
         return bridge;
+    }
+
+    function stopCurrentSync() {
+        if (currentSyncTimer !== null) root.clearInterval?.(currentSyncTimer);
+        currentSyncTimer = null;
+    }
+
+    function startCurrentSync(onUpdated, intervalMs = 30000) {
+        stopCurrentSync();
+        const linked = root.TarObiBridge?.getLinkedBridge?.();
+        if (!configured() || !linked || read(RESTORED_BRIDGE_KEY) !== linked.bridgeId) return false;
+        let syncing = false;
+        const refresh = async () => {
+            const before = root.TarObiBridge?.getLinkedBridge?.();
+            if (!before || read(RESTORED_BRIDGE_KEY) !== before.bridgeId || syncing) {
+                if (!before) stopCurrentSync();
+                return;
+            }
+            syncing = true;
+            try {
+                const remote = await request('/api/monitors/current');
+                const bridge = remote?.bridge;
+                if (!root.TarObiBridge?.linkBridge?.(bridge)) return;
+                storage()?.setItem(RESTORED_BRIDGE_KEY, bridge.bridgeId);
+                if (JSON.stringify(before) !== JSON.stringify(bridge) && typeof onUpdated === 'function') {
+                    onUpdated(bridge);
+                }
+            } catch (error) {
+                root.console?.warn?.('[Background Monitor Sync]', error);
+            } finally {
+                syncing = false;
+            }
+        };
+        currentSyncTimer = root.setInterval?.(refresh, intervalMs) ?? null;
+        return currentSyncTimer !== null;
     }
 
     function renderRestorePanel(container, onRestored) {
@@ -172,5 +210,5 @@
         }
     }
 
-    return Object.freeze({ configured, syncMonitor, setLifecycle, status, restoreCurrent, renderRestorePanel, render });
+    return Object.freeze({ configured, syncMonitor, setLifecycle, status, restoreCurrent, startCurrentSync, stopCurrentSync, renderRestorePanel, render });
 });

@@ -517,6 +517,12 @@
             render();
         });
         document.getElementById('refresh-button').addEventListener('click', fetchData);
+        const startRestoredBridgeSync = () => {
+            window.TarObiBackgroundMonitor?.startCurrentSync?.(() => {
+                renderBridgeContext();
+                render();
+            });
+        };
         const renderBridgeContext = () => {
             window.TarObiBridge?.renderContextPanel(executionContext, {
                 renderStandalone(container) {
@@ -524,6 +530,7 @@
                         quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
                         renderBridgeContext();
                         render();
+                        startRestoredBridgeSync();
                         fetchData();
                     });
                 },
@@ -549,6 +556,7 @@
             onUiRefresh: renderBridgeContext
         });
         renderBridgeContext();
+        startRestoredBridgeSync();
         render(); fetchData();
         ensureRefreshTimer('unavailable');
         document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });

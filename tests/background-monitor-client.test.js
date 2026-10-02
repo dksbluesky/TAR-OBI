@@ -15,6 +15,9 @@ global.localStorage = {
 };
 let captured;
 let responseBody = { lifecycle: { status: 'ACTIVE' } };
+let scheduledSync = null;
+global.setInterval = (callback, delay) => { scheduledSync = { callback, delay }; return 99; };
+global.clearInterval = () => { scheduledSync = null; };
 global.fetch = async (url, options) => {
     captured = { url, options };
     return { ok: true, status: 200, json: async () => responseBody };
@@ -39,6 +42,16 @@ const client = require(modulePath);
     assert.equal(captured.url, 'https://monitor.example/api/monitors/current');
     assert.equal(captured.options.headers.Authorization, 'Bearer secret');
     assert.equal(captured.options.method, undefined, 'restore uses a read-only GET request');
+    assert.equal(values.get('tarObi.backgroundMonitor.restoredBridgeId.v1'), 'bridge-current');
+    global.TarObiBridge.getLinkedBridge = () => linkedBridge;
+    let synchronizedBridge = null;
+    assert.equal(client.startCurrentSync(bridge => { synchronizedBridge = bridge; }), true);
+    assert.equal(scheduledSync.delay, 30000);
+    responseBody = { bridge: { ...restoredBridge, extensions: { sourceContextUpdatedAt: '2026-10-02T01:35:00.000Z' } } };
+    await scheduledSync.callback();
+    assert.equal(synchronizedBridge.extensions.sourceContextUpdatedAt, '2026-10-02T01:35:00.000Z');
+    assert.equal(linkedBridge.extensions.sourceContextUpdatedAt, '2026-10-02T01:35:00.000Z');
+    client.stopCurrentSync();
     responseBody = { lifecycle: { status: 'ACTIVE' } };
     values.set('tarObi.backgroundMonitor.url.v1', '192.168.68.61 :8080');
     await client.syncMonitor({ bridgeId: 'bridge one', ticker: '2330' });

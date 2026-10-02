@@ -6,12 +6,11 @@ $runtime = Join-Path $root '.monitor-runtime'
 $envFile = Join-Path $root '.env'
 $entryUrl = 'https://dksbluesky.github.io/TAR-OBI/entry-assessment.html'
 $node = (Get-Command node.exe -ErrorAction Stop).Source
-$cloudflared = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\Cloudflare.cloudflared_Microsoft.Winget.Source_8wekyb3d8bbwe\cloudflared.exe'
+$tailscale = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
 $servicePidFile = Join-Path $runtime 'monitor.pid'
-$tunnelPidFile = Join-Path $runtime 'tunnel.pid'
 
-if (-not (Test-Path -LiteralPath $cloudflared)) {
-    [System.Windows.Forms.MessageBox]::Show('Cloudflare Tunnel is not installed for this Windows user. Install Cloudflare.cloudflared with WinGet, then run this launcher again.', 'TAR-OBI Monitor') | Out-Null
+if (-not (Test-Path -LiteralPath $tailscale)) {
+    [System.Windows.Forms.MessageBox]::Show('Tailscale is not installed. Install and sign in to Tailscale, then run this launcher again.', 'TAR-OBI Monitor') | Out-Null
     exit 1
 }
 
@@ -137,32 +136,22 @@ if (-not $localReady) {
     exit 1
 }
 
-$tunnelOut = Join-Path $runtime 'tunnel.log'
-$tunnelError = Join-Path $runtime 'tunnel-error.log'
-$tunnel = Start-Process -FilePath $cloudflared -ArgumentList @('tunnel', '--url', "http://127.0.0.1:$port") -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput $tunnelOut -RedirectStandardError $tunnelError
-Set-Content -LiteralPath $tunnelPidFile -Value $tunnel.Id -Encoding ascii
-
-$publicUrl = $null
-for ($i = 0; $i -lt 60 -and -not $publicUrl; $i++) {
-    Start-Sleep -Seconds 1
-    if (-not (Get-Process -Id $tunnel.Id -ErrorAction SilentlyContinue)) { break }
-    foreach ($log in @($tunnelOut, $tunnelError)) {
-        if (Test-Path -LiteralPath $log) {
-            $logText = Get-Content -LiteralPath $log -Raw -ErrorAction SilentlyContinue
-            if ([string]::IsNullOrWhiteSpace($logText)) { continue }
-            $match = [regex]::Match($logText, 'https://[a-z0-9-]+\.trycloudflare\.com')
-            if ($match.Success) { $publicUrl = $match.Value; break }
-        }
-    }
-}
-if (-not $publicUrl) {
-    Get-Process -Id $tunnel.Id -ErrorAction SilentlyContinue | Stop-Process -Force
+try {
+    $null = & $tailscale status 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'Tailscale is not connected.' }
+    $funnelOutput = (& $tailscale funnel --bg $port 2>&1 | Out-String)
+    if ($LASTEXITCODE -ne 0) { throw $funnelOutput.Trim() }
+    $funnelStatus = (& $tailscale funnel status 2>&1 | Out-String)
+    $match = [regex]::Match($funnelStatus, 'https://[a-z0-9.-]+\.ts\.net')
+    if (-not $match.Success) { throw 'Tailscale Funnel did not provide a public URL.' }
+    $publicUrl = $match.Value
+} catch {
     Get-Process -Id $service.Id -ErrorAction SilentlyContinue | Stop-Process -Force
-    Remove-Item -LiteralPath $tunnelPidFile, $servicePidFile -Force -ErrorAction SilentlyContinue
-    [System.Windows.Forms.MessageBox]::Show("Cloudflare Tunnel did not provide a public URL. Check $tunnelError.", 'TAR-OBI Monitor') | Out-Null
+    Remove-Item -LiteralPath $servicePidFile -Force -ErrorAction SilentlyContinue
+    [System.Windows.Forms.MessageBox]::Show("Tailscale Funnel did not start.`n`n$($_.Exception.Message)", 'TAR-OBI Monitor') | Out-Null
     exit 1
 }
 
 Set-Clipboard -Value $publicUrl
 Start-Process $entryUrl
-[System.Windows.Forms.MessageBox]::Show("Monitor service and tunnel are running on this PC.`n`nNew Service URL (copied to clipboard):`n$publicUrl`n`nIn Entry Assessment, paste this into Service URL. Use the private control token from your saved local .env file. The Mac is not needed while this PC is running.", 'TAR-OBI Monitor') | Out-Null
+[System.Windows.Forms.MessageBox]::Show("Monitor service and Tailscale Funnel are running on this PC.`n`nStable Service URL (copied to clipboard):`n$publicUrl`n`nSave this URL once in Entry Assessment on each device. It remains the same after restarts. Use the private control token from your saved local .env file.", 'TAR-OBI Monitor') | Out-Null
