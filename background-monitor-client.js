@@ -81,7 +81,24 @@
             throw new Error('The monitor service returned an invalid linked bridge.');
         }
         storage()?.setItem(RESTORED_BRIDGE_KEY, bridge.bridgeId);
+        root.location?.reload?.();
         return bridge;
+    }
+
+    function adoptReturnedBridge(remote, requestedBridge) {
+        const bridge = remote?.bridge;
+        if (!bridge || bridge.bridgeId === requestedBridge?.bridgeId) return requestedBridge;
+        if (!root.TarObiBridge?.linkBridge?.(bridge)) {
+            throw new Error('The monitor service returned an invalid linked bridge.');
+        }
+        storage()?.setItem(RESTORED_BRIDGE_KEY, bridge.bridgeId);
+        return bridge;
+    }
+
+    function remoteStatusText(remote) {
+        const lifecycle = remote?.bridge?.lifecycle?.status || 'CONNECTED';
+        const confirmation = remote?.serverState?.confirmation?.status || 'NONE';
+        return `SERVER ${lifecycle} · ${confirmation}`;
     }
 
     function stopCurrentSync() {
@@ -197,8 +214,9 @@
             storage()?.setItem(TOKEN_KEY, wrapper.querySelector('[data-background-token]').value.trim());
             show('Connecting…');
             try {
-                await syncMonitor(bridge);
-                show('SERVER ACTIVE — Telegram monitoring enabled');
+                const remote = await syncMonitor(bridge);
+                adoptReturnedBridge(remote, bridge);
+                show(remoteStatusText(remote));
             } catch (error) {
                 show(error.message, true);
             }
@@ -207,9 +225,10 @@
             const restoredConsumer = read(RESTORED_BRIDGE_KEY) === bridge.bridgeId;
             const connect = restoredConsumer
                 ? status(bridge.bridgeId)
-                : syncMonitor(bridge).then(() => status(bridge.bridgeId));
+                : syncMonitor(bridge);
             connect.then(remote => {
-                show(remote ? `SERVER ${remote.lifecycle?.status || 'CONNECTED'} · ${remote.serverState?.confirmation?.status || 'NONE'}` : 'Configured — monitor not started on server', !remote);
+                if (remote) adoptReturnedBridge(remote, bridge);
+                show(remote ? remoteStatusText(remote) : 'Configured — monitor not started on server', !remote);
             }).catch(error => show(error.message, true));
         }
     }

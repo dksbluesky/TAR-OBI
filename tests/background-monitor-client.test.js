@@ -14,8 +14,10 @@ global.localStorage = {
     setItem: (key, value) => values.set(key, String(value))
 };
 let captured;
-let responseBody = { lifecycle: { status: 'ACTIVE' } };
+let responseBody = { bridge: { bridgeId: 'bridge one', ticker: '2330', lifecycle: { status: 'ACTIVE' } } };
 let scheduledSync = null;
+let reloads = 0;
+global.location = { reload() { reloads += 1; } };
 global.setInterval = (callback, delay) => { scheduledSync = { callback, delay }; return 99; };
 global.clearInterval = () => { scheduledSync = null; };
 global.fetch = async (url, options) => {
@@ -52,7 +54,7 @@ const client = require(modulePath);
     assert.equal(synchronizedBridge.extensions.sourceContextUpdatedAt, '2026-10-02T01:35:00.000Z');
     assert.equal(linkedBridge.extensions.sourceContextUpdatedAt, '2026-10-02T01:35:00.000Z');
     client.stopCurrentSync();
-    responseBody = { lifecycle: { status: 'ACTIVE' } };
+    responseBody = { bridge: { bridgeId: 'bridge one', ticker: '2330', lifecycle: { status: 'ACTIVE' } } };
     values.set('tarObi.backgroundMonitor.url.v1', '192.168.68.61 :8080');
     await client.syncMonitor({ bridgeId: 'bridge one', ticker: '2330' });
     assert.equal(captured.url, 'http://192.168.68.61:8080/api/monitors/bridge%20one');
@@ -102,6 +104,23 @@ const client = require(modulePath);
     client.render(container, bridge);
     details = container.children[0].elements['[data-background-monitor-details]'];
     assert.equal(details.open, false, 'a collapsed monitor panel remains closed after a UI rerender');
+
+    values.set('tarObi.backgroundMonitor.url.v1', 'https://monitor.example');
+    values.set('tarObi.backgroundMonitor.token.v1', 'secret');
+    values.delete('tarObi.backgroundMonitor.restoredBridgeId.v1');
+    responseBody = {
+        bridge: { version: '1.0', bridgeId: 'server-current', ticker: '2330', lifecycle: { status: 'ACTIVE' } },
+        serverState: { confirmation: { status: 'PENDING' } }
+    };
+    linkedBridge = bridge;
+    container.children = [];
+    client.render(container, bridge);
+    await new Promise(resolve => setImmediate(resolve));
+    const synchronizedElements = container.children[0].elements;
+    assert.equal(linkedBridge.bridgeId, 'server-current', 'a rejected stale device bridge adopts the active server bridge');
+    assert.equal(values.get('tarObi.backgroundMonitor.restoredBridgeId.v1'), 'server-current');
+    assert.equal(reloads, 1, 'the page reloads once so all monitor consumers use the adopted bridge');
+    assert.equal(synchronizedElements['[data-background-status]'].textContent, 'SERVER ACTIVE · PENDING');
 
     const restoreContainer = { children: [], appendChild(child) { this.children.push(child); } };
     let restoredFromPanel = null;
