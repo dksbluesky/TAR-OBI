@@ -802,13 +802,86 @@
                 ? vwapDifference / vwap
                 : null;
 
+        const extensionThreshold =
+            hasVwap
+                ? Math.max(
+                    vwap * 0.003,
+                    4 * tick
+                )
+                : null;
+
         const materialExtension =
             hasVwap
             && vwapDifference
-                > Math.max(
-                    vwap * 0.003,
-                    4 * tick
-                );
+                > extensionThreshold;
+
+        const openingContext =
+            input.openingContext;
+
+        const previousClose =
+            Number(openingContext?.previousClose);
+
+        const openPrice =
+            Number(openingContext?.openPrice);
+
+        const marketDate =
+            openingContext?.marketDate;
+
+        const openTimestamp =
+            timestampToMs(openingContext?.openTime)
+            || Date.parse(
+                `${marketDate}T09:00:00+08:00`
+            );
+
+        const candleMs =
+            5 * 60 * 1000;
+
+        const openingCandleStart =
+            Number.isFinite(openTimestamp)
+                ? Math.floor(openTimestamp / candleMs)
+                    * candleMs
+                : null;
+
+        const largeOpeningGap =
+            Number.isFinite(previousClose)
+            && previousClose > 0
+            && Number.isFinite(openPrice)
+            && openPrice > previousClose
+            && hasVwap
+            && openPrice - previousClose
+                > extensionThreshold;
+
+        const completedOpeningCandles =
+            new Set(
+                (
+                    Array.isArray(openingContext?.candles?.data)
+                        ? openingContext.candles.data
+                        : []
+                )
+                    .map(candle => Date.parse(candle?.date))
+                    .filter(start =>
+                        Number.isFinite(start)
+                        && Number.isFinite(openingCandleStart)
+                        && start >= openingCandleStart
+                        && start < openingCandleStart
+                            + 5 * candleMs
+                        && start + candleMs
+                            <= input.timestamp
+                    )
+            );
+
+        const openingPeriodComplete =
+            completedOpeningCandles.size >= 5
+            || (
+                Number.isFinite(openTimestamp)
+                && input.timestamp >= openTimestamp
+                    + 6 * candleMs
+            );
+
+        const openingExtension =
+            largeOpeningGap
+            && Number.isFinite(openTimestamp)
+            && !openingPeriodComplete;
 
         let lower;
         let upper;
@@ -1189,6 +1262,11 @@
             rawState =
                 'WAIT FOR PULLBACK';
         } else if (
+            openingExtension
+        ) {
+            rawState =
+                'WAIT FOR CONFIRMATION';
+        } else if (
             belowVwapSelling
             || wideSpreadWithNegativeScore
             || wideSpread
@@ -1479,6 +1557,12 @@
                         : price > vwap
                             ? '✓ Price above VWAP'
                             : '✕ Price below VWAP'
+            );
+        }
+
+        if (openingExtension) {
+            factors.push(
+                '✕ Opening gap/extension — waiting for post-open market development'
             );
         }
 

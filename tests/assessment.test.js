@@ -61,6 +61,79 @@ assert.equal(assess().lower, 32.45, 'combined lower boundary');
 assert.equal(assess().upper, 32.6, 'positive score expands upper boundary two ticks');
 assert.equal(assess().maximum, 32.6, 'positive score expands maximum two ticks');
 assert.equal(assess().state, 'ENTRY CONDITIONS MET');
+const monitor = require('../bridge-monitor.js');
+const liveBridge = {
+    activeZone: { low: 265, high: 266 },
+    invalidationLevel: 264,
+    zoneMode: 'automatic',
+    extensions: { marketContextV1: { context: 'bullish', automaticZoneEligible: true } },
+    notificationState: { continuousValidity: { status: 'LIVE' } }
+};
+const gapTimestamp = Date.parse('2026-07-27T09:21:00+08:00');
+const gapBase = {
+    current: 265.4, bid: 265.35, ask: 265.4, vwap: 265.2,
+    tick: 0.05, timestamp: gapTimestamp,
+    openingContext: {
+        previousClose: 258,
+        openPrice: 264.2,
+        openTime: Date.parse('2026-07-27T09:00:00+08:00') * 1000,
+        marketDate: '2026-07-27',
+        candles: { data: [
+            { date: '2026-07-27T09:00:00+08:00', open: 264.2, high: 265.4, low: 264.1, close: 265.2 },
+            { date: '2026-07-27T09:05:00+08:00', open: 265.2, high: 265.6, low: 265, close: 265.5 },
+            { date: '2026-07-27T09:10:00+08:00', open: 265.5, high: 265.8, low: 265.3, close: 265.7 },
+            { date: '2026-07-27T09:15:00+08:00', open: 265.7, high: 266.1, low: 265.4, close: 266 }
+        ] }
+    }
+};
+const gapAssessment = assess(gapBase);
+assert.equal(gapAssessment.state, 'WAIT FOR CONFIRMATION', 'large opening gap waits despite near VWAP and positive flow');
+assert.ok(gapAssessment.factors.some(factor => /Opening gap\/extension/.test(factor)));
+assert.equal(monitor.finalActionContext(liveBridge, gapAssessment.state, 265.4).action, 'WAIT', 'large gap cannot reach BUY NOW with a LIVE zone');
+assert.equal(assess({ ...gapBase, openingContext: null }).state, 'ENTRY CONDITIONS MET', 'legacy callers without opening context retain behavior');
+assert.equal(assess({ ...gapBase, openingContext: { ...gapBase.openingContext, previousClose: 264 } }).state, 'ENTRY CONDITIONS MET', 'ordinary open retains entry assessment');
+assert.equal(monitor.finalActionContext(liveBridge, 'ENTRY CONDITIONS MET', 265.4).action, 'BUY_NOW', 'ordinary entry still reaches BUY NOW with LIVE zone');
+assert.equal(assess({ ...gapBase, tar: 'Seller Active', obi: 'Ask Dominant' }).state, 'DO NOT ENTER', 'hard blocker outranks opening gap');
+assert.equal(assess({ ...gapBase, session: 'stale' }).state, 'DATA UNAVAILABLE', 'stale data outranks opening gap');
+const wideFirstCandle = assess({
+    ...gapBase,
+    openingContext: { ...gapBase.openingContext, candles: { data: [
+        { ...gapBase.openingContext.candles.data[0], high: 275, low: 263 },
+        ...gapBase.openingContext.candles.data.slice(1)
+    ] } }
+});
+assert.equal(wideFirstCandle.state, 'WAIT FOR CONFIRMATION', 'wide opening candle does not deactivate gap protection');
+const developed = assess({
+    ...gapBase,
+    timestamp: Date.parse('2026-07-27T09:26:00+08:00'),
+    openingContext: { ...gapBase.openingContext, candles: { data: [
+        ...gapBase.openingContext.candles.data,
+        { date: '2026-07-27T09:20:00+08:00', open: 266, high: 267, low: 265.5, close: 266.8 }
+    ] } }
+});
+assert.equal(developed.state, 'ENTRY CONDITIONS MET', 'five completed opening candles retire guard without a PA-pattern check');
+assert.equal(
+    assess({ ...gapBase, timestamp: Date.parse('2026-07-27T13:00:00+08:00') }).state,
+    'ENTRY CONDITIONS MET',
+    'morning gap no longer independently blocks an afternoon entry'
+);
+assert.equal(
+    assess({ ...gapBase, openingContext: { ...gapBase.openingContext, candles: null } }).state,
+    'WAIT FOR CONFIRMATION',
+    'missing candles do not remove early opening protection'
+);
+assert.equal(
+    assess({ ...gapBase, timestamp: Date.parse('2026-07-27T09:31:00+08:00'), openingContext: {
+        ...gapBase.openingContext, candles: null
+    } }).state,
+    'ENTRY CONDITIONS MET',
+    'fresh quote bounds opening guard when candles are unavailable'
+);
+assert.equal(
+    assess({ ...gapBase, current: 267, vwap: 265.2 }).state,
+    'WAIT FOR PULLBACK',
+    'material VWAP extension keeps pullback precedence over opening gap'
+);
 assert.deepEqual([assess().tradingLower, assess().tradingUpper], [32.45, 32.5], 'trading range remains executable bid/ask');
 
 assert.deepEqual(

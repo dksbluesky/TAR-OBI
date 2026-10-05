@@ -316,6 +316,13 @@
         const volumeQuality = MarketData.calculateVolumeQuality(candleData, timestamp, session);
         const assessment = MarketData.calculateEntryAssessment({
             current: price, bid, ask, vwap, tick, timestamp, session, tar, obi,
+            openingContext: {
+                previousClose: quoteData?.previousClose,
+                openPrice: quoteData?.openPrice,
+                openTime: quoteData?.openTime,
+                marketDate: quoteData?.date,
+                candles: candleData
+            },
             entryBasis: document.getElementById('entry-basis').value,
             invalidationBasis: document.getElementById('invalidation-basis').value,
             volumeQuality: volumeQuality.quality,
