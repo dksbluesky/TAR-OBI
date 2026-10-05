@@ -126,8 +126,8 @@ function renderNotificationCase(permission, preferenceEnabled, supported = true,
     const { fields } = renderNotificationCase('default', false, true, {
         extensions: { sourceContextUpdatedAt: '2000-01-01T00:00:00.000Z' }
     });
-    assert.equal(fields.get('entry-confirmation').textContent, 'ETF CONTEXT STALE — reopen or refresh ETF_DCA-plan');
-    assert.equal(fields.get('continuous-validity').textContent, 'ETF CONTEXT STALE — reopen or refresh ETF_DCA-plan');
+    assert.equal(fields.get('entry-confirmation').textContent, 'Not pending');
+    assert.equal(fields.get('continuous-validity').textContent, 'Not pending');
 }
 
 {

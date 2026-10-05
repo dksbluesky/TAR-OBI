@@ -370,17 +370,19 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
         }
     });
 
-    assert.equal(monitor.sourceContextStale(linkedBridge, '2026-07-27T02:01:30.000Z'), false);
-    assert.equal(monitor.sourceContextStale(linkedBridge, '2026-07-27T02:01:31.000Z'), true);
-    const stale = monitor.captureCompletedAssessment(entry('2026-07-27T02:01:31.000Z'));
-    assert.equal(stale.continuousValidity.status, 'STALE');
-    assert.equal(stale.confirmed, false);
-    assert.equal(stale.notified, false);
+    assert.equal(monitor.sourceContextHeartbeatStale(linkedBridge, '2026-07-27T02:01:30.000Z'), false);
+    assert.equal(monitor.sourceContextHeartbeatStale(linkedBridge, '2026-07-27T02:01:31.000Z'), true);
+    const pending = monitor.captureCompletedAssessment(entry('2026-07-27T02:01:31.000Z'));
+    assert.equal(pending.continuousValidity.status, 'PENDING', 'a stale transport heartbeat does not invalidate ETF context');
+    const live = monitor.captureCompletedAssessment(entry('2026-07-27T02:03:01.000Z'));
+    assert.equal(live.continuousValidity.status, 'LIVE', 'the existing 90-second entry confirmation still completes');
+    assert.equal(live.confirmed, true);
 }
 {
     const manualBridge = validBridge({
-        zoneMode: 'manual_override',
+        zoneMode: 'manual',
         extensions: {
+            sourceContextUpdatedAt: '2026-07-27T02:00:00.000Z',
             marketContextV1: {
                 context: 'unclear',
                 automaticZoneEligible: false,
@@ -401,6 +403,14 @@ for (const status of ['PAUSED', 'COMPLETED', 'INVALIDATED']) {
     assert.equal(live.continuousValidity.status, 'LIVE');
     assert.equal(live.notified, true, 'a manual Active Zone may notify after TAR-OBI confirmation');
     assert.equal(notifications.length, 1);
+    const oneDayLater = monitor.captureCompletedAssessment(entry('2026-07-28T02:02:30.000Z'));
+    assert.equal(monitor.sourceContextHeartbeatStale(manualBridge, '2026-07-28T02:02:30.000Z'), true);
+    assert.equal(monitor.linkedZoneGateEligible(manualBridge, entry('2026-07-28T02:02:30.000Z')), true,
+        'the explicit manual zone and ETF market context govern validity after the heartbeat stops');
+    assert.equal(oneDayLater.continuousValidity.status, 'LIVE', 'manual context remains valid a day later without an ETF heartbeat');
+    const invalidContext = { ...manualBridge, extensions: { ...manualBridge.extensions, marketContextV1: { context: 'unclear', automaticZoneEligible: false, manualOverride: false } } };
+    assert.equal(monitor.linkedZoneGateEligible(invalidContext, entry('2026-07-28T02:02:30.000Z')), false,
+        'an explicitly invalid ETF context still blocks confirmation');
 }
 function createAlertContainer() {
     const alertFields = new Map();

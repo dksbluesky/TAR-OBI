@@ -139,6 +139,16 @@ function compareBridgeFreshness(left, right) {
     return leftFreshness[0] - rightFreshness[0] || leftFreshness[1] - rightFreshness[1];
 }
 
+function mergeSourceBridge(existing, incoming) {
+    if (!existing) return jsonClone(incoming);
+    return {
+        ...jsonClone(incoming),
+        lifecycle: jsonClone(existing.lifecycle || incoming.lifecycle || {}),
+        monitorResult: jsonClone(existing.monitorResult ?? incoming.monitorResult ?? null),
+        notificationState: jsonClone(existing.notificationState || incoming.notificationState || {})
+    };
+}
+
 function readState(file) {
     try {
         const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -226,6 +236,8 @@ function createMonitorService(options = {}) {
 
     function putMonitor(bridge, settings = {}) {
         if (!bridge?.bridgeId || !bridge?.ticker) throw new Error('A valid linked bridge is required.');
+        const existing = state.monitors[bridge.bridgeId] || null;
+        if (existing && compareBridgeFreshness(existing.bridge, bridge) > 0) return existing;
         const competing = Object.values(state.monitors)
             .filter(record => record.bridge?.bridgeId !== bridge.bridgeId
                 && record.bridge?.ticker === bridge.ticker
@@ -242,15 +254,14 @@ function createMonitorService(options = {}) {
             };
             record.updatedAt = replacedAt;
         });
-        const existing = state.monitors[bridge.bridgeId] || {};
-        const pushedEvents = existing.pushedEvents || [];
+        const pushedEvents = existing?.pushedEvents || [];
         if (!state.monitors[bridge.bridgeId] && !pushedEvents.includes(STARTED_PENDING_EVENT)) {
             pushedEvents.push(STARTED_PENDING_EVENT);
         }
         state.monitors[bridge.bridgeId] = {
-            ...existing,
-            bridge: jsonClone(bridge),
-            settings: { ...(existing.settings || {}), ...settings },
+            ...(existing || {}),
+            bridge: mergeSourceBridge(existing?.bridge, bridge),
+            settings: { ...(existing?.settings || {}), ...settings },
             pushedEvents,
             updatedAt: config.now().toISOString()
         };

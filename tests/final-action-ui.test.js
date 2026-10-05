@@ -22,10 +22,34 @@ assert.equal(
     'a valid AUTO zone with the existing LIVE confirmation presents BUY NOW'
 );
 assert.equal(
-    monitor.finalActionContext(bridge({ zoneMode: 'manual_override', extensions: { marketContextV1: { manualOverride: true } } }), 'ENTRY CONDITIONS MET', 29.1).action,
+    monitor.finalActionContext(bridge({ extensions: { sourceContextUpdatedAt: '2000-01-01T00:00:00.000Z', marketContextV1: { context: 'bullish', automaticZoneEligible: true } } }), 'ENTRY CONDITIONS MET', 29.1).action,
+    'BUY_NOW',
+    'an old transport heartbeat does not make valid ETF context stale'
+);
+assert.equal(
+    monitor.finalActionContext(bridge({ zoneMode: 'manual', extensions: { marketContextV1: { manualOverride: true } } }), 'ENTRY CONDITIONS MET', 29.1).action,
     'BUY_NOW',
     'a valid MANUAL zone uses the same existing LIVE confirmation result'
 );
+const reassessed = bridge({
+    zoneMode: 'manual',
+    extensions: {
+        sourceContextUpdatedAt: '2026-07-27T02:00:00.000Z',
+        marketContextV1: { context: 'unclear', automaticZoneEligible: false, manualOverride: true }
+    }
+});
+const originalNow = Date.now;
+try {
+    for (const elapsedMs of [91_000, 24 * 60 * 60 * 1000]) {
+        Date.now = () => Date.parse('2026-07-27T02:00:00.000Z') + elapsedMs;
+        assert.equal(monitor.sourceContextHeartbeatStale(reassessed), true);
+        const action = monitor.finalActionContext(reassessed, 'ENTRY CONDITIONS MET', 29.1, 'live');
+        assert.equal(action.action, 'BUY_NOW', `a valid reassessed context remains usable after ${elapsedMs} ms without an ETF heartbeat`);
+        assert.notEqual(action.reason, 'ETF CONTEXT STALE');
+    }
+} finally {
+    Date.now = originalNow;
+}
 assert.equal(
     monitor.finalActionContext(bridge({ notificationState: { continuousValidity: { status: 'PENDING' } } }), 'ENTRY CONDITIONS MET', 29.1).action,
     'WAIT',

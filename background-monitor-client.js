@@ -19,6 +19,16 @@
         return `http://${normalized}`;
     };
     const configured = () => Boolean(cleanUrl(read(URL_KEY)) && read(TOKEN_KEY));
+    const bridgeFreshness = bridge => {
+        const sourceUpdated = Date.parse(bridge?.extensions?.sourceContextUpdatedAt || '');
+        const created = Date.parse(bridge?.createdAt || '');
+        return [Number.isFinite(sourceUpdated) ? sourceUpdated : 0, Number.isFinite(created) ? created : 0];
+    };
+    const compareBridgeFreshness = (left, right) => {
+        const leftFreshness = bridgeFreshness(left);
+        const rightFreshness = bridgeFreshness(right);
+        return leftFreshness[0] - rightFreshness[0] || leftFreshness[1] - rightFreshness[1];
+    };
     const escapeHtml = value => String(value || '').replace(/[&<>"']/g, character => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[character]);
@@ -87,7 +97,9 @@
 
     function adoptReturnedBridge(remote, requestedBridge) {
         const bridge = remote?.bridge;
-        if (!bridge || bridge.bridgeId === requestedBridge?.bridgeId) return requestedBridge;
+        if (!bridge
+            || bridge.bridgeId === requestedBridge?.bridgeId
+            || compareBridgeFreshness(bridge, requestedBridge) < 0) return requestedBridge;
         if (!root.TarObiBridge?.linkBridge?.(bridge)) {
             throw new Error('The monitor service returned an invalid linked bridge.');
         }
@@ -119,8 +131,12 @@
             }
             syncing = true;
             try {
-                const remote = await request('/api/monitors/current');
+                let remote = await request('/api/monitors/current');
+                if (compareBridgeFreshness(before, remote?.bridge) > 0) {
+                    remote = await syncMonitor(before);
+                }
                 const bridge = remote?.bridge;
+                if (!bridge || compareBridgeFreshness(bridge, before) < 0) return;
                 if (!root.TarObiBridge?.linkBridge?.(bridge)) return;
                 storage()?.setItem(RESTORED_BRIDGE_KEY, bridge.bridgeId);
                 if (JSON.stringify(before) !== JSON.stringify(bridge) && typeof onUpdated === 'function') {
@@ -222,10 +238,7 @@
             }
         });
         if (configured()) {
-            const restoredConsumer = read(RESTORED_BRIDGE_KEY) === bridge.bridgeId;
-            const connect = restoredConsumer
-                ? status(bridge.bridgeId)
-                : syncMonitor(bridge);
+            const connect = syncMonitor(bridge);
             connect.then(remote => {
                 if (remote) adoptReturnedBridge(remote, bridge);
                 show(remote ? remoteStatusText(remote) : 'Configured — monitor not started on server', !remote);
@@ -233,5 +246,5 @@
         }
     }
 
-    return Object.freeze({ configured, syncMonitor, setLifecycle, status, restoreCurrent, startCurrentSync, stopCurrentSync, renderRestorePanel, render });
+    return Object.freeze({ configured, compareBridgeFreshness, syncMonitor, setLifecycle, status, restoreCurrent, startCurrentSync, stopCurrentSync, renderRestorePanel, render });
 });

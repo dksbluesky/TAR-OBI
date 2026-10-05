@@ -105,6 +105,17 @@ async function request(port, method, target, body, headers = {}) {
     const freshBridge = { ...bridge(), bridgeId: 'bridge-fresh', extensions: { ...bridge().extensions, sourceContextUpdatedAt: '2026-07-27T02:00:00.000Z' } };
     const staleBridge = { ...bridge(), bridgeId: 'bridge-stale', createdAt: '2026-07-27T02:05:00.000Z', extensions: { ...bridge().extensions, sourceContextUpdatedAt: '2026-07-27T01:55:00.000Z' } };
     guardService.putMonitor(freshBridge);
+    guardService.state.monitors['bridge-fresh'].bridge.monitorResult = { evaluatedAt: '2026-07-27T02:00:10.000Z' };
+    guardService.state.monitors['bridge-fresh'].bridge.notificationState = {
+        continuousValidity: { status: 'PENDING', startedAt: '2026-07-27T02:00:10.000Z' }
+    };
+    const olderSameBridge = { ...freshBridge, activeZone: { low: 220, high: 221 }, extensions: { ...freshBridge.extensions, sourceContextUpdatedAt: '2026-07-27T01:59:00.000Z' } };
+    assert.deepEqual(guardService.putMonitor(olderSameBridge).bridge.activeZone, freshBridge.activeZone, 'an older same-id bridge cannot overwrite service context');
+    const reassessedBridge = { ...freshBridge, activeZone: { low: 236, high: 237 }, extensions: { ...freshBridge.extensions, sourceContextUpdatedAt: '2026-07-27T02:00:30.000Z' } };
+    const reassessedRecord = guardService.putMonitor(reassessedBridge);
+    assert.deepEqual(reassessedRecord.bridge.activeZone, reassessedBridge.activeZone, 'a newer reassessment reaches the service');
+    assert.equal(reassessedRecord.bridge.notificationState.continuousValidity.status, 'PENDING', 'source updates preserve the 90-second confirmation state');
+    assert.equal(reassessedRecord.bridge.monitorResult.evaluatedAt, '2026-07-27T02:00:10.000Z', 'source updates preserve the service assessment');
     const staleResult = guardService.putMonitor(staleBridge);
     assert.equal(staleResult.bridge.bridgeId, 'bridge-fresh', 'an older mobile bridge cannot replace the fresher active source bridge');
     assert.equal(guardService.state.monitors['bridge-stale'], undefined, 'a rejected stale bridge is not activated');
