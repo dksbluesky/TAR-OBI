@@ -98,16 +98,29 @@ if (@($required | Where-Object { -not $values.ContainsKey($_) -or -not $values[$
     [System.IO.File]::WriteAllLines($envFile, $lines, [System.Text.UTF8Encoding]::new($false))
 }
 
+$port = if ($values['PORT']) { [int]$values['PORT'] } else { 8080 }
 if (Test-Path -LiteralPath $servicePidFile) {
     $oldPid = [int](Get-Content -LiteralPath $servicePidFile -ErrorAction SilentlyContinue)
-    if ($oldPid -gt 0 -and (Get-Process -Id $oldPid -ErrorAction SilentlyContinue)) {
+    $oldProcess = if ($oldPid -gt 0) {
+        Get-CimInstance Win32_Process -Filter "ProcessId = $oldPid" -ErrorAction SilentlyContinue
+    }
+    $oldListener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Where-Object { $_.OwningProcess -eq $oldPid } |
+        Select-Object -First 1
+    $oldMonitorRunning = $oldProcess `
+        -and $oldProcess.Name -eq 'node.exe' `
+        -and $oldProcess.CommandLine -match 'monitor-service\.js' `
+        -and $oldListener
+    if ($oldMonitorRunning) {
         [System.Windows.Forms.MessageBox]::Show('The monitor launcher already has a running service. Use stop-monitor-windows.bat before starting another copy.', 'TAR-OBI Monitor') | Out-Null
         exit 1
+    }
+    if ($oldProcess -and $oldProcess.Name -eq 'node.exe' -and $oldProcess.CommandLine -match 'monitor-service\.js') {
+        Stop-Process -Id $oldPid -Force -ErrorAction SilentlyContinue
     }
     Remove-Item -LiteralPath $servicePidFile -Force -ErrorAction SilentlyContinue
 }
 
-$port = if ($values['PORT']) { [int]$values['PORT'] } else { 8080 }
 $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($listener) {
     [System.Windows.Forms.MessageBox]::Show("Port $port is already used by another process. Stop that process or change PORT in the local .env file.", 'TAR-OBI Monitor') | Out-Null
@@ -145,6 +158,19 @@ try {
     $match = [regex]::Match($funnelStatus, 'https://[a-z0-9.-]+\.ts\.net')
     if (-not $match.Success) { throw 'Tailscale Funnel did not provide a public URL.' }
     $publicUrl = $match.Value
+    $publicReady = $false
+    for ($i = 0; $i -lt 30; $i++) {
+        Start-Sleep -Seconds 1
+        if (-not (Get-Process -Id $service.Id -ErrorAction SilentlyContinue)) { break }
+        try {
+            $publicConfig = Invoke-RestMethod -Uri "$publicUrl/api/config" -TimeoutSec 3
+            if ($publicConfig.notification -eq 'telegram') {
+                $publicReady = $true
+                break
+            }
+        } catch {}
+    }
+    if (-not $publicReady) { throw 'Tailscale Funnel did not become publicly reachable.' }
 } catch {
     Get-Process -Id $service.Id -ErrorAction SilentlyContinue | Stop-Process -Force
     Remove-Item -LiteralPath $servicePidFile -Force -ErrorAction SilentlyContinue
