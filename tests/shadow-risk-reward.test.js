@@ -47,6 +47,9 @@ const nextSession = Array.from({ length: 5 }, (_, i) => ({
 const crossedSession = rr.assess({ ...base, asOf: new Date(start + 5 * 300000).toISOString(),
     historicalCandles: { data: priorSession }, intradayCandles: { data: nextSession } });
 assert.equal(crossedSession.candleQuality.status, 'OK');
+assert.equal(crossedSession.completedFiveMinuteBars, 59, 'total includes prior and current sessions');
+assert.equal(rr.completedFiveMinuteBars(null, { data: nextSession }, crossedSession.asOf).length, 5,
+    'today count uses the same completed-candle cutoff without prior history');
 assert.equal(crossedSession.evidence.find(level => level.price === 102)?.rejectionCount, 0,
     'a next-session gap is not an intraday rejection');
 

@@ -112,4 +112,7 @@ assert.match(html, /<details class="mt-2 text-xs text-slate-500">/);
 assert.doesNotMatch(html, /Entry Structural Stop \/ 進場結構停損/);
 assert.doesNotMatch(html, /Entry Stop Basis \/ 進場停損依據/);
 assert.match(html, /Gross R&R \(ETF broad risk\)/);
+assert.doesNotMatch(html, /Net R&R \/ 淨風險報酬比/);
+assert.match(html, /Candles analysed \/ 已分析五分K/);
+assert.match(html, /completedFiveMinuteBars\(null, intradayCandles, shadow\.asOf\)\.length/);
 console.log('final action UI tests passed');

@@ -320,8 +320,14 @@
         if (presentation.action === 'DO_NOT_ENTER' || presentation.zoneInvalid) rows.push(['Current Price', priceValue]);
         setFinalActionDetails(rows);
     }
-    function renderShadowRr(shadow, tick) {
+    function renderShadowRr(shadow, tick, intradayCandles) {
         const value = number => Number.isFinite(number) ? formatPrice(number, tick) : 'Unavailable';
+        const todayCount = shadow.asOf
+            ? window.TarObiShadowRr.completedFiveMinuteBars(null, intradayCandles, shadow.asOf).length
+            : null;
+        const sinceDate = shadow.firstCompletedCandle
+            ? new Date(shadow.firstCompletedCandle).toLocaleDateString('en-US', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit' })
+            : null;
         const rows = [
             ['Proposed Entry / 預計成交價 (Ask 1)', value(shadow.proposedEntry)],
             ['T1 / 第一可信阻力', shadow.target1 ? value(shadow.target1.price) : 'Unavailable'],
@@ -330,10 +336,10 @@
             ['Manual / Trailing Invalidation / 人工或移動停損', value(shadow.manualOrTrailingInvalidation)],
             ['Available Upside / 可用上漲空間', Number.isFinite(shadow.availableUpsidePct) ? `${shadow.availableUpsidePct.toFixed(2)}%` : 'Unavailable'],
             ['Gross R&R (ETF broad risk) / 毛風險報酬比（ETF 廣義風險）', Number.isFinite(shadow.grossRr) ? `${shadow.grossRr.toFixed(2)}R` : 'Unavailable'],
-            ['Net R&R / 淨風險報酬比', 'Unavailable — costs not established'],
             ['Resistance Evidence / 阻力證據', shadow.resistanceConfidence],
             ['Shadow Assessment / 模擬評估', shadow.rrAssessment],
-            ['Completed 5m Bars / 已完成五分K', String(shadow.completedFiveMinuteBars)],
+            ['Candles analysed / 已分析五分K', todayCount === null
+                ? 'Unavailable' : `${shadow.completedFiveMinuteBars} (since ${sinceDate || 'unknown'} and ${todayCount} today)`],
             ['Candle Coverage / K線完整性', shadow.candleQuality?.status || 'Unavailable']
         ];
         const details = document.getElementById('shadow-rr-details');
@@ -511,7 +517,7 @@
             etfBroadInvalidation: shadowContext?.etfBroadInvalidation,
             manualOrTrailingInvalidation: shadowContext?.manualOrTrailingInvalidation ?? linkedBridge?.invalidationLevel ?? null
         });
-        renderShadowRr(shadowRr, tick);
+        renderShadowRr(shadowRr, tick, candleData);
         return {
             complete: Boolean(quoteData && metrics && timestamp),
             ticker: settings.symbol,
