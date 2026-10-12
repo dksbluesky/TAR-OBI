@@ -121,7 +121,10 @@ assert.match(html, /Stop must be below entry; Planned Buy must be above Planned 
 assert.match(html, /PREVIOUS-SESSION REFERENCE/);
 assert.match(html, /CLOSED-SESSION REFERENCE/);
 assert.match(html, /evidenceValid: shadow\.candleQuality\?\.status === 'OK'/);
-assert.match(html, /askValid: !referenceIsPriorDay/);
+assert.match(html, /askValid: askIsLive/);
+assert.match(html, /Last known Ask 1 — stale/);
+assert.match(html, /REFERENCE ONLY — ETF broad invalidation; not used in Planned or Executable R&R/);
+assert.doesNotMatch(html, /\['Shadow Assessment \/ 模擬評估', shadow\.rrAssessment\]/);
 assert.doesNotMatch(html, /Net R&R \/ 淨風險報酬比/);
 assert.match(html, /Candles analysed \/ 已分析五分K/);
 assert.match(html, /completedFiveMinuteBars\(null, intradayCandles, shadow\.asOf\)\.length/);

@@ -356,15 +356,20 @@
         const sinceDate = shadow.firstCompletedCandle
             ? new Date(shadow.firstCompletedCandle).toLocaleDateString('en-US', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit' })
             : null;
+        const session = MarketData.getMarketSession(quoteData, querySettings().interval * 1000);
+        const taipeiDay = value => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
+        const quoteDay = shadow.asOf ? taipeiDay(shadow.asOf) : null;
+        const referenceIsPriorDay = quoteDay !== null && quoteDay !== taipeiDay(Date.now());
+        const askIsLive = !referenceIsPriorDay && session === 'live' && shadow.proposedEntry > 0;
         const rows = [
-            ['Proposed Entry / 預計成交價 (Ask 1)', value(shadow.proposedEntry)],
+            [askIsLive ? 'Current Ask 1 / 即時賣一' : shadow.proposedEntry > 0 ? 'Last known Ask 1 — stale / 最後賣一（非即時）' : 'Ask 1 unavailable / 賣一無資料', value(shadow.proposedEntry)],
             ['T1 / 第一可信阻力', shadow.target1 ? value(shadow.target1.price) : 'Unavailable'],
             ['T2 / 下一可信阻力', shadow.target2 ? value(shadow.target2.price) : 'Unavailable'],
             ['ETF Broad Invalidation / ETF 廣義失效價', value(shadow.etfBroadInvalidation)],
             ['Manual / Trailing Invalidation / 人工或移動停損', value(shadow.manualOrTrailingInvalidation)],
-            ['Available Upside / 可用上漲空間', Number.isFinite(shadow.availableUpsidePct) ? `${shadow.availableUpsidePct.toFixed(2)}%` : 'Unavailable'],
+            [askIsLive ? 'Available Upside / 可用上漲空間' : 'Upside from last known Ask 1 / 前次賣一上漲空間', Number.isFinite(shadow.availableUpsidePct) ? `${shadow.availableUpsidePct.toFixed(2)}%` : 'Unavailable'],
             ['Resistance Evidence / 阻力證據', shadow.resistanceConfidence],
-            ['Shadow Assessment / 模擬評估', shadow.rrAssessment],
+            ['ETF broad-risk status / ETF 廣義風險狀態', 'REFERENCE ONLY — ETF broad invalidation; not used in Planned or Executable R&R.'],
             ['Candles analysed / 已分析五分K', todayCount === null
                 ? 'Unavailable' : `${shadow.completedFiveMinuteBars} (since ${sinceDate || 'unknown'} and ${todayCount} today)`],
             ['Candle Coverage / K線完整性', shadow.candleQuality?.status || 'Unavailable']
@@ -382,10 +387,6 @@
             item.append(term, description);
             return item;
         }));
-        const session = MarketData.getMarketSession(quoteData, querySettings().interval * 1000);
-        const taipeiDay = value => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
-        const quoteDay = shadow.asOf ? taipeiDay(shadow.asOf) : null;
-        const referenceIsPriorDay = quoteDay !== null && quoteDay !== taipeiDay(Date.now());
         const buyInput = document.getElementById('planned-buy').value;
         const stopInput = document.getElementById('planned-stop').value;
         const buyNumber = Number(buyInput), stopNumber = Number(stopInput);
@@ -395,7 +396,7 @@
             plannedBuy: buyInput,
             plannedStop: stopInput,
             ask: shadow.proposedEntry, target1: shadow.target1, target2: shadow.target2,
-            askValid: !referenceIsPriorDay && session === 'live' && shadow.proposedEntry > 0,
+            askValid: askIsLive,
             evidenceValid: shadow.candleQuality?.status === 'OK',
             evidenceReason: 'Resistance evidence unavailable.'
         });
