@@ -35,6 +35,9 @@ assert.equal(rr.calculateTradePlan({ ...trade, plannedStop: 101 }).planned.targe
 assert.equal(rr.calculateTradePlan({ ...trade, askValid: false }).executable.targets[0].grossRr, null);
 assert.equal(rr.calculateTradePlan({ ...trade, askValid: false }).planned.targets[0].grossRr, 2);
 assert.equal(rr.calculateTradePlan({ ...trade, evidenceValid: false }).planned.targets[0].grossRr, null);
+assert.equal(rr.calculateTradePlan({ ...trade, evidenceValid: false,
+    evidenceReason: 'Previous-session resistance; await new market data.' }).planned.targets[0].reason,
+    'Previous-session resistance; await new market data.');
 assert.equal(rr.calculateTradePlan({ ...trade, etfBroadInvalidation: 80, manualOrTrailingInvalidation: 90 }).planned.targets[0].grossRr, 2);
 assert.equal(result.target1?.kind, 'CREDIBLE_RESISTANCE');
 assert.equal(result.entryStructuralStop, null, 'a generic pivot is not a setup-specific stop');

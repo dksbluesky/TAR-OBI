@@ -63,12 +63,12 @@
         return collectCompletedFiveMinuteBars(historical, intraday, asOf).bars;
     }
 
-    function calculateTradePlan({ plannedBuy, plannedStop, ask, target1, target2, askValid = false, evidenceValid = false } = {}) {
+    function calculateTradePlan({ plannedBuy, plannedStop, ask, target1, target2, askValid = false, evidenceValid = false, evidenceReason = 'Resistance evidence unavailable.' } = {}) {
         const buy = number(plannedBuy), stop = number(plannedStop), executableAsk = number(ask);
         const calculate = (entry, missingReason) => {
             const risk = entry > 0 && stop > 0 && stop < entry ? entry - stop : null;
             const reason = !(entry > 0) ? missingReason : !(stop > 0) ? 'Enter Planned Stop Price.'
-                : !(stop < entry) ? 'Stop must be below entry.' : !evidenceValid ? 'Resistance evidence unavailable.' : null;
+                : !(stop < entry) ? 'Stop must be below entry.' : !evidenceValid ? evidenceReason : null;
             const targets = [target1, target2].map((target, index) => {
                 const price = number(target?.price);
                 const problem = reason || !(price > 0) || target?.kind !== 'CREDIBLE_RESISTANCE'
