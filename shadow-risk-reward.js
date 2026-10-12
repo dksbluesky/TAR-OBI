@@ -63,6 +63,28 @@
         return collectCompletedFiveMinuteBars(historical, intraday, asOf).bars;
     }
 
+    function calculateTradePlan({ plannedBuy, plannedStop, ask, target1, target2, askValid = false, evidenceValid = false } = {}) {
+        const buy = number(plannedBuy), stop = number(plannedStop), executableAsk = number(ask);
+        const calculate = (entry, missingReason) => {
+            const risk = entry > 0 && stop > 0 && stop < entry ? entry - stop : null;
+            const reason = !(entry > 0) ? missingReason : !(stop > 0) ? 'Enter Planned Stop Price.'
+                : !(stop < entry) ? 'Stop must be below entry.' : !evidenceValid ? 'Resistance evidence unavailable.' : null;
+            const targets = [target1, target2].map((target, index) => {
+                const price = number(target?.price);
+                const problem = reason || !(price > 0) || target?.kind !== 'CREDIBLE_RESISTANCE'
+                    ? reason || 'Resistance target unavailable.' : price <= entry ? `T${index + 1} is not above entry.` : null;
+                const upside = problem ? null : price - entry;
+                return { target: price, upside, upsidePct: upside === null ? null : upside / entry * 100,
+                    grossRr: upside === null ? null : upside / risk, reason: problem };
+            });
+            return { entry, stop, risk, targets };
+        };
+        return { planned: calculate(buy, 'Enter Planned Buy Price.'),
+            executable: calculate(askValid ? executableAsk : null, 'Ask 1 unavailable or stale.'),
+            askDifference: buy > 0 && askValid && executableAsk > 0 ? executableAsk - buy : null,
+            askDifferencePct: buy > 0 && askValid && executableAsk > 0 ? (executableAsk - buy) / buy * 100 : null };
+    }
+
     function pivots(bars, field, span = 2) {
         const found = [];
         for (let i = span; i < bars.length - span; i++) {
@@ -184,5 +206,5 @@
         return result;
     }
 
-    return Object.freeze({ assess, completedFiveMinuteBars });
+    return Object.freeze({ assess, completedFiveMinuteBars, calculateTradePlan });
 });

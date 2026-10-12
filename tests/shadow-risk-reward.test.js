@@ -19,6 +19,23 @@ const base = {
     manualOrTrailingInvalidation: 98
 };
 const result = rr.assess(base);
+const trade = { plannedBuy: 100, plannedStop: 95, ask: 101, askValid: true, evidenceValid: true,
+    target1: { price: 110, kind: 'CREDIBLE_RESISTANCE' }, target2: { price: 120, kind: 'CREDIBLE_RESISTANCE' } };
+const planned = rr.calculateTradePlan(trade);
+assert.equal(planned.planned.targets[0].grossRr, 2);
+assert.equal(planned.planned.targets[1].grossRr, 4);
+assert.equal(planned.executable.targets[0].grossRr, 1.5);
+assert.equal(planned.executable.targets[1].grossRr, 19 / 6);
+assert.equal(planned.askDifference, 1);
+assert.equal(rr.calculateTradePlan({ ...trade, plannedBuy: 99 }).executable.targets[0].grossRr, 1.5);
+assert.equal(rr.calculateTradePlan({ ...trade, ask: 102 }).planned.targets[0].grossRr, 2);
+assert.equal(rr.calculateTradePlan({ ...trade, plannedStop: 96 }).planned.targets[0].grossRr, 2.5);
+assert.equal(rr.calculateTradePlan({ ...trade, target1: null }).planned.targets[0].reason, 'Resistance target unavailable.');
+assert.equal(rr.calculateTradePlan({ ...trade, plannedStop: 101 }).planned.targets[0].reason, 'Stop must be below entry.');
+assert.equal(rr.calculateTradePlan({ ...trade, askValid: false }).executable.targets[0].grossRr, null);
+assert.equal(rr.calculateTradePlan({ ...trade, askValid: false }).planned.targets[0].grossRr, 2);
+assert.equal(rr.calculateTradePlan({ ...trade, evidenceValid: false }).planned.targets[0].grossRr, null);
+assert.equal(rr.calculateTradePlan({ ...trade, etfBroadInvalidation: 80, manualOrTrailingInvalidation: 90 }).planned.targets[0].grossRr, 2);
 assert.equal(result.target1?.kind, 'CREDIBLE_RESISTANCE');
 assert.equal(result.entryStructuralStop, null, 'a generic pivot is not a setup-specific stop');
 assert.equal(result.etfBroadInvalidation, 97);
