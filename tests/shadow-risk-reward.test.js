@@ -34,6 +34,22 @@ assert.equal(result.evidence[1]?.price, result.target2?.price, 'T2 is displayed 
 assert.ok(result.target1?.rejections.every(rejection => rejection.pivotAt && rejection.reactionAt
     && Number.isFinite(rejection.pivotPrice) && Number.isFinite(rejection.reactionLow)));
 
+const priorStart = Date.parse('2026-10-08T09:00:00+08:00');
+const priorSession = Array.from({ length: 53 }, (_, i) => ({
+    date: new Date(priorStart + i * 300000).toISOString(), high: 100, low: 99.9, close: 99.95
+}));
+priorSession[52] = { ...priorSession[52], high: 102, low: 101.8, close: 101.9 };
+priorSession.push({ date: new Date(priorStart + 54 * 300000).toISOString(),
+    high: 101.99, low: 101.98, close: 101.98 });
+const nextSession = Array.from({ length: 5 }, (_, i) => ({
+    date: new Date(start + i * 300000).toISOString(), high: 100, low: 99, close: 99.5
+}));
+const crossedSession = rr.assess({ ...base, asOf: new Date(start + 5 * 300000).toISOString(),
+    historicalCandles: { data: priorSession }, intradayCandles: { data: nextSession } });
+assert.equal(crossedSession.candleQuality.status, 'OK');
+assert.equal(crossedSession.evidence.find(level => level.price === 102)?.rejectionCount, 0,
+    'a next-session gap is not an intraday rejection');
+
 const noEntry = rr.assess({ ...base, proposedEntry: null });
 assert.equal(noEntry.completedFiveMinuteBars, bars.length, 'coverage is independent of entry availability');
 assert.equal(noEntry.grossRr, null);

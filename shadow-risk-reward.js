@@ -135,7 +135,9 @@
         const levels = groups.map(group => {
             const touches = highs.filter(point => Math.abs(point.price - group.price) <= tolerance);
             const rejections = touches.map(point => {
-                const following = bars.slice(point.index + 1, point.index + 5);
+                const pivotDay = taipeiDate(Date.parse(point.date));
+                const following = bars.slice(point.index + 1, point.index + 5)
+                    .filter(bar => taipeiDate(bar.start) === pivotDay);
                 const reaction = following.find(bar => group.price - bar.low >= rejectionMove);
                 return reaction ? { pivotPrice: point.price, pivotAt: point.date,
                     reactionLow: reaction.low, reactionAt: reaction.date } : null;

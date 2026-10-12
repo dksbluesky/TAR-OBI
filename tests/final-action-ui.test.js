@@ -103,4 +103,10 @@ assert.match(html, /TarObiBridgeMonitor\?\.signalModeLabel\?\.\(assessment\.stat
 assert.match(html, /TarObiBridgeMonitor\?\.finalActionContext\?\.\(linkedBridge, assessment\.state, price, session\)/);
 assert.doesNotMatch(html, /TAR-OBI Assessment Invalidation/);
 assert.match(html, /ETF_DCA Manual \/ Trailing Invalidation/);
+assert.match(html, /automatic_context: 'AUTO \/ CONTEXT'/);
+assert.match(html, /manual: 'MANUAL'/);
+assert.match(html, /aggressive_override: 'SUGGESTED \/ AGGRESSIVE'/);
+assert.match(html, /conservative_override: 'SUGGESTED \/ CONSERVATIVE'/);
+assert.match(html, /id="shadow-rr-summary"/);
+assert.match(html, /<details class="mt-2 text-xs text-slate-500">/);
 console.log('final action UI tests passed');
