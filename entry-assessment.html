@@ -326,7 +326,6 @@
             ['Proposed Entry / 預計成交價 (Ask 1)', value(shadow.proposedEntry)],
             ['T1 / 第一可信阻力', shadow.target1 ? value(shadow.target1.price) : 'Unavailable'],
             ['T2 / 下一可信阻力', shadow.target2 ? value(shadow.target2.price) : 'Unavailable'],
-            ['Entry Structural Stop / 進場結構停損', shadow.entryStructuralStop ? value(shadow.entryStructuralStop.price) : 'Unavailable'],
             ['ETF Broad Invalidation / ETF 廣義失效價', value(shadow.etfBroadInvalidation)],
             ['Manual / Trailing Invalidation / 人工或移動停損', value(shadow.manualOrTrailingInvalidation)],
             ['Available Upside / 可用上漲空間', Number.isFinite(shadow.availableUpsidePct) ? `${shadow.availableUpsidePct.toFixed(2)}%` : 'Unavailable'],
@@ -335,8 +334,7 @@
             ['Resistance Evidence / 阻力證據', shadow.resistanceConfidence],
             ['Shadow Assessment / 模擬評估', shadow.rrAssessment],
             ['Completed 5m Bars / 已完成五分K', String(shadow.completedFiveMinuteBars)],
-            ['Candle Coverage / K線完整性', shadow.candleQuality?.status || 'Unavailable'],
-            ['Entry Stop Basis / 進場停損依據', shadow.stopReason || 'Unavailable']
+            ['Candle Coverage / K線完整性', shadow.candleQuality?.status || 'Unavailable']
         ];
         const details = document.getElementById('shadow-rr-details');
         details.replaceChildren(...rows.map(([label, content]) => {

@@ -109,4 +109,7 @@ assert.match(html, /aggressive_override: 'SUGGESTED \/ AGGRESSIVE'/);
 assert.match(html, /conservative_override: 'SUGGESTED \/ CONSERVATIVE'/);
 assert.match(html, /id="shadow-rr-summary"/);
 assert.match(html, /<details class="mt-2 text-xs text-slate-500">/);
+assert.doesNotMatch(html, /Entry Structural Stop \/ 進場結構停損/);
+assert.doesNotMatch(html, /Entry Stop Basis \/ 進場停損依據/);
+assert.match(html, /Gross R&R \(ETF broad risk\)/);
 console.log('final action UI tests passed');
