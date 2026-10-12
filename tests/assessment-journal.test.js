@@ -27,7 +27,8 @@ const snapshot = {
     obiState: 'Bid Dominant',
     vwapState: 'Above VWAP',
     spreadState: 'ACCEPTABLE',
-    volumeQuality: 'Normal'
+    volumeQuality: 'Normal',
+    shadowRr: { asOf: '2026-08-05T01:00:00.000Z', grossRr: null, rrAssessment: 'R&R UNAVAILABLE' }
 };
 
 assert.strictEqual(journal.recordCompletedAssessment(snapshot, null), null, 'standalone mode must not be recorded');
@@ -36,6 +37,7 @@ assert.strictEqual(entry.assessmentState, 'WAIT FOR PULLBACK');
 assert.strictEqual(entry.currentPrice, 237);
 assert.deepStrictEqual(entry.setupContext.activeZone, { low: 225, high: 231 });
 assert.strictEqual(entry.setupContext.C2.met, true);
+assert.strictEqual(entry.shadowRr.rrAssessment, 'R&R UNAVAILABLE');
 assert.strictEqual(journal.recordCompletedAssessment(snapshot, bridge), null, 'duplicate timestamp must be ignored');
 assert.strictEqual(journal.recordCompletedAssessment({
     ...snapshot,
@@ -73,5 +75,15 @@ const heartbeat = journal.recordCompletedAssessment({
     assessment: { state: 'WAIT FOR CONFIRMATION', confidence: 'Medium' }
 }, bridge, { continuousValidity: { status: 'CONFIRMING', reason: 'confirmation window started' } });
 assert.ok(heartbeat, 'unchanged state is retained as a 15-minute heartbeat');
+const shadowResolved = journal.recordCompletedAssessment({
+    ...snapshot,
+    evaluatedAt: '2026-08-05T01:15:30.000Z',
+    shadowRr: { rrAssessment: 'CALCULABLE — no validated R&R gate', target1: { price: 240 }, entryStructuralStop: { price: 235 } },
+    assessment: { state: 'WAIT FOR CONFIRMATION', confidence: 'Medium' }
+}, bridge, { continuousValidity: { status: 'CONFIRMING', reason: 'confirmation window started' } });
+assert.ok(shadowResolved, 'newly resolved shadow evidence is recorded without changing the assessment state');
+
+values.set(journal.STORAGE_KEY, JSON.stringify({ version: 1, entries: [{ ticker: '006208', bridgeId: 'old', evaluatedAt: '2026-08-01T01:00:00.000Z' }] }));
+assert.strictEqual(journal.listEntries({ bridgeId: 'old' })[0].shadowRr, undefined, 'older journal entries remain readable');
 
 console.log('assessment-journal tests passed');

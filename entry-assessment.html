@@ -6,6 +6,7 @@
     <title>Intraday Entry Assessment | TAR-OBI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./shared-market.js"></script>
+    <script src="./shadow-risk-reward.js"></script>
     <script src="./bridge-loader.js"></script>
     <script src="./assessment-journal.js"></script>
     <script src="./mobile-support.js"></script>
@@ -118,6 +119,13 @@
             </article>
         </section>
 
+        <section class="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm" aria-label="Shadow risk reward assessment">
+            <h2 class="text-xs font-black tracking-wider text-indigo-700">SHADOW R&amp;R / 風險報酬觀察</h2>
+            <p class="mt-1 text-xs text-slate-500">Research only. Gross R&R uses ETF_DCA's broader invalidation as a risk reference, not an intraday stop. Existing Final Action and confirmation remain authoritative. / 僅供觀察；毛風險報酬比以 ETF 廣義失效價作風險參考，並非盤中停損；原有最終判斷不變。</p>
+            <dl id="shadow-rr-details" class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3"></dl>
+            <p id="shadow-rr-evidence" class="mt-3 text-xs text-slate-500">Waiting for completed candles.</p>
+        </section>
+
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-4 text-xs font-black tracking-wider text-slate-600">CURRENT MARKET DATA / 即時市場資料</h2>
             <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
@@ -155,6 +163,9 @@
     let quoteData = null;
     let metrics = null;
     let candleData = null;
+    let historicalCandles = null;
+    let historicalRequestKey = null;
+    let historicalRetryAt = 0;
     let fetching = false;
     let refreshTimer = null;
     let refreshDelay = null;
@@ -295,9 +306,52 @@
             ['Active Zone', hasZone ? `${formatPrice(Number(zone.low), tick)}–${formatPrice(Number(zone.high), tick)}` : 'Unavailable'],
             ['Zone Source', zoneSource]
         ];
-        if (hasZone && presentation.zoneInvalidation !== null) rows.push(['ETF_DCA Zone Invalidation', formatPrice(presentation.zoneInvalidation, tick)]);
+        if (hasZone && presentation.zoneInvalidation !== null) rows.push(['ETF_DCA Manual / Trailing Invalidation', formatPrice(presentation.zoneInvalidation, tick)]);
         if (presentation.action === 'DO_NOT_ENTER' || presentation.zoneInvalid) rows.push(['Current Price', priceValue]);
         setFinalActionDetails(rows);
+    }
+    function renderShadowRr(shadow, tick) {
+        const value = number => Number.isFinite(number) ? formatPrice(number, tick) : 'Unavailable';
+        const rows = [
+            ['Proposed Entry / 預計成交價 (Ask 1)', value(shadow.proposedEntry)],
+            ['T1 / 第一可信阻力', shadow.target1 ? value(shadow.target1.price) : 'Unavailable'],
+            ['T2 / 下一可信阻力', shadow.target2 ? value(shadow.target2.price) : 'Unavailable'],
+            ['Entry Structural Stop / 進場結構停損', shadow.entryStructuralStop ? value(shadow.entryStructuralStop.price) : 'Unavailable'],
+            ['ETF Broad Invalidation / ETF 廣義失效價', value(shadow.etfBroadInvalidation)],
+            ['Manual / Trailing Invalidation / 人工或移動停損', value(shadow.manualOrTrailingInvalidation)],
+            ['Available Upside / 可用上漲空間', Number.isFinite(shadow.availableUpsidePct) ? `${shadow.availableUpsidePct.toFixed(2)}%` : 'Unavailable'],
+            ['Gross R&R (ETF broad risk) / 毛風險報酬比（ETF 廣義風險）', Number.isFinite(shadow.grossRr) ? `${shadow.grossRr.toFixed(2)}R` : 'Unavailable'],
+            ['Net R&R / 淨風險報酬比', 'Unavailable — costs not established'],
+            ['Resistance Evidence / 阻力證據', shadow.resistanceConfidence],
+            ['Shadow Assessment / 模擬評估', shadow.rrAssessment],
+            ['Completed 5m Bars / 已完成五分K', String(shadow.completedFiveMinuteBars)],
+            ['Candle Coverage / K線完整性', shadow.candleQuality?.status || 'Unavailable'],
+            ['Entry Stop Basis / 進場停損依據', shadow.stopReason || 'Unavailable']
+        ];
+        const details = document.getElementById('shadow-rr-details');
+        details.replaceChildren(...rows.map(([label, content]) => {
+            const item = document.createElement('div');
+            item.className = 'rounded-lg bg-indigo-50/50 p-3';
+            const term = document.createElement('dt');
+            term.className = 'text-xs text-slate-500';
+            term.textContent = label;
+            const description = document.createElement('dd');
+            description.className = 'mt-1 font-mono font-bold text-slate-800';
+            description.textContent = content;
+            item.append(term, description);
+            return item;
+        }));
+        const evidence = shadow.evidence.map((level, index) => {
+            const target = level.price === shadow.target1?.price ? 'T1 ' : level.price === shadow.target2?.price ? 'T2 ' : '';
+            const reactions = (level.rejections || []).map(item =>
+                `${item.pivotAt} high ${formatPrice(item.pivotPrice, tick)} → ${item.reactionAt} low ${formatPrice(item.reactionLow, tick)}`).join('; ');
+            const structure = reactions || (level.observedAt || []).join(', ') || 'supporting time unavailable';
+            return `${target}${formatPrice(level.price, tick)} ${level.kind} (${structure}${level.repeatedDailyPivots ? '; repeated daily pivots' : ''})`;
+        }).join(' · ');
+        const quality = shadow.candleQuality || {};
+        const coverage = `Duplicates: ${(quality.duplicateTimestamps || []).join(', ') || 'none'}; Missing: ${(quality.missingCandles || []).join(', ') || 'none'}`;
+        document.getElementById('shadow-rr-evidence').textContent =
+            `As of ${shadow.asOf || 'Unavailable'} · Last completed 5m ${shadow.lastCompletedCandle || 'Unavailable'} · ${coverage} · ${evidence || 'No resistance evidence'} · Early entry: ${shadow.earlyEntryReason}`;
     }
     function render() {
         const settings = querySettings();
@@ -433,6 +487,18 @@
         document.getElementById('vwap-card').textContent = vwapPosition;
         document.getElementById('volume-quality-card').textContent = volumeQuality.quality;
         document.getElementById('factor-list').innerHTML = assessment.factors.map(factor => `<li>${factor}</li>`).join('');
+        const shadowContext = linkedBridge?.extensions?.structuralRrV1 || null;
+        const shadowRr = window.TarObiShadowRr.assess({
+            asOf: timestamp ? new Date(timestamp).toISOString() : null,
+            proposedEntry: ask,
+            tick,
+            intradayCandles: candleData,
+            historicalCandles,
+            dailyResistance: shadowContext?.dailyResistance,
+            etfBroadInvalidation: shadowContext?.etfBroadInvalidation,
+            manualOrTrailingInvalidation: shadowContext?.manualOrTrailingInvalidation ?? linkedBridge?.invalidationLevel ?? null
+        });
+        renderShadowRr(shadowRr, tick);
         return {
             complete: Boolean(quoteData && metrics && timestamp),
             ticker: settings.symbol,
@@ -451,8 +517,43 @@
             obiState: obi,
             vwapState: vwapPosition,
             spreadState: Number.isFinite(spread) ? (assessment.wideSpread ? 'WIDE' : 'ACCEPTABLE') : null,
-            volumeQuality: volumeQuality.quality
+            volumeQuality: volumeQuality.quality,
+            shadowRr
         };
+    }
+
+    function startHistoricalFetch(settings) {
+        if (!settings.apiKey || !settings.symbol || settings.source !== 'fugle') return;
+        const taipeiDay = date => {
+            const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+            const part = name => parts.find(item => item.type === name)?.value;
+            return `${part('year')}-${part('month')}-${part('day')}`;
+        };
+        const today = taipeiDay(new Date());
+        const requestKey = `${settings.symbol}:${today}`;
+        if (historicalRequestKey === requestKey || Date.now() < historicalRetryAt) return;
+        historicalRequestKey = requestKey;
+        historicalCandles = null;
+        const from = taipeiDay(new Date(Date.now() - 21 * 86400000));
+        const to = taipeiDay(new Date(Date.now() - 86400000));
+        const url = `${API_BASE}/stock/historical/candles/${encodeURIComponent(settings.symbol)}?timeframe=5&from=${from}&to=${to}`;
+        fetch(url, { headers: { 'X-API-KEY': settings.apiKey }, cache: 'no-store' })
+            .then(async response => {
+                if (!response.ok) throw new Error(`Historical candles HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (historicalRequestKey !== requestKey) return;
+                historicalCandles = data;
+                render();
+            })
+            .catch(error => {
+                if (historicalRequestKey === requestKey) {
+                    historicalRequestKey = null;
+                    historicalRetryAt = Date.now() + 5 * 60000;
+                }
+                console.warn('[Shadow R&R] Historical candles unavailable', error);
+            });
     }
 
     async function fetchData() {
@@ -465,6 +566,7 @@
         fetching = true;
         document.getElementById('refresh-button').disabled = true;
         try {
+            startHistoricalFetch(settings);
             const headers = { 'X-API-KEY': settings.apiKey };
             const quoteRequest = fetch(`${API_BASE}/stock/intraday/quote/${settings.symbol}`, { headers, cache: 'no-store' });
             const candleRequest = fetch(`${API_BASE}/stock/intraday/candles/${settings.symbol}?timeframe=5`, { headers, cache: 'no-store' })

@@ -16,6 +16,8 @@ assert.match(
     /intraday\/candles\/\$\{settings\.symbol\}\?timeframe=5`,\s*\{\s*headers,\s*cache:\s*'no-store'\s*\}/,
     'Fugle candle requests bypass browser cache'
 );
+assert.match(html, /shadow-risk-reward\.js/, 'shadow calculation is loaded independently');
+assert.match(html, /historical\/candles\/\$\{encodeURIComponent\(settings\.symbol\)\}\?timeframe=5/, 'prior-session 5-minute candles are requested');
 assert.match(
     html,
     /ensureRefreshTimer\(MarketData\.getMarketSession\(quoteData,\s*settings\.interval\s*\*\s*1000\)\)/,

@@ -34,7 +34,10 @@
             assessmentState: entry.assessmentState,
             confirmationStatus: entry.confirmationState?.status || null,
             confirmationReason: entry.confirmationState?.reason || null,
-            marketSession: entry.marketSession
+            marketSession: entry.marketSession,
+            shadowAssessment: entry.shadowRr?.rrAssessment || null,
+            shadowTarget: entry.shadowRr?.target1?.price ?? null,
+            shadowStop: entry.shadowRr?.entryStructuralStop?.price ?? null
         });
     }
 
@@ -80,6 +83,7 @@
             spreadState: snapshot.spreadState || null,
             volumeQuality: snapshot.volumeQuality || null,
             marketSession: snapshot.marketSession || null,
+            shadowRr: snapshot.shadowRr || null,
             confirmationState: monitorState?.continuousValidity || null,
             setupContext: {
                 activeZone: bridge.activeZone || null,
