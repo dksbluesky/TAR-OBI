@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daytrade 30M Playbook | TAR-OBI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./shared-market.js"></script>
     <meta name="theme-color" content="#4338ca">
     <style>body{font-family:Inter,sans-serif}</style>
 </head>
@@ -160,7 +161,7 @@
         const finalOpeningBar = opening.at(-1);
         const volumes = opening.map(bar => Math.round(bar.volume).toLocaleString('en-US'));
         const lowVolume = opening.length > 1 && opening.at(-1).volume < opening[0].volume;
-        const tick = rangeHigh !== null ? (rangeHigh < 10 ? 0.01 : rangeHigh < 50 ? 0.05 : rangeHigh < 100 ? 0.1 : rangeHigh < 500 ? 0.5 : rangeHigh < 1000 ? 1 : 5) : 0.05;
+        const tick = rangeHigh !== null ? (window.MarketData?.inferTickSize(quote) || (rangeHigh < 10 ? 0.01 : rangeHigh < 50 ? 0.05 : rangeHigh < 100 ? 0.1 : rangeHigh < 500 ? 0.5 : rangeHigh < 1000 ? 1 : 5)) : 0.05;
         const retestLow = rangeHigh !== null ? rangeHigh - tick * 4 : null;
         const bullTargetLow = rangeHigh !== null ? rangeHigh * 1.015 : null;
         const bullTargetHigh = rangeHigh !== null ? rangeHigh * 1.02 : null;
