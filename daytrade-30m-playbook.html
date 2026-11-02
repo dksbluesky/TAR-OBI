@@ -58,9 +58,17 @@
         </section>
 
         <section class="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
-            <h2 class="text-xs font-black tracking-wider text-indigo-700">符合 playbook 的條件 / RULE CHECK</h2>
-            <ul id="rule-list" class="mt-3 space-y-2 text-sm text-slate-700"><li>等待有效的已完成 5 分K。</li></ul>
-            <p class="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">原始 playbook 的方向條件把「09:05–09:30 突破前 30 分鐘高低」放在區間形成期間，時間上無法成立。本頁將突破檢查放在 09:30 後，並要求突破K棒量高於開盤六根K棒的平均量；若尚未突破，顯示等待，不會預先猜方向。停損與停利百分比保留為原文件所列風控參考，不會自動換算成下單價位。</p>
+            <h2 class="text-xs font-black tracking-wider text-indigo-700">📊 開盤結構判讀 / OPENING READ</h2>
+            <h3 id="report-structure" class="mt-3 text-lg font-black text-slate-800">等待市場資料</h3>
+            <ol id="report-evidence" class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700"><li>等待有效的已完成 5 分K。</li></ol>
+            <h3 id="report-plan-title" class="mt-5 border-t border-slate-100 pt-4 text-sm font-black text-slate-800">當沖作戰 Playbook</h3>
+            <p id="report-main-plan" class="mt-2 text-sm font-bold text-slate-700">等待開盤區間資料。</p>
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+                <article class="rounded-lg border border-rose-100 bg-rose-50 p-3"><h4 class="text-xs font-black text-rose-800">右側偏多條件 / LONG IF</h4><p id="report-long" class="mt-2 text-sm leading-relaxed text-slate-700">等待開盤區間資料。</p></article>
+                <article class="rounded-lg border border-emerald-100 bg-emerald-50 p-3"><h4 class="text-xs font-black text-emerald-800">右側偏空條件 / SHORT IF</h4><p id="report-short" class="mt-2 text-sm leading-relaxed text-slate-700">等待開盤區間資料。</p></article>
+            </div>
+            <p id="report-risk" class="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">風控：依原 playbook 設定，單筆虧損不超過資金 5%，當日兩筆停損後停止交易；不凹單、不留倉。</p>
+            <p class="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">方向突破只在 09:30 後判讀；本頁採用使用者提供範例中的單根量能至少 500 張且高於開盤平均量作為「帶量」門檻。目標價為條件式參考值，尚未觸發時不代表進場訊號，也不會下單。</p>
         </section>
 
         <section id="setup-required" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -127,8 +135,9 @@
         $('market-time').textContent = `資料更新：${timeLabel(new Date(updatedAt))}（台灣時間）`;
 
         const openingAverageVolume = opening.length ? opening.reduce((sum, item) => sum + item.volume, 0) / opening.length : 0;
-        const bullishBreakout = rangeHigh === null ? null : afterOpen.find(bar => bar.close > rangeHigh && bar.volume > openingAverageVolume);
-        const bearishBreakout = rangeLow === null ? null : afterOpen.find(bar => bar.close < rangeLow && bar.volume > openingAverageVolume);
+        const volumeThreshold = Math.max(500, openingAverageVolume);
+        const bullishBreakout = rangeHigh === null ? null : afterOpen.find(bar => bar.close > rangeHigh && bar.volume >= volumeThreshold);
+        const bearishBreakout = rangeLow === null ? null : afterOpen.find(bar => bar.close < rangeLow && bar.volume >= volumeThreshold);
         const bullish = bullishBreakout && openPrice !== null && prevClose !== null && openPrice > prevClose && first && !postFirst.some(bar => bar.low < first.low);
         const bearish = bearishBreakout && openPrice !== null && prevClose !== null && openPrice < prevClose && first && !postFirst.some(bar => bar.high > first.high);
         const breakout = bullish ? bullishBreakout : bearish ? bearishBreakout : null;
@@ -144,14 +153,38 @@
         $('structure-title').className = `mt-3 text-2xl font-black ${tone}`;
         $('structure-reason').textContent = reason;
 
-        const checks = [
-            `開盤相對昨收：${openPrice !== null && prevClose !== null ? (openPrice > prevClose ? '高於昨收' : openPrice < prevClose ? '低於昨收' : '等於昨收') : '資料不足'}`,
-            `首根 5 分K：${first ? `高 ${price(first.high)}、低 ${price(first.low)}` : '尚未完成'}`,
-            `前 30 分鐘區間：${rangeHigh !== null ? `高 ${price(rangeHigh)}、低 ${price(rangeLow)}` : '等待六根完成K棒'}`,
-            `09:30 後突破：${breakout ? `${timeLabel(new Date(breakout.start))} K棒符合量高於開盤六根平均` : '尚未確認'}`,
-            '風控原文：單筆虧損上限 5% 資金；連續兩筆虧損當日停手；文件列出停損 1.5%–3%、停利 3%–6%，此處不代算價位。'
-        ];
-        $('rule-list').innerHTML = checks.map(item => `<li class="rounded-lg bg-slate-50 px-3 py-2">${safeText(item)}</li>`).join('');
+        const gap = openPrice !== null && prevClose !== null ? openPrice - prevClose : null;
+        const gapPercent = gap !== null && prevClose ? gap / prevClose * 100 : null;
+        const firstLowHeld = first ? !postFirst.some(bar => bar.low < first.low) : null;
+        const firstHighHeld = first ? !postFirst.some(bar => bar.high > first.high) : null;
+        const finalOpeningBar = opening.at(-1);
+        const volumes = opening.map(bar => Math.round(bar.volume).toLocaleString('en-US'));
+        const lowVolume = opening.length > 1 && opening.at(-1).volume < opening[0].volume;
+        const tick = rangeHigh !== null ? (rangeHigh < 10 ? 0.01 : rangeHigh < 50 ? 0.05 : rangeHigh < 100 ? 0.1 : rangeHigh < 500 ? 0.5 : rangeHigh < 1000 ? 1 : 5) : 0.05;
+        const retestLow = rangeHigh !== null ? rangeHigh - tick * 4 : null;
+        const bullTargetLow = rangeHigh !== null ? rangeHigh * 1.015 : null;
+        const bullTargetHigh = rangeHigh !== null ? rangeHigh * 1.02 : null;
+        const bearTargetLow = rangeLow !== null ? rangeLow * 0.97 : null;
+        const bearTargetHigh = rangeLow !== null ? rangeLow * 0.98 : null;
+        if (rangeHigh !== null) {
+            $('report-structure').textContent = `當前結構：【${bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : '無方向／區間震盪，觀望'}】`;
+            const gapText = gap !== null ? `${gap >= 0 ? '高於' : '低於'}昨收 ${Math.abs(gap).toFixed(2)} 元（${gapPercent >= 0 ? '+' : ''}${gapPercent.toFixed(2)}%）` : '昨收或開盤價資料不足';
+            const firstText = first ? `首根高 ${price(first.high)}／低 ${price(first.low)}；首根低點${firstLowHeld ? '尚未跌破' : '已跌破'}、高點${firstHighHeld ? '尚未突破' : '已突破'}。` : '首根 5 分K 尚未完成。';
+            const volumeText = volumes.length ? `開盤六根量序：${volumes.join(' → ')} 張${lowVolume ? '；末根量低於首根，開盤量能整體收縮' : ''}。` : '開盤量能資料不足。';
+            const closeText = finalOpeningBar ? `最後一根開盤K（${timeLabel(new Date(finalOpeningBar.start))}–09:30）收 ${price(finalOpeningBar.close)}，${finalOpeningBar.close < finalOpeningBar.open ? '收黑' : '收紅'}。` : '';
+            $('report-evidence').innerHTML = [
+                `開盤基調：${safeText(gapText)}。`,
+                safeText(firstText),
+                `${safeText(volumeText)} ${safeText(closeText)}`,
+                bullish || bearish ? '區間形成後出現符合量能門檻的收盤突破。' : '開盤區間尚未出現符合條件的帶量收盤突破，依「結構沒出來就不做」先觀望。'
+            ].map(item => `<li>${item}</li>`).join('');
+            $('report-main-plan').textContent = bullish ? '偏多條件已觸發；依原則等待回測確認，不追價。' : bearish ? '偏空條件已觸發；依原則等待反彈受阻確認，不追價。' : '【觀望不進場】先不預設方向，等價格帶量走出 09:00–09:30 區間。';
+            const bullGapTarget = prevClose !== null && prevClose > rangeHigh ? `昨收缺口 ${price(prevClose)}` : '昨收缺口不在上方，略過缺口目標';
+            $('report-long').textContent = `觸發：已完成 5 分K 收在 ${price(rangeHigh)} 上方，量至少 500 張且不低於開盤均量；再回測 ${price(retestLow)}–${price(rangeHigh)} 守穩才確認。停損參考突破K低點，並把進場風險限制在 1.5%–3%。目標參考 ${bullGapTarget}，延伸 ${price(bullTargetLow)}–${price(bullTargetHigh)}（以區間高估算 +1.5%–2%）。${bullish ? `目前觸發K低點：${price(bullishBreakout.low)}。` : '目前尚未觸發。'}`;
+            $('report-short').textContent = `觸發：開盤低於昨收、首根高點未突破；價格回到 ${price(openPrice)} 下方後，已完成 5 分K 帶至少 500 張量收在 ${price(rangeLow)} 下方。停損參考站回首根高點 ${price(first?.high)}；目標參考 ${price(bearTargetLow)}–${price(bearTargetHigh)}（區間低下方約 3%–2%）。${bearish ? `目前觸發K高點：${price(bearishBreakout.high)}。` : '目前尚未觸發。'}`;
+            $('report-risk').textContent = '⚠️ 風控與執行紀律：單筆虧損不超過總資金 5%；當日累積停損 2 筆即停止；結構破壞執行停損，不凹單、不留倉隔日沖。這些是 playbook 的規則參考，不是獲利保證。';
+        }
+
         $('candle-rows').innerHTML = bars.length ? bars.map(bar => {
             const part = taipeiParts(new Date(bar.start));
             const minuteOfDay = Number(part.hour) * 60 + Number(part.minute);
