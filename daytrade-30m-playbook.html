@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daytrade 30M Playbook | TAR-OBI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="theme-color" content="#4338ca">
+    <style>body{font-family:Inter,sans-serif}</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+<main class="min-h-screen p-4 sm:p-6">
+    <div class="mx-auto max-w-4xl space-y-5">
+        <header class="rounded-xl bg-gradient-to-r from-indigo-800 to-indigo-600 p-5 text-white shadow-md">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h1 class="text-2xl font-black sm:text-3xl">Daytrade 30M Playbook</h1>
+                    <p class="mt-1 text-sm text-indigo-100">開盤前 30 分鐘 5 分K 自動盤點</p>
+                </div>
+                <a href="./index.html" class="self-start rounded-lg border border-white/30 px-3 py-2 text-xs font-bold hover:bg-white/10">← TAR-OBI</a>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/20 pt-3 text-sm">
+                <span id="source-status">讀取已儲存的 Fugle 設定…</span>
+                <button id="refresh-button" class="rounded-lg bg-white px-3 py-2 text-xs font-bold text-indigo-700 disabled:opacity-50">立即更新</button>
+            </div>
+        </header>
+
+        <section class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+            <strong>資料與判讀界線：</strong>直接使用此 TAR-OBI 網域已保存的 Fugle 金鑰與股票代碼；只讀取報價及 5 分K，不會下單。前 30 分鐘區間必須等 09:30 結束後才完整，突破只從 09:30 之後的已完成 K 棒判讀。結果是依 playbook 規則整理的觀察資訊，不代表獲利保證。
+        </section>
+
+        <section class="grid gap-4 sm:grid-cols-2">
+            <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 class="text-xs font-black tracking-wider text-slate-500">開盤錨點 / OPENING ANCHORS</h2>
+                <dl class="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">昨收</dt><dd id="prev-close" class="mt-1 font-mono text-lg font-bold">—</dd></div>
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">今日開盤</dt><dd id="today-open" class="mt-1 font-mono text-lg font-bold">—</dd></div>
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">首根 5 分K 高 / 低</dt><dd id="first-range" class="mt-1 font-mono font-bold">—</dd></div>
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">09:00–09:30 區間高 / 低</dt><dd id="opening-range" class="mt-1 font-mono font-bold">等待 6 根完成K棒</dd></div>
+                </dl>
+            </article>
+            <article id="structure-card" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 class="text-xs font-black tracking-wider text-slate-500">結構判定 / STRUCTURE</h2>
+                <p id="structure-title" class="mt-3 text-2xl font-black text-slate-700">等待市場資料</p>
+                <p id="structure-reason" class="mt-2 text-sm leading-relaxed text-slate-600">—</p>
+                <p id="market-time" class="mt-3 text-xs text-slate-400">資料時間：—</p>
+            </article>
+        </section>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="text-xs font-black tracking-wider text-slate-500">當日 5 分K / TODAY'S 5-MINUTE CANDLES</h2>
+            <div class="mt-3 overflow-x-auto">
+                <table class="w-full min-w-[560px] text-right text-xs">
+                    <thead><tr class="border-b text-slate-500"><th class="py-2 text-left">時間</th><th>開</th><th>高</th><th>低</th><th>收</th><th>量</th><th class="text-left">區段</th></tr></thead>
+                    <tbody id="candle-rows"><tr><td colspan="7" class="py-5 text-center text-slate-400">等待 Fugle 資料</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
+            <h2 class="text-xs font-black tracking-wider text-indigo-700">符合 playbook 的條件 / RULE CHECK</h2>
+            <ul id="rule-list" class="mt-3 space-y-2 text-sm text-slate-700"><li>等待有效的已完成 5 分K。</li></ul>
+            <p class="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">原始 playbook 的方向條件把「09:05–09:30 突破前 30 分鐘高低」放在區間形成期間，時間上無法成立。本頁將突破檢查放在 09:30 後，並要求突破K棒量高於開盤六根K棒的平均量；若尚未突破，顯示等待，不會預先猜方向。停損與停利百分比保留為原文件所列風控參考，不會自動換算成下單價位。</p>
+        </section>
+
+        <section id="setup-required" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            找不到此 TAR-OBI 瀏覽器儲存的 Fugle 設定。請回<a href="./index.html" class="font-bold underline">TAR-OBI 主頁</a>輸入 Fugle Key、設定股票代碼並取得一次行情。
+        </section>
+    </div>
+</main>
+<script>
+(() => {
+    const API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
+    const $ = id => document.getElementById(id);
+    let fetching = false;
+    let timer = null;
+    let refreshDelay = null;
+
+    function taipeiParts(date) {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+            .formatToParts(date).reduce((result, part) => { result[part.type] = part.value; return result; }, {});
+    }
+    function timeLabel(date) {
+        return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+    }
+    function price(value) { const n = Number(value); return Number.isFinite(n) && n > 0 ? n.toFixed(2) : '—'; }
+    function positiveNumber(value) { if (value === null || value === undefined || value === '') return null; const number = Number(value); return Number.isFinite(number) && number > 0 ? number : null; }
+    function safeText(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
+    function showUnavailable(message) {
+        $('source-status').textContent = message;
+        $('setup-required').classList.remove('hidden');
+    }
+    function completedTodayBars(payload, now) {
+        const today = taipeiParts(now);
+        const dateKey = `${today.year}-${today.month}-${today.day}`;
+        return (Array.isArray(payload?.data) ? payload.data : []).map(bar => {
+            const start = Date.parse(bar.date || '');
+            const open = Number(bar.open), high = Number(bar.high), low = Number(bar.low), close = Number(bar.close), volume = Number(bar.volume ?? bar.total?.volume ?? 0);
+            if (!Number.isFinite(start) || ![open, high, low, close].every(Number.isFinite)) return null;
+            const parts = taipeiParts(new Date(start));
+            if (`${parts.year}-${parts.month}-${parts.day}` !== dateKey || start + 300000 > now.getTime()) return null;
+            return { start, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 };
+        }).filter(Boolean).sort((a, b) => a.start - b.start);
+    }
+    function render(quote, candles, now, symbol, updatedAt) {
+        const today = taipeiParts(now);
+        const bars = completedTodayBars(candles, now);
+        const opening = bars.filter(bar => {
+            const parts = taipeiParts(new Date(bar.start));
+            const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+            return minutes >= 540 && minutes < 570;
+        });
+        const afterOpen = bars.filter(bar => bar.start >= Date.parse(`${today.year}-${today.month}-${today.day}T09:30:00+08:00`));
+        const first = opening[0];
+        const rangeHigh = opening.length >= 6 ? Math.max(...opening.map(bar => bar.high)) : null;
+        const rangeLow = opening.length >= 6 ? Math.min(...opening.map(bar => bar.low)) : null;
+        const prevClose = positiveNumber(quote?.previousClose);
+        const openPrice = positiveNumber(quote?.openPrice) ?? positiveNumber(first?.open);
+        const postFirst = first ? bars.filter(bar => bar.start > first.start) : [];
+        const nowMinutes = Number(today.hour) * 60 + Number(today.minute);
+        const sessionAfterOpening = nowMinutes >= 570;
+        $('prev-close').textContent = price(prevClose);
+        $('today-open').textContent = price(openPrice);
+        $('first-range').textContent = first ? `${price(first.high)} / ${price(first.low)}` : '等待首根完成K棒';
+        $('opening-range').textContent = rangeHigh !== null ? `${price(rangeHigh)} / ${price(rangeLow)}` : `已完成 ${opening.length} / 6 根`;
+        $('source-status').textContent = `${symbol} · Fugle · 已完成 ${bars.length} 根今日K棒`;
+        $('market-time').textContent = `資料更新：${timeLabel(new Date(updatedAt))}（台灣時間）`;
+
+        const openingAverageVolume = opening.length ? opening.reduce((sum, item) => sum + item.volume, 0) / opening.length : 0;
+        const bullishBreakout = rangeHigh === null ? null : afterOpen.find(bar => bar.close > rangeHigh && bar.volume > openingAverageVolume);
+        const bearishBreakout = rangeLow === null ? null : afterOpen.find(bar => bar.close < rangeLow && bar.volume > openingAverageVolume);
+        const bullish = bullishBreakout && openPrice !== null && prevClose !== null && openPrice > prevClose && first && !postFirst.some(bar => bar.low < first.low);
+        const bearish = bearishBreakout && openPrice !== null && prevClose !== null && openPrice < prevClose && first && !postFirst.some(bar => bar.high > first.high);
+        const breakout = bullish ? bullishBreakout : bearish ? bearishBreakout : null;
+        let title = '等待開盤資料', reason = '需有昨收、今日開盤及完成的 5 分K 才能判讀。', tone = 'text-slate-700';
+        if (!bars.length) { title = '尚無已完成 5 分K'; reason = '盤前或資料尚未到達；目前不判斷方向。'; }
+        else if (opening.length < 6) { title = '開盤區間形成中'; reason = `目前有 ${opening.length} 根已完成開盤K棒；等到 09:30 後才計算完整高低區間。`; tone = 'text-amber-700'; }
+        else if (!sessionAfterOpening) { title = '等待 09:30 區間完成'; reason = '完整前 30 分鐘區間形成後，才開始檢查區間外的突破。'; tone = 'text-amber-700'; }
+        else if (bullish) { title = '偏多條件符合'; reason = `開盤高於昨收，首根低點未破，且 ${timeLabel(new Date(breakout.start))} 突破開盤區間高點並放量。仍須依原 playbook 等回測確認，不構成保證或訂單。`; tone = 'text-red-700'; }
+        else if (bearish) { title = '偏空條件符合'; reason = `開盤低於昨收，首根高點未破，且 ${timeLabel(new Date(breakout.start))} 跌破開盤區間低點並放量。仍須依原 playbook 等反彈確認，不構成保證或訂單。`; tone = 'text-green-700'; }
+        else if (afterOpen.length) { title = '未確認突破 / 觀望'; reason = '尚無同時符合方向、首根K棒守位、區間突破與量能條件的已完成K棒。'; tone = 'text-amber-700'; }
+        $('structure-title').textContent = title;
+        $('structure-title').className = `mt-3 text-2xl font-black ${tone}`;
+        $('structure-reason').textContent = reason;
+
+        const checks = [
+            `開盤相對昨收：${openPrice !== null && prevClose !== null ? (openPrice > prevClose ? '高於昨收' : openPrice < prevClose ? '低於昨收' : '等於昨收') : '資料不足'}`,
+            `首根 5 分K：${first ? `高 ${price(first.high)}、低 ${price(first.low)}` : '尚未完成'}`,
+            `前 30 分鐘區間：${rangeHigh !== null ? `高 ${price(rangeHigh)}、低 ${price(rangeLow)}` : '等待六根完成K棒'}`,
+            `09:30 後突破：${breakout ? `${timeLabel(new Date(breakout.start))} K棒符合量高於開盤六根平均` : '尚未確認'}`,
+            '風控原文：單筆虧損上限 5% 資金；連續兩筆虧損當日停手；文件列出停損 1.5%–3%、停利 3%–6%，此處不代算價位。'
+        ];
+        $('rule-list').innerHTML = checks.map(item => `<li class="rounded-lg bg-slate-50 px-3 py-2">${safeText(item)}</li>`).join('');
+        $('candle-rows').innerHTML = bars.length ? bars.map(bar => {
+            const part = taipeiParts(new Date(bar.start));
+            const minuteOfDay = Number(part.hour) * 60 + Number(part.minute);
+            const section = minuteOfDay < 570 ? '開盤30分' : '區間後';
+            return `<tr class="border-b border-slate-100"><td class="py-2 text-left font-mono">${timeLabel(new Date(bar.start))}</td><td>${price(bar.open)}</td><td>${price(bar.high)}</td><td>${price(bar.low)}</td><td>${price(bar.close)}</td><td>${Math.round(bar.volume).toLocaleString('en-US')}</td><td class="text-left text-slate-500">${section}</td></tr>`;
+        }).join('') : '<tr><td colspan="7" class="py-5 text-center text-slate-400">尚無今日已完成K棒</td></tr>';
+    }
+    async function refresh() {
+        if (fetching) return;
+        const apiKey = localStorage.getItem('fugle_api_key') || '';
+        const symbol = (localStorage.getItem('fugle_symbol') || '').trim().toUpperCase();
+        if (!apiKey || !symbol) { showUnavailable('尚未設定 Fugle Key 或股票代碼'); return; }
+        fetching = true;
+        $('refresh-button').disabled = true;
+        $('source-status').textContent = `${symbol} · Fugle 資料讀取中…`;
+        try {
+            const headers = { 'X-API-KEY': apiKey };
+            const [quoteResponse, candleResponse] = await Promise.all([
+                fetch(`${API_BASE}/stock/intraday/quote/${encodeURIComponent(symbol)}`, { headers, cache: 'no-store' }),
+                fetch(`${API_BASE}/stock/intraday/candles/${encodeURIComponent(symbol)}?timeframe=5`, { headers, cache: 'no-store' })
+            ]);
+            if (!quoteResponse.ok) throw new Error(`Fugle quote HTTP ${quoteResponse.status}`);
+            if (!candleResponse.ok) throw new Error(`Fugle 5分K HTTP ${candleResponse.status}`);
+            const [quote, candles] = await Promise.all([quoteResponse.json(), candleResponse.json()]);
+            render(quote, candles, new Date(), symbol, Date.now());
+            $('setup-required').classList.add('hidden');
+        } catch (error) {
+            $('source-status').textContent = `資料讀取失敗：${error.message}`;
+        } finally {
+            fetching = false;
+            $('refresh-button').disabled = false;
+            ensureRefresh();
+        }
+    }
+    function ensureRefresh() {
+        const now = taipeiParts(new Date());
+        const minutes = Number(now.hour) * 60 + Number(now.minute);
+        const marketOpen = minutes >= 540 && minutes < 815;
+        const configured = Number(localStorage.getItem('fugle_interval')) || 30;
+        const delay = (marketOpen && [10, 30, 60].includes(configured) ? configured : 60) * 1000;
+        if (timer && refreshDelay === delay) return;
+        if (timer) clearInterval(timer);
+        refreshDelay = delay;
+        timer = setInterval(refresh, delay);
+    }
+    $('refresh-button').addEventListener('click', refresh);
+    refresh();
+    ensureRefresh();
+    window.addEventListener('beforeunload', () => clearInterval(timer));
+})();
+</script>
+</body>
+</html>
