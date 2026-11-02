@@ -139,6 +139,7 @@
         else if (bullish) { title = '偏多條件符合'; reason = `開盤高於昨收，首根低點未破，且 ${timeLabel(new Date(breakout.start))} 突破開盤區間高點並放量。仍須依原 playbook 等回測確認，不構成保證或訂單。`; tone = 'text-red-700'; }
         else if (bearish) { title = '偏空條件符合'; reason = `開盤低於昨收，首根高點未破，且 ${timeLabel(new Date(breakout.start))} 跌破開盤區間低點並放量。仍須依原 playbook 等反彈確認，不構成保證或訂單。`; tone = 'text-green-700'; }
         else if (afterOpen.length) { title = '未確認突破 / 觀望'; reason = '尚無同時符合方向、首根K棒守位、區間突破與量能條件的已完成K棒。'; tone = 'text-amber-700'; }
+        else { title = '等待區間外突破 / 觀望'; reason = '09:30 開盤區間已完整；等待後續已完成 5 分K 確認是否帶量突破。'; tone = 'text-amber-700'; }
         $('structure-title').textContent = title;
         $('structure-title').className = `mt-3 text-2xl font-black ${tone}`;
         $('structure-reason').textContent = reason;
