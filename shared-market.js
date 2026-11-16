@@ -1640,6 +1640,86 @@
         };
     }
 
+    // Observations only: callers retain ownership of monitoring and entry decisions.
+    function analyzePriceAction({ candles, quote, vwap, now = Date.now() }) {
+        const quoteTime = timestampToMs(quote?.lastUpdated || quote?.lastTrade?.time || quote?.closeTime);
+        const cutoff = Math.min(now, quoteTime || 0);
+        const day = quote?.date;
+        const open = Number(quote?.openPrice);
+        const current = Number(quote?.lastPrice ?? quote?.closePrice);
+        const bars = (Array.isArray(candles?.data) ? candles.data : [])
+            .map(item => ({ start: Date.parse(item?.date), open: Number(item?.open),
+                high: Number(item?.high), low: Number(item?.low), close: Number(item?.close),
+                volume: Number(item?.volume ?? item?.total?.volume) }))
+            .filter(bar => Number.isFinite(bar.start) && bar.start + 300000 <= cutoff
+                && new Date(bar.start).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) === day
+                && [bar.open, bar.high, bar.low, bar.close, bar.volume].every(Number.isFinite)
+                && bar.volume >= 0)
+            .sort((a, b) => a.start - b.start)
+            .filter((bar, index, all) => index === 0 || bar.start !== all[index - 1].start);
+        const openingStart = Date.parse(`${day}T09:00:00+08:00`);
+        const opening = Array.from({ length: 6 }, (_, index) =>
+            bars.find(bar => bar.start === openingStart + index * 300000));
+        const openingComplete = opening.every(Boolean);
+        const rangeHigh = openingComplete ? Math.max(...opening.map(bar => bar.high)) : null;
+        const rangeLow = openingComplete ? Math.min(...opening.map(bar => bar.low)) : null;
+        const after = openingComplete ? bars.filter(bar => bar.start >= openingStart + 1800000) : [];
+        const latest = after.at(-1), previous = after.at(-2) || opening.at(-1);
+        const candleFresh = Boolean(latest && quoteTime - (latest.start + 300000) <= 360000);
+        const quality = calculateVolumeQuality(candles, quoteTime, getMarketSession(quote, 30000, new Date(now)));
+        const ratio = quality.ratio;
+        const volumeExpanding = ratio !== null && ratio >= 1.4;
+        const volumeWeakening = ratio !== null && ratio < 0.6;
+        const breakout = Boolean(latest && latest.close > rangeHigh
+            && latest.volume >= Math.max(500, opening.reduce((sum, bar) => sum + bar.volume, 0) / 6));
+        const breakdown = Boolean(latest && latest.close < rangeLow);
+        const earlierBreakout = after.slice(0, -1).some(bar => bar.close > rangeHigh);
+        const falseBreakout = Boolean(earlierBreakout && latest && latest.close <= rangeHigh);
+        const acceptedBreakout = Boolean(breakout && previous?.close > rangeHigh);
+        const successfulRetest = Boolean(acceptedBreakout && latest.low <= rangeHigh
+            && latest.close > rangeHigh);
+        const first = opening[0];
+        const initialRally = Boolean(first && Number.isFinite(open) && first.high > open && first.close > open);
+        const initialDecline = Boolean(first && Number.isFinite(open) && first.low < open && first.close < open);
+        const pullbackHoldsOpen = Boolean(initialRally && latest
+            && bars.some(bar => bar.start > first.start && bar.start < latest.start
+                && bar.low >= open && bar.low < first.high)
+            && latest.low >= open);
+        const secondAttempt = Boolean(pullbackHoldsOpen && latest.close > previous.close);
+        const rapidBreakBelowOpen = Boolean(initialRally && previous && latest.close < open
+            && previous.close > latest.close && latest.start - previous.start <= 300000);
+        const failedReclaim = Boolean(initialDecline && latest && after.length >= 2
+            && after.some(bar => bar.high >= open) && latest.close < open && latest.high <= open);
+        const recent = after.slice(-3);
+        const gradualVwapRise = Boolean(recent.length === 3 && Number.isFinite(vwap) && vwap > 0
+            && recent.every(bar => bar.close > vwap)
+            && recent[0].close < recent[1].close && recent[1].close < recent[2].close
+            && (recent[2].close - recent[0].close) / recent[0].close <= 0.015
+            && ratio !== null && ratio >= 1 && ratio < 2);
+        const lowVolumePullback = Boolean(previous && latest && previous.close > previous.open
+            && latest.close < previous.close && latest.low >= open && volumeWeakening);
+        const higherLow = Boolean(after.length >= 3 && after.at(-1).low > after.at(-3).low);
+        const strongSellingPullback = Boolean(previous && latest && previous.close > previous.open
+            && latest.close < previous.low && volumeExpanding);
+        const resistanceRejection = Boolean(previous && latest && latest.high >= previous.high
+            && latest.close < previous.close && latest.close < latest.open);
+        const breakdownFailedRetest = Boolean(previous && latest && previous.close < rangeLow
+            && latest.high >= rangeLow && latest.close < rangeLow);
+        const failedGapRecovery = Boolean(Number.isFinite(Number(quote?.previousClose))
+            && open < Number(quote.previousClose) && latest?.high >= Number(quote.previousClose)
+            && latest.close < Number(quote.previousClose));
+        const priceVolume = previous && latest && ratio !== null
+            ? `${latest.close >= previous.close ? 'RISING' : 'FALLING'}_${volumeExpanding ? 'EXPANDING' : volumeWeakening ? 'DECLINING' : 'NORMAL'}` : 'UNAVAILABLE';
+        const divergence = Boolean(previous && latest && volumeWeakening
+            && (latest.high > previous.high || latest.low < previous.low));
+        return { openingComplete, rangeHigh, rangeLow, openPrice: open, currentPrice: current,
+            vwap, quoteTime, latest, candleFresh, ratio, priceVolume,
+            breakout, breakdown, acceptedBreakout, falseBreakout, successfulRetest,
+            secondAttempt, rapidBreakBelowOpen, failedReclaim, gradualVwapRise,
+            lowVolumePullback, higherLow, strongSellingPullback, resistanceRejection,
+            failedGapRecovery, breakdownFailedRetest, divergence };
+    }
+
     global.MarketData =
         Object.freeze({
             OBI_THRESHOLD,
@@ -1659,6 +1739,7 @@
             calculateVolumeQuality,
             inferTickSize,
             roundToTick,
-            calculateEntryAssessment
+            calculateEntryAssessment,
+            analyzePriceAction
         });
 })(window);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daytrade 30M Playbook | TAR-OBI</title>
+    <title>Intraday Market Structure | TAR-OBI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./shared-market.js"></script>
     <meta name="theme-color" content="#4338ca">
@@ -15,19 +15,40 @@
         <header class="rounded-xl bg-gradient-to-r from-indigo-800 to-indigo-600 p-5 text-white shadow-md">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h1 class="text-2xl font-black sm:text-3xl">Daytrade 30M Playbook</h1>
-                    <p class="mt-1 text-sm text-indigo-100">開盤前 30 分鐘 5 分K 自動盤點</p>
+                    <h1 class="text-2xl font-black sm:text-3xl">Intraday Market Structure / 盤中市場結構分析</h1>
+                    <p class="mt-1 text-sm text-indigo-100">09:30 初判 · 之後隨時重新評估盤中趨勢</p>
                 </div>
                 <a href="./index.html" class="self-start rounded-lg border border-white/30 px-3 py-2 text-xs font-bold hover:bg-white/10">← TAR-OBI</a>
             </div>
             <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/20 pt-3 text-sm">
                 <span id="source-status">讀取已儲存的 Fugle 設定…</span>
-                <button id="refresh-button" class="rounded-lg bg-white px-3 py-2 text-xs font-bold text-indigo-700 disabled:opacity-50">立即更新</button>
+                <button id="refresh-button" class="rounded-lg bg-white px-3 py-2 text-xs font-bold text-indigo-700 disabled:opacity-50">盤勢更新</button>
             </div>
         </header>
 
         <section class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
-            <strong>資料與判讀界線：</strong>直接使用此 TAR-OBI 網域已保存的 Fugle 金鑰與股票代碼；只讀取報價及 5 分K，不會下單。前 30 分鐘區間必須等 09:30 結束後才完整，突破只從 09:30 之後的已完成 K 棒判讀。結果是依 playbook 規則整理的觀察資訊，不代表獲利保證。
+            <strong>資料與判讀界線：</strong>直接使用此 TAR-OBI 網域已保存的 Fugle 金鑰與股票代碼；只讀取報價及 5 分K，不會下單。前 30 分鐘區間必須等 09:30 結束後才完整，突破只從 09:30 之後的已完成 K 棒判讀。初判與盤中重新評估都是觀察資訊，不代表進場指示或獲利保證。
+        </section>
+
+        <section class="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm" aria-label="最新盤勢">
+            <h2 class="text-xs font-black tracking-wider text-indigo-700">CURRENT REASSESSMENT / 現在是否值得繼續觀察？</h2>
+            <p id="as-of-time" class="mt-2 text-sm font-bold text-slate-600">等待市場資料</p>
+            <p id="structure-pattern" class="mt-2 text-2xl font-black text-slate-800">等待市場資料</p>
+            <p id="structure-title" class="mt-1 text-sm font-black text-slate-700">等待市場資料</p>
+            <p id="structure-reason" class="mt-2 text-sm leading-relaxed text-slate-600">—</p>
+            <p id="intraday-evidence" class="mt-2 text-sm leading-relaxed text-slate-700">盤中新結構：等待已完成 5 分K</p>
+            <p id="market-time" class="mt-2 text-xs text-slate-400">資料時間：—</p>
+            <div class="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                <div><h3 class="text-xs font-black text-slate-500">相對 09:30 初判的變化</h3><p id="structure-change" class="mt-1 text-sm font-semibold text-slate-700">等待開盤區間</p></div>
+                <div><h3 class="text-xs font-black text-slate-500">下一個需要觀察的條件</h3><p id="structure-watch" class="mt-1 text-sm text-slate-700">等待有效資料</p></div>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div class="rounded-lg bg-slate-50 p-2">OR30 高點<strong id="key-high" class="mt-1 block font-mono text-sm">—</strong></div>
+                <div class="rounded-lg bg-slate-50 p-2">OR30 低點<strong id="key-low" class="mt-1 block font-mono text-sm">—</strong></div>
+                <div class="rounded-lg bg-slate-50 p-2">已確認高點序列<strong id="swing-high" class="mt-1 block text-sm">不足</strong></div>
+                <div class="rounded-lg bg-slate-50 p-2">已確認低點序列<strong id="swing-low" class="mt-1 block text-sm">不足</strong></div>
+            </div>
+            <p class="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">這是監控決定，不是進場指示。若考慮進場，請另看 <a href="./entry-assessment.html" class="font-bold text-indigo-700 underline">Intraday Entry Assessment / 盤中進場評估</a>；仍以該頁 Final Action 為準。</p>
         </section>
 
         <section class="grid gap-4 sm:grid-cols-2">
@@ -40,15 +61,36 @@
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">09:00–09:30 區間高 / 低</dt><dd id="opening-range" class="mt-1 font-mono font-bold">等待 6 根完成K棒</dd></div>
                 </dl>
             </article>
-            <article id="structure-card" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 class="text-xs font-black tracking-wider text-slate-500">結構判定 / STRUCTURE</h2>
-                <p id="structure-title" class="mt-3 text-2xl font-black text-slate-700">等待市場資料</p>
-                <p id="structure-reason" class="mt-2 text-sm leading-relaxed text-slate-600">—</p>
-                <p id="market-time" class="mt-3 text-xs text-slate-400">資料時間：—</p>
+            <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 class="text-xs font-black tracking-wider text-slate-500">09:30 初判快照 / OPENING VIEW</h2>
+                <p id="opening-decision" class="mt-3 text-sm font-black text-slate-700">等待六根完成K棒</p>
+                <p id="opening-hypothesis" class="mt-3 text-lg font-black text-slate-800">等待六根完成K棒</p>
+                <p id="opening-support" class="mt-2 text-sm leading-relaxed text-slate-700">支持：—</p>
+                <p id="opening-counter" class="mt-2 text-sm leading-relaxed text-slate-700">反證：—</p>
+                <p id="opening-conditions" class="mt-2 text-xs leading-relaxed text-slate-500">成立與失效條件：—</p>
             </article>
         </section>
 
+        <section class="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm" aria-label="Price Action Analysis">
+            <h2 class="text-xs font-black tracking-wider text-indigo-700">PRICE ACTION ANALYSIS / 價格行為判讀</h2>
+            <p class="mt-1 text-xs text-slate-500">以下為觀察證據；形成中的型態不等於進場確認。</p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <div class="rounded-lg bg-slate-50 p-3"><strong class="text-sm text-slate-800">回檔守開盤價 → 再攻</strong><span id="pa-second-state" class="mt-1 block text-xs font-bold text-slate-500">INSUFFICIENT DATA</span><p id="pa-second-evidence" class="mt-1 text-xs text-slate-600">等待有效完成K。</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><strong class="text-sm text-slate-800">先漲後跌破開盤價</strong><span id="pa-reversal-state" class="mt-1 block text-xs font-bold text-slate-500">INSUFFICIENT DATA</span><p id="pa-reversal-evidence" class="mt-1 text-xs text-slate-600">等待有效完成K。</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><strong class="text-sm text-slate-800">先跌後反彈未站回開盤價</strong><span id="pa-weak-state" class="mt-1 block text-xs font-bold text-slate-500">INSUFFICIENT DATA</span><p id="pa-weak-evidence" class="mt-1 text-xs text-slate-600">等待有效完成K。</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><strong class="text-sm text-slate-800">VWAP 上方緩升與相對量觀察</strong><span id="pa-gradual-state" class="mt-1 block text-xs font-bold text-slate-500">INSUFFICIENT DATA</span><p id="pa-gradual-evidence" class="mt-1 text-xs text-slate-600">等待有效完成K。</p></div>
+            </div>
+            <ul id="pa-category-evidence" class="mt-3 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-600"><li>價量與結構證據：等待有效資料。</li></ul>
+        </section>
+
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="text-xs font-black tracking-wider text-slate-500">歷史演變紀錄 / COMPLETED 5-MINUTE EVENTS</h2>
+            <ol id="event-timeline" class="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-700"><li>等待開盤區間完成。</li></ol>
+            <p class="mt-2 text-xs text-slate-500">只列截至目前已完成 K 棒所確認的事件；歷史事件不等於目前仍有效。</p>
+        </section>
+
+        <details class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><summary class="cursor-pointer text-xs font-black tracking-wider text-slate-500">展開今日 5 分 K 明細 / TODAY'S 5-MINUTE CANDLES</summary>
+        <section class="mt-3">
             <h2 class="text-xs font-black tracking-wider text-slate-500">當日 5 分K / TODAY'S 5-MINUTE CANDLES</h2>
             <div class="mt-3 overflow-x-auto">
                 <table class="w-full min-w-[560px] text-right text-xs">
@@ -56,9 +98,9 @@
                     <tbody id="candle-rows"><tr><td colspan="7" class="py-5 text-center text-slate-400">等待 Fugle 資料</td></tr></tbody>
                 </table>
             </div>
-        </section>
+        </section></details>
 
-        <section class="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
+        <details class="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm"><summary class="cursor-pointer text-xs font-black tracking-wider text-indigo-700">展開原 Playbook 詳細策略與參考條件</summary><section class="mt-3">
             <h2 class="text-xs font-black tracking-wider text-indigo-700">📊 開盤結構判讀 / OPENING READ</h2>
             <h3 id="report-structure" class="mt-3 text-lg font-black text-slate-800">等待市場資料</h3>
             <ol id="report-evidence" class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700"><li>等待有效的已完成 5 分K。</li></ol>
@@ -69,8 +111,8 @@
                 <article class="rounded-lg border border-emerald-100 bg-emerald-50 p-3"><h4 class="text-xs font-black text-emerald-800">右側偏空條件 / SHORT IF</h4><p id="report-short" class="mt-2 text-sm leading-relaxed text-slate-700">等待開盤區間資料。</p></article>
             </div>
             <p id="report-risk" class="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">風控：依原 playbook 設定，單筆虧損不超過資金 5%，當日兩筆停損後停止交易；不凹單、不留倉。</p>
-            <p class="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">方向突破只在 09:30 後判讀；本頁採用使用者提供範例中的單根量能至少 500 張且高於開盤平均量作為「帶量」門檻。目標價為條件式參考值，尚未觸發時不代表進場訊號，也不會下單。</p>
-        </section>
+            <p class="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">方向突破只在 09:30 後判讀；本頁採用使用者提供範例中的單根量能至少 500 張且高於開盤平均量作為「帶量」門檻。策略計畫、目標與停損是未經本系統確認的參考，不是目前可執行計畫或進場訊號，也不會下單。</p>
+        </section></details>
 
         <section id="setup-required" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             找不到此 TAR-OBI 瀏覽器儲存的 Fugle 設定。請回<a href="./index.html" class="font-bold underline">TAR-OBI 主頁</a>輸入 Fugle Key、設定股票代碼並取得一次行情。
@@ -84,6 +126,7 @@
     let fetching = false;
     let timer = null;
     let refreshDelay = null;
+    let validUntil = 0;
 
     function taipeiParts(date) {
         return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
@@ -97,32 +140,279 @@
     function safeText(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
     function showUnavailable(message) {
         $('source-status').textContent = message;
+        $('structure-title').textContent = '資料未取得 / CHECK LATER';
+        $('structure-reason').textContent = message + '；歷史K棒僅供參考，沒有目前注意力判定。';
+        $('report-structure').textContent = '目前無有效結構判定；先前資料僅供參考';
+        $('report-main-plan').textContent = '目前沒有可執行的判定；等待有效資料。';
+        clearCurrentStructure('目前資料未取得');
+        validUntil = 0;
         $('setup-required').classList.remove('hidden');
     }
     function completedTodayBars(payload, now) {
         const today = taipeiParts(now);
         const dateKey = `${today.year}-${today.month}-${today.day}`;
+        const seen = new Set();
         return (Array.isArray(payload?.data) ? payload.data : []).map(bar => {
             const start = Date.parse(bar.date || '');
             const open = Number(bar.open), high = Number(bar.high), low = Number(bar.low), close = Number(bar.close), volume = Number(bar.volume ?? bar.total?.volume ?? 0);
             if (!Number.isFinite(start) || ![open, high, low, close].every(Number.isFinite)) return null;
             const parts = taipeiParts(new Date(start));
-            if (`${parts.year}-${parts.month}-${parts.day}` !== dateKey || start + 300000 > now.getTime()) return null;
+            if (`${parts.year}-${parts.month}-${parts.day}` !== dateKey || start + 300000 > now.getTime()
+                || seen.has(start)) return null;
+            seen.add(start);
             return { start, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 };
         }).filter(Boolean).sort((a, b) => a.start - b.start);
     }
+    function openingHypothesis(opening, previousClose, openPrice, rangeHigh, rangeLow, volumeThreshold) {
+        if (opening.length !== 6 || previousClose === null || openPrice === null) return null;
+        const first = opening[0], last = opening.at(-1);
+        const midpoint = (rangeHigh + rangeLow) / 2;
+        const earlyVolume = opening.slice(0, 3).reduce((sum, bar) => sum + bar.volume, 0);
+        const lateVolume = opening.slice(3).reduce((sum, bar) => sum + bar.volume, 0);
+        const higherCloses = opening.slice(3).filter(bar => bar.close > first.close).length;
+        const lowerCloses = opening.slice(3).filter(bar => bar.close < first.close).length;
+        const bullish = last.close > first.close && last.close > midpoint && (higherCloses >= 2 || lateVolume > earlyVolume);
+        const bearish = last.close < first.close && last.close < midpoint && (lowerCloses >= 2 || lateVolume > earlyVolume);
+        const bias = bullish ? '略偏多' : bearish ? '略偏空' : '方向尚未確認';
+        const openingGap = openPrice > previousClose ? '開盤相對昨收略有優勢'
+            : openPrice < previousClose ? '開盤相對昨收略顯弱勢' : '開盤與昨收持平';
+        const support = [openingGap, bullish ? '開盤後收盤價上移至區間上半部'
+            : bearish ? '開盤後收盤價下移至區間下半部' : '六根收盤未形成足夠的方向證據'];
+        const counter = [lateVolume <= earlyVolume ? '後三根總量未高於前三根' : '量能增加仍需後續價格確認',
+            '區間後尚未確認突破或新盤中結構'];
+        return {
+            bias,
+            decision: bullish ? 'CONTINUE / 繼續觀察' : bearish ? 'CHECK LATER / 暫避偏多' : 'CHECK LATER / 可先離開',
+            label: `區間震盪，${bias}${bias === '方向尚未確認' ? `；${openingGap}` : ''}`,
+            support: support.join('；'), counter: counter.join('；'),
+            conditions: `OR30 參考：區間後完成 5 分K 收於 ${price(rangeHigh)} 上方且量至少 ${Math.round(volumeThreshold).toLocaleString('en-US')} 張，後續完成K與現價仍在上方；跌破 ${price(rangeLow)} 是偏空警訊。盤中另觀察新區間與已確認高低點；後續證據可推翻初判。`
+        };
+    }
+    function confirmedSwings(bars) {
+        const highs = [], lows = [];
+        for (let index = 1; index < bars.length - 1; index++) {
+            const previous = bars[index - 1], bar = bars[index], next = bars[index + 1];
+            // A pivot is known only after the following 5-minute bar has completed.
+            if (bar.high > previous.high && bar.high > next.high) highs.push(bar);
+            if (bar.low < previous.low && bar.low < next.low) lows.push(bar);
+        }
+        const comparison = (pivots, field, up, down, equal) => pivots.length < 2
+            ? `尚待兩個已確認${field === 'high' ? '高點' : '低點'}`
+            : pivots.at(-1)[field] > pivots.at(-2)[field] ? up
+                : pivots.at(-1)[field] < pivots.at(-2)[field] ? down : equal;
+        return {
+            high: comparison(highs, 'high', 'HH 較高高點', 'LH 較低高點', '等高'),
+            low: comparison(lows, 'low', 'HL 較高低點', 'LL 較低低點', '等低'),
+            latestHigh: highs.at(-1) || null, latestLow: lows.at(-1) || null
+        };
+    }
+    function intradayStructure(bars, swings, rangeHigh, rangeLow, current) {
+        const latest = bars.at(-1);
+        if (!latest || current === null) return null;
+        const support = swings.latestLow?.low, resistance = swings.latestHigh?.high;
+        if (support != null && latest.close < support && current < support) return {
+            kind: 'support_break', level: support,
+            label: '盤中支撐失守', detail: `已確認低點 ${price(support)} 被完成K與現價跌破。`,
+            watch: `觀察能否重站盤中支撐 ${price(support)}；OR30 ${price(rangeLow)} 僅作較早的參考。`
+        };
+        if (resistance != null && latest.close > resistance && current > resistance) return {
+            kind: 'resistance_break', level: resistance,
+            label: '突破盤中阻力', detail: `完成K與現價已高於先前確認高點 ${price(resistance)}。`,
+            watch: `觀察能否守住盤中阻力 ${price(resistance)}，並等待新的已確認低點。`
+        };
+        if (support != null && latest.low <= support && latest.close > support && current > support) return {
+            kind: 'support_hold', level: support,
+            label: '盤中支撐回測暫守', detail: `本根最低觸及已確認低點 ${price(support)}，收盤與現價仍在上方。`,
+            watch: `觀察後續完成K是否續守 ${price(support)}；單根回測不代表進場確認。`
+        };
+        if (bars.length >= 5) {
+            const previous = bars.slice(-5, -1);
+            const high = Math.max(...previous.map(bar => bar.high));
+            const low = Math.min(...previous.map(bar => bar.low));
+            // The four-bar reference must add a level beyond the opening range.
+            if (high !== rangeHigh || low !== rangeLow) {
+                if (latest.close > high && current > high) return {
+                    kind: 'resistance_break', level: high,
+                    label: '突破近四根盤中區間', detail: `完成K與現價高於前四根完成K高點 ${price(high)}。`,
+                    watch: `觀察能否守住新盤中高點 ${price(high)}，以及是否形成較高低點。`
+                };
+                if (latest.close < low && current < low) return {
+                    kind: 'support_break', level: low,
+                    label: '跌破近四根盤中區間', detail: `完成K與現價低於前四根完成K低點 ${price(low)}。`,
+                    watch: `觀察能否重站新盤中低點 ${price(low)}，以及是否形成較低高點。`
+                };
+                if (latest.high <= high && latest.low >= low) return {
+                    label: '盤中新區間內整理', detail: `近四根完成K形成 ${price(low)}–${price(high)}；目前完成K仍在此區間。`,
+                    watch: `觀察完成K與現價能否共同突破 ${price(high)} 或跌破 ${price(low)}。`
+                };
+            }
+        }
+        if (swings.latestHigh || swings.latestLow) return {
+            label: '盤中高低點逐步形成',
+            detail: `已確認高點 ${price(resistance)}（${swings.high}）；低點 ${price(support)}（${swings.low}）。`,
+            watch: `觀察下一個已完成K是否突破盤中高點 ${price(resistance)} 或失守低點 ${price(support)}。`
+        };
+        return null;
+    }
+    function reassessPostOr30(after, current, vwap, rangeHigh, rangeLow, volumeThreshold, hypothesis, structure, action, bullish, bearish, bullBrokenLow) {
+        const latest = after.at(-1);
+        if (!latest) {
+            const bias = hypothesis?.bias;
+            return {
+                title: bias === '略偏多' ? 'CONTINUE' : 'CHECK LATER',
+                pattern: '09:30 開盤初判',
+                reason: bias === '略偏多' ? '09:30 初判略偏多，值得觀察區間後是否出現新趨勢；尚無區間後完成K，不代表可進場。'
+                    : bias === '略偏空' ? '09:30 初判略偏空，可先離開並暫避偏多設定；之後可隨時重新取得資料再評估。'
+                        : '09:30 尚無足夠方向證據，可以先離開；之後重新開啟本頁即可用新資料再評估。',
+                watch: `等待 09:30 後完成K；觀察能否突破 ${price(rangeHigh)}、跌破 ${price(rangeLow)}，或形成新的盤中高低點。`,
+                volumeEvidence: '尚無區間後的多根量能比較。'
+            };
+        }
+        const recent = after.slice(-3);
+        const consecutive = bars => bars.every((bar, index) => index === 0 || bar.start - bars[index - 1].start === 300000);
+        const rising = recent.length === 3 && consecutive(recent) && recent[0].close < recent[1].close
+            && recent[1].close < recent[2].close && recent[2].low > recent[0].low;
+        const falling = recent.length === 3 && consecutive(recent) && recent[0].close > recent[1].close
+            && recent[1].close > recent[2].close && recent[2].high < recent[0].high;
+        const recentFour = after.slice(-4);
+        const completeVolumeSequence = recentFour.length === 4 && consecutive(recentFour);
+        const earlierVolume = completeVolumeSequence ? (recentFour[0].volume + recentFour[1].volume) / 2 : 0;
+        const laterVolume = completeVolumeSequence ? (recentFour[2].volume + recentFour[3].volume) / 2 : 0;
+        const volumeChange = earlierVolume > 0 ? laterVolume / earlierVolume : null;
+        const volumeTrend = volumeChange === null ? '不足' : volumeChange >= 1.2 ? '增加'
+            : volumeChange <= 0.8 ? '減少' : '大致持平';
+        const volumeEvidence = volumeChange === null ? '區間後完成K未滿四根，尚無兩組量能可比較。'
+            : `最近四根完成K的後兩根均量相對前兩根為 ${volumeChange.toFixed(2)} 倍（${volumeTrend}）；僅是盤中量能比較。`;
+        let activeBreakout = null, failedBreakout = null;
+        for (let index = 4; index < after.length; index++) {
+            const bar = after[index];
+            const referenceBars = after.slice(index - 4, index + 1);
+            if (!consecutive(referenceBars)) {
+                activeBreakout = null;
+                failedBreakout = null;
+                continue;
+            }
+            if (activeBreakout) {
+                if (bar.close <= activeBreakout.level) {
+                    failedBreakout = { ...activeBreakout, failedIndex: index };
+                    activeBreakout = null;
+                } else {
+                    activeBreakout.heldBars++;
+                    if (bar.low <= activeBreakout.level) activeBreakout.retestHeld = true;
+                }
+            }
+            if (!activeBreakout) {
+                const level = Math.max(...referenceBars.slice(0, -1).map(previous => previous.high));
+                if (bar.close > level && bar.volume >= volumeThreshold) {
+                    activeBreakout = { level, heldBars: 0, retestHeld: false };
+                    failedBreakout = null;
+                }
+            }
+        }
+        const localBreakout = structure?.kind === 'resistance_break' && after.length >= 3
+            && consecutive(recent) && latest.volume >= volumeThreshold
+            && current > structure.level;
+        const heldBreakout = activeBreakout && activeBreakout.heldBars > 0 && current > activeBreakout.level;
+        const failedRecently = failedBreakout && failedBreakout.failedIndex >= after.length - 2
+            && current <= failedBreakout.level && !activeBreakout;
+        const supportLost = structure?.kind === 'support_break' && after.length >= 3 && consecutive(recent);
+        const strongSelling = falling && volumeTrend === '增加' && current <= latest.close;
+        const risingWatch = rising && Number.isFinite(vwap) && vwap > 0 && current > vwap
+            && volumeChange !== null && volumeChange >= 1;
+        const gradualWatch = action.gradualVwapRise && volumeTrend === '增加' && current > vwap;
+        const oldRisk = (latest.close < rangeLow && current < rangeLow) || bearish
+            || (action.rapidBreakBelowOpen && current < action.openPrice)
+            || (action.failedReclaim && current < action.openPrice)
+            || action.strongSellingPullback || action.breakdownFailedRetest
+            || (bullBrokenLow && !(latest.close > rangeHigh && current > rangeHigh));
+        if (supportLost || oldRisk || strongSelling) {
+            const level = supportLost ? structure.level : rangeLow;
+            return { title: 'HIGH RISK / AVOID FOR NOW', pattern: supportLost ? structure.label : '目前偏多結構受損',
+                reason: (supportLost ? `新盤中支撐 ${price(level)} 已被完成K與現價跌破；暫避偏多設定，重新站回後再評估。`
+                    : strongSelling ? '最近三根完成K走低且最近兩根均量增加，偏多設定風險升高；等待新支撐形成。'
+                        : 'OR30 或開盤價相關的偏多條件受損；暫避偏多設定，後續新資料可改變判斷。')
+                    + ' 這不是全天不安全的預測。',
+                watch: `觀察完成K與現價能否重新站回 ${price(level)}，並形成新的盤中支撐。`, volumeEvidence };
+        }
+        if (bullish || localBreakout || heldBreakout || risingWatch || action.secondAttempt || gradualWatch) {
+            const level = activeBreakout?.level ?? structure?.level ?? rangeHigh;
+            const breakoutPattern = heldBreakout ? activeBreakout.retestHeld ? '盤中突破回測暫守' : '盤中突破持續站上'
+                : localBreakout ? '新盤中阻力初次突破' : null;
+            return { title: 'CONTINUE', pattern: breakoutPattern || (bullish ? 'OR30 高點上方' : '盤中偏多線索形成'),
+                reason: bullish ? `完成K與現價仍高於 OR30 高點 ${price(rangeHigh)}；值得繼續觀察，尚非進場確認。`
+                    : heldBreakout ? `先前帶量突破新盤中阻力 ${price(activeBreakout.level)}，後續完成K與現價仍在上方；繼續觀察是否延續。`
+                        : localBreakout ? `完成K帶量突破新盤中阻力 ${price(structure.level)}，現價仍在上方；這是初次突破，尚待站穩。`
+                            : action.secondAttempt ? '回檔未破開盤價，最新完成K再上移；值得觀察第二次上攻，但尚未確認突破。'
+                                : gradualWatch ? '近三根完成K收盤上移、現價高於 VWAP，且最近兩根均量增加；值得繼續觀察，尚未確認進場。'
+                                    : '最近完成K的收盤與低點上移，現價高於 VWAP，量能未縮減；值得繼續觀察。',
+                watch: `觀察下一根完成K與現價能否續守 ${price(level)}；若跌回其下，重新評估。`, volumeEvidence };
+        }
+        return { title: 'CHECK LATER', pattern: failedRecently ? '新盤中突破失效' : structure?.label || '盤中新結構待確認',
+            reason: failedRecently ? `先前突破新盤中阻力 ${price(failedBreakout.level)} 後收回，暫無持續上攻證據；可稍後再看。`
+                : '目前沒有足夠的新盤中趨勢證據，可以先離開；下次開啟或按「盤勢更新」會重新判斷。',
+            watch: failedRecently ? `等待新完成K重新站上 ${price(failedBreakout.level)} 並觀察量能。`
+                : structure?.watch || `等待完成K突破新盤中阻力，或跌破 ${price(rangeLow)}。`, volumeEvidence };
+    }
+    function clearCurrentStructure(message) {
+        $('structure-pattern').textContent = message;
+        $('intraday-evidence').textContent = '盤中新結構：目前資料不足，僅保留歷史參考';
+        $('structure-change').textContent = '目前資料不足，不能比較最新結構';
+        $('structure-watch').textContent = '等待新鮮報價與已完成 5 分K';
+        $('swing-high').textContent = '資料不足';
+        $('swing-low').textContent = '資料不足';
+        $('as-of-time').textContent = '目前無有效盤中判讀';
+        renderPriceAction(null, false);
+    }
+    function renderPriceAction(action, valid, openPrice, vwap) {
+        const ready = valid && action?.candleFresh;
+        const rows = [
+            ['second', action?.secondAttempt, 'DEVELOPING', `已觀察到回檔未破開盤 ${price(openPrice)}，最新完成K再上移；仍待後續確認。`],
+            ['reversal', action?.rapidBreakBelowOpen, 'CONFIRMED', `先漲後最新完成K跌至 ${price(action?.latest?.close)}，低於開盤 ${price(openPrice)}；為下行警訊。`],
+            ['weak', action?.failedReclaim, 'CONFIRMED', `反彈曾觸及開盤 ${price(openPrice)}，最新完成K收 ${price(action?.latest?.close)}，未站回。`],
+            ['gradual', action?.gradualVwapRise, 'DEVELOPING', `近三根完成K收盤緩升且高於目前 VWAP 參考 ${price(vwap)}；最新相對量 ${action?.ratio?.toFixed(2) ?? '—'} 倍。並未核對每根K當時的VWAP。`]
+        ];
+        rows.forEach(([id, detected, detectedState, evidence]) => {
+            const state = !ready ? 'INSUFFICIENT DATA' : detected ? detectedState : 'NOT DETECTED';
+            $(`pa-${id}-state`).textContent = state;
+            $(`pa-${id}-state`).className = `mt-1 block text-xs font-bold ${state === 'CONFIRMED' ? 'text-red-700' : state === 'DEVELOPING' ? 'text-indigo-700' : 'text-slate-500'}`;
+            $(`pa-${id}-evidence`).textContent = !ready ? '等待新鮮報價、完整 OR30 與區間後完成K。'
+                : detected ? evidence : `目前未符合完整型態；開盤 ${price(openPrice)}，最新完成K收 ${price(action.latest.close)}。`;
+        });
+        if (!ready) {
+            $('pa-category-evidence').innerHTML = '<li>價量與結構證據：目前資料不足，不判定型態。</li>';
+            return;
+        }
+        const evidence = [];
+        if (action.resistanceRejection || action.failedGapRecovery || action.breakdownFailedRetest)
+            evidence.push('阻力拒絕／缺口回補或跌破回測受阻；僅是價格結構，不代表機構活動。');
+        if (action.priceVolume !== 'UNAVAILABLE') evidence.push(`最新兩根收盤與最新K相對當日量中位數：${action.priceVolume}；相對量 ${action.ratio?.toFixed(2) ?? '—'} 倍，並非連續量柱趨勢。`);
+        if (action.acceptedBreakout) evidence.push(`完成K持續站上 OR30 高點 ${price(action.rangeHigh)}。`);
+        else if (action.falseBreakout) evidence.push(`先前上破 OR30 高點 ${price(action.rangeHigh)} 後收回區間，等待重新確認。`);
+        else if (action.breakout) evidence.push(`最新完成K帶量上破 OR30 高點 ${price(action.rangeHigh)}，仍待持續接受。`);
+        if (action.successfulRetest) evidence.push(`突破後回測 OR30 高點 ${price(action.rangeHigh)} 暫守。`);
+        if (action.divergence) evidence.push('價量背離是警示，未單獨確認反轉。');
+        if (action.lowVolumePullback) evidence.push(`量縮回檔，開盤 ${price(openPrice)} 尚未失守；仍待較高低點與再攻。`);
+        if (action.higherLow) evidence.push('近三根完成K的低點有墊高跡象。');
+        $('pa-category-evidence').innerHTML = (evidence.length ? evidence : ['目前未辨識到額外價量或阻力結構。'])
+            .map(item => `<li>• ${safeText(item)}</li>`).join('');
+    }
     function render(quote, candles, now, symbol, updatedAt) {
         const today = taipeiParts(now);
-        const bars = completedTodayBars(candles, now);
-        const opening = bars.filter(bar => {
+        const quoteTime = window.MarketData.timestampToMs(quote?.lastUpdated || quote?.lastTrade?.time || quote?.closeTime);
+        const bars = completedTodayBars(candles, new Date(Math.min(now.getTime(), quoteTime || 0)));
+        const openingCandidates = bars.filter(bar => {
             const parts = taipeiParts(new Date(bar.start));
             const minutes = Number(parts.hour) * 60 + Number(parts.minute);
             return minutes >= 540 && minutes < 570;
         });
+        const expectedSlots = [0, 5, 10, 15, 20, 25].map(minute =>
+            Date.parse(`${today.year}-${today.month}-${today.day}T09:${String(minute).padStart(2, '0')}:00+08:00`));
+        const opening = expectedSlots.map(slot => openingCandidates.find(bar => bar.start === slot)).filter(Boolean);
+        const completeOpening = opening.length === 6;
         const afterOpen = bars.filter(bar => bar.start >= Date.parse(`${today.year}-${today.month}-${today.day}T09:30:00+08:00`));
         const first = opening[0];
-        const rangeHigh = opening.length >= 6 ? Math.max(...opening.map(bar => bar.high)) : null;
-        const rangeLow = opening.length >= 6 ? Math.min(...opening.map(bar => bar.low)) : null;
+        const rangeHigh = completeOpening ? Math.max(...opening.map(bar => bar.high)) : null;
+        const rangeLow = completeOpening ? Math.min(...opening.map(bar => bar.low)) : null;
         const prevClose = positiveNumber(quote?.previousClose);
         const openPrice = positiveNumber(quote?.openPrice) ?? positiveNumber(first?.open);
         const postFirst = first ? bars.filter(bar => bar.start > first.start) : [];
@@ -133,26 +423,132 @@
         $('first-range').textContent = first ? `${price(first.high)} / ${price(first.low)}` : '等待首根完成K棒';
         $('opening-range').textContent = rangeHigh !== null ? `${price(rangeHigh)} / ${price(rangeLow)}` : `已完成 ${opening.length} / 6 根`;
         $('source-status').textContent = `${symbol} · Fugle · 已完成 ${bars.length} 根今日K棒`;
-        $('market-time').textContent = `資料更新：${timeLabel(new Date(updatedAt))}（台灣時間）`;
+        $('market-time').textContent = `行情時間：${quoteTime ? timeLabel(new Date(quoteTime)) : '未知'}；接收時間：${timeLabel(new Date(updatedAt))}（台灣時間）`;
 
         const openingAverageVolume = opening.length ? opening.reduce((sum, item) => sum + item.volume, 0) / opening.length : 0;
         const volumeThreshold = Math.max(500, openingAverageVolume);
-        const bullishBreakout = rangeHigh === null ? null : afterOpen.find(bar => bar.close > rangeHigh && bar.volume >= volumeThreshold);
-        const bearishBreakout = rangeLow === null ? null : afterOpen.find(bar => bar.close < rangeLow && bar.volume >= volumeThreshold);
-        const bullish = bullishBreakout && openPrice !== null && prevClose !== null && openPrice > prevClose && first && !postFirst.some(bar => bar.low < first.low);
-        const bearish = bearishBreakout && openPrice !== null && prevClose !== null && openPrice < prevClose && first && !postFirst.some(bar => bar.high > first.high);
-        const breakout = bullish ? bullishBreakout : bearish ? bearishBreakout : null;
+        const hypothesis = rangeHigh !== null
+            ? openingHypothesis(opening, prevClose, openPrice, rangeHigh, rangeLow, volumeThreshold) : null;
+        $('opening-decision').textContent = `09:30 觀察決定：${hypothesis?.decision || '等待完整開盤資料'}（僅為當時初判）`;
+        $('opening-decision').className = `mt-3 text-sm font-black ${hypothesis?.bias === '略偏多' ? 'text-emerald-700'
+            : hypothesis?.bias === '略偏空' ? 'text-red-700' : 'text-slate-700'}`;
+        $('opening-hypothesis').textContent = hypothesis?.label || '等待開盤證據';
+        $('opening-support').textContent = `支持：${hypothesis?.support || '昨收、開盤價或六根完成K不足'}`;
+        $('opening-counter').textContent = `反證／限制：${hypothesis?.counter || '目前無法判定'}`;
+        $('opening-conditions').textContent = hypothesis?.conditions || '成立與失效條件：等待完整 OR30。';
+        $('key-high').textContent = price(rangeHigh);
+        $('key-low').textContent = price(rangeLow);
+        const historicalBull = rangeHigh === null ? null : afterOpen.find(bar => bar.close > rangeHigh && bar.volume >= volumeThreshold);
+        const historicalBear = rangeLow === null ? null : afterOpen.find(bar => bar.close < rangeLow && bar.volume >= volumeThreshold);
+        let bullishBreakout = null, bearishBreakout = null, bullBrokenLow = false;
+        let priorBullEvent = false, priorBearEvent = false;
+        const events = [];
+        for (const bar of afterOpen) {
+            if (bullishBreakout && (bar.close <= rangeHigh || bar.low < bullishBreakout.low)) {
+                bullBrokenLow ||= bar.low < bullishBreakout.low;
+                events.push({ time: bar.start + 300000, label: '向上突破失效', detail: bar.low < bullishBreakout.low
+                    ? '已跌破突破 K 低點' : '完成 K 收回 OR30 高點內' });
+                bullishBreakout = null;
+            }
+            if (bearishBreakout && (bar.close >= rangeLow || bar.high > bearishBreakout.high)) {
+                events.push({ time: bar.start + 300000, label: '向下突破失效', detail: '完成 K 返回 OR30 或越過事件 K 高點' });
+                bearishBreakout = null;
+            }
+            if (rangeHigh !== null && bar.close > rangeHigh && bar.volume >= volumeThreshold) {
+                if (!bullishBreakout) events.push({ time: bar.start + 300000, label: priorBullEvent ? '再次向上突破' : '向上突破',
+                    detail: `完成 K 收 ${price(bar.close)}；量 ${Math.round(bar.volume).toLocaleString('en-US')} 張` });
+                bullishBreakout = bar;
+                priorBullEvent = true;
+            }
+            if (rangeLow !== null && bar.close < rangeLow && bar.volume >= volumeThreshold) {
+                if (!bearishBreakout) events.push({ time: bar.start + 300000, label: priorBearEvent ? '再次向下突破' : '向下突破',
+                    detail: `完成 K 收 ${price(bar.close)}；量 ${Math.round(bar.volume).toLocaleString('en-US')} 張` });
+                bearishBreakout = bar;
+                priorBearEvent = true;
+            }
+        }
+        const swings = confirmedSwings(afterOpen);
+        const intradayEvents = [];
+        let previousIntradayLabel = null;
+        for (let index = 0; index < afterOpen.length; index++) {
+            const observed = afterOpen.slice(0, index + 1);
+            const bar = observed.at(-1);
+            const structure = intradayStructure(observed, confirmedSwings(observed), rangeHigh, rangeLow, bar.close);
+            if (structure && structure.label !== previousIntradayLabel && structure.label !== '盤中高低點逐步形成') {
+                intradayEvents.push({ time: bar.start + 300000, label: structure.label,
+                    detail: '依當時已完成 5 分K 的盤中價位判讀' });
+            }
+            previousIntradayLabel = structure?.label || null;
+        }
+        const current = positiveNumber(quote?.lastPrice ?? quote?.closePrice);
+        const vwap = window.MarketData.getVwap(quote);
+        const action = window.MarketData.analyzePriceAction({ candles, quote, vwap, now: now.getTime() });
+        const latest = bars.at(-1);
+        let bullish = bullishBreakout && latest?.close > rangeHigh && current > rangeHigh;
+        let bearish = bearishBreakout && latest?.close < rangeLow && current < rangeLow;
+        const quoteSession = quoteTime > now.getTime() + 15000 ? 'stale'
+            : window.MarketData.getMarketSession(quote, refreshDelay || 30000, now);
+        const candleGrace = 300000 + 2 * (refreshDelay || 30000) + 15000;
+        const candleFresh = latest && now.getTime() - (latest.start + 300000) <= candleGrace;
+        const recentAfter = afterOpen.slice(-5);
+        const sequenceComplete = recentAfter.every((bar, index) => index === 0
+            || bar.start - recentAfter[index - 1].start === 300000);
+        const valid = quoteSession === 'live' && completeOpening && candleFresh && current !== null && sequenceComplete;
+        bullish = valid && bullish;
+        bearish = valid && bearish;
+        validUntil = valid ? Math.min(quoteTime + Math.max(90000, 2 * (refreshDelay || 30000) + 15000),
+            latest.start + 300000 + candleGrace,
+            Date.parse(`${today.year}-${today.month}-${today.day}T13:30:00+08:00`)) : 0;
+        const intraday = valid ? intradayStructure(afterOpen, swings, rangeHigh, rangeLow, current) : null;
+        const reassessment = valid ? reassessPostOr30(afterOpen, current, vwap, rangeHigh, rangeLow,
+            volumeThreshold, hypothesis, intraday, action, bullish, bearish, bullBrokenLow) : null;
         let title = '等待開盤資料', reason = '需有昨收、今日開盤及完成的 5 分K 才能判讀。', tone = 'text-slate-700';
-        if (!bars.length) { title = '尚無已完成 5 分K'; reason = '盤前或資料尚未到達；目前不判斷方向。'; }
-        else if (opening.length < 6) { title = '開盤區間形成中'; reason = `目前有 ${opening.length} 根已完成開盤K棒；等到 09:30 後才計算完整高低區間。`; tone = 'text-amber-700'; }
+        if (quoteSession !== 'live') { title = '資料非即時 / CHECK LATER'; reason = `目前行情狀態 ${quoteSession}；歷史資訊僅供參考。`; }
+        else if (!bars.length) { title = '尚無已完成 5 分K'; reason = '盤前或資料尚未到達；目前不判斷方向。'; }
+        else if (!completeOpening) { title = '開盤區間資料不足'; reason = `六個指定時間槽中已完成 ${opening.length} / 6 根；目前不判斷方向。`; tone = 'text-amber-700'; }
         else if (!sessionAfterOpening) { title = '等待 09:30 區間完成'; reason = '完整前 30 分鐘區間形成後，才開始檢查區間外的突破。'; tone = 'text-amber-700'; }
-        else if (bullish) { title = '偏多條件符合'; reason = `開盤高於昨收，首根低點未破，且 ${timeLabel(new Date(breakout.start))} 突破開盤區間高點並放量。仍須依原 playbook 等回測確認，不構成保證或訂單。`; tone = 'text-red-700'; }
-        else if (bearish) { title = '偏空條件符合'; reason = `開盤低於昨收，首根高點未破，且 ${timeLabel(new Date(breakout.start))} 跌破開盤區間低點並放量。仍須依原 playbook 等反彈確認，不構成保證或訂單。`; tone = 'text-green-700'; }
-        else if (afterOpen.length) { title = '未確認突破 / 觀望'; reason = '尚無同時符合方向、首根K棒守位、區間突破與量能條件的已完成K棒。'; tone = 'text-amber-700'; }
-        else { title = '等待區間外突破 / 觀望'; reason = '09:30 開盤區間已完整；等待後續已完成 5 分K 確認是否帶量突破。'; tone = 'text-amber-700'; }
+        else if (!candleFresh || current === null || !sequenceComplete) { title = '資料不足 / CHECK LATER'; reason = sequenceComplete
+            ? '目前報價或完成K無效；歷史資訊僅供參考。'
+            : '最近的 5 分K 有缺漏；等待連續完成K再評估目前趨勢。'; }
+        else if (reassessment) {
+            title = reassessment.title;
+            reason = reassessment.reason;
+            tone = title === 'CONTINUE' ? 'text-emerald-700'
+                : title === 'HIGH RISK / AVOID FOR NOW' ? 'text-red-700' : 'text-amber-700';
+        }
+        if (valid) reason += ` 歷史事件：偏多 ${historicalBull ? timeLabel(new Date(historicalBull.start)) : '無'}；偏空 ${historicalBear ? timeLabel(new Date(historicalBear.start)) : '無'}。開盤模板：${openPrice !== null && prevClose !== null && openPrice > prevClose ? '開高' : '非開高'}，首根低點${postFirst.some(bar => bar.low < first.low) ? '曾跌破' : '未跌破'}。`;
         $('structure-title').textContent = title;
-        $('structure-title').className = `mt-3 text-2xl font-black ${tone}`;
+        $('structure-title').className = `mt-1 text-sm font-black ${tone}`;
         $('structure-reason').textContent = reason;
+        const latestEvent = events.at(-1);
+        if (valid) {
+            renderPriceAction(action, valid, openPrice, vwap);
+            const pattern = bullish && latestEvent?.label === '再次向上突破'
+                ? '再次向上突破' : reassessment.pattern;
+            $('as-of-time').textContent = `行情截至 ${timeLabel(new Date(quoteTime))}；最新完成K截至 ${timeLabel(new Date(latest.start + 300000))}（台灣時間）`;
+            $('structure-pattern').textContent = intraday && intraday.label !== pattern ? `${pattern} · ${intraday.label}` : pattern;
+            $('intraday-evidence').textContent = `盤中新結構：${intraday?.detail || '尚待 OR30 後形成新的已確認高低點或近四根完成K區間。'}`;
+            $('intraday-evidence').textContent += ` ${reassessment.volumeEvidence}`
+                + ` 開盤 ${price(openPrice)}；OR30 ${price(rangeLow)}–${price(rangeHigh)}；現價 ${price(current)}${vwap ? `，${current > vwap ? '高於' : current < vwap ? '低於' : '貼近'} VWAP ${price(vwap)}` : '，VWAP 不可用'}。`
+                + (action.lowVolumePullback ? ' 量縮回檔待支撐確認。' : '')
+                + (action.divergence ? ' 價量背離僅作警示。' : '')
+                + (action.falseBreakout ? ' 曾突破後收回區間，等待重新確認。' : '')
+                + (action.resistanceRejection || action.failedGapRecovery ? ' 供給區樣態、阻力或缺口回補受阻；不代表機構活動已獲證實。' : '')
+                + (action.breakdownFailedRetest ? ' 跌破後回測失敗。' : '')
+                + (action.successfulRetest ? ' 突破後回測暫守。' : '');
+            const recentEvents = [...events, ...intradayEvents].sort((a, b) => a.time - b.time).slice(-2);
+            $('structure-change').textContent = `09:30 ${hypothesis?.decision || '初判不足'} → 現在 ${title}；${pattern}`
+                + (intraday ? `；目前${intraday.label}` : '')
+                + (recentEvents.length ? `；最近事件 ${recentEvents.map(event => `${timeLabel(new Date(event.time))} ${event.label}`).join(' → ')}` : '；尚無區間後事件');
+            $('structure-watch').textContent = reassessment.watch;
+            $('swing-high').textContent = swings.high;
+            $('swing-low').textContent = swings.low;
+        } else clearCurrentStructure('目前無有效盤中結構');
+        $('event-timeline').innerHTML = rangeHigh !== null
+            ? [`<li data-event-time="09:30">09:30 OR30 完成：${price(rangeHigh)}／${price(rangeLow)}</li>`,
+                ...[...events, ...intradayEvents].sort((a, b) => a.time - b.time)
+                    .map(event => `<li data-event-time="${timeLabel(new Date(event.time))}">${timeLabel(new Date(event.time))} ${safeText(event.label)}：${safeText(event.detail)}</li>`)].join('')
+            : '<li>等待六根唯一的已完成開盤 K 棒。</li>';
 
         const gap = openPrice !== null && prevClose !== null ? openPrice - prevClose : null;
         const gapPercent = gap !== null && prevClose ? gap / prevClose * 100 : null;
@@ -168,7 +564,9 @@
         const bearTargetLow = rangeLow !== null ? rangeLow * 0.97 : null;
         const bearTargetHigh = rangeLow !== null ? rangeLow * 0.98 : null;
         if (rangeHigh !== null) {
-            $('report-structure').textContent = `當前結構：【${bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : '無方向／區間震盪，觀望'}】`;
+            $('report-structure').textContent = valid
+                ? `當前結構：【${title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定暫時高風險' : bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : title === 'CONTINUE' ? '盤中值得繼續觀察，進場未確認' : '無方向／區間震盪，觀望'}】`
+                : '目前資料不足；以下開盤與歷史事件僅供參考';
             const gapText = gap !== null ? `${gap >= 0 ? '高於' : '低於'}昨收 ${Math.abs(gap).toFixed(2)} 元（${gapPercent >= 0 ? '+' : ''}${gapPercent.toFixed(2)}%）` : '昨收或開盤價資料不足';
             const firstText = first ? `首根高 ${price(first.high)}／低 ${price(first.low)}；首根低點${firstLowHeld ? '尚未跌破' : '已跌破'}、高點${firstHighHeld ? '尚未突破' : '已突破'}。` : '首根 5 分K 尚未完成。';
             const volumeText = volumes.length ? `開盤六根量序：${volumes.join(' → ')} 張${lowVolume ? '；末根量低於首根，開盤量能整體收縮' : ''}。` : '開盤量能資料不足。';
@@ -177,13 +575,26 @@
                 `開盤基調：${safeText(gapText)}。`,
                 safeText(firstText),
                 `${safeText(volumeText)} ${safeText(closeText)}`,
-                bullish || bearish ? '區間形成後出現符合量能門檻的收盤突破。' : '開盤區間尚未出現符合條件的帶量收盤突破，依「結構沒出來就不做」先觀望。'
+                bullish || bearish ? '目前區間形成後有有效的帶量收盤突破。'
+                    : historicalBull || historicalBear ? '歷史上曾有符合量能門檻的收盤突破；目前已失效或現價與完成K未同步，等待重新判定。'
+                        : '開盤區間尚未出現符合條件的帶量收盤突破，依「結構沒出來就不做」先觀望。'
             ].map(item => `<li>${item}</li>`).join('');
-            $('report-main-plan').textContent = bullish ? '偏多條件已觸發；依原則等待回測確認，不追價。' : bearish ? '偏空條件已觸發；依原則等待反彈受阻確認，不追價。' : '【觀望不進場】先不預設方向，等價格帶量走出 09:00–09:30 區間。';
+            $('report-main-plan').textContent = !valid ? '目前沒有可執行的判定；以下策略僅供參考。'
+                : bullish ? '偏多條件已觸發；依原則等待回測確認，不追價。'
+                    : bearish ? '偏空條件已觸發；依原則等待反彈受阻確認，不追價。'
+                        : title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定風險較高；等待新的支撐與確認，暫不進場。'
+                        : title === 'CONTINUE' ? '新盤中結構值得繼續觀察；原 OR30 突破條件尚未觸發，不把監控結論當進場訊號。'
+                        : '【觀望不進場】先不預設方向，等價格帶量走出 09:00–09:30 區間。';
             const bullGapTarget = prevClose !== null && prevClose > rangeHigh ? `昨收缺口 ${price(prevClose)}` : '昨收缺口不在上方，略過缺口目標';
             $('report-long').textContent = `觸發：已完成 5 分K 收在 ${price(rangeHigh)} 上方，量至少 500 張且不低於開盤均量；再回測 ${price(retestLow)}–${price(rangeHigh)} 守穩才確認。停損參考突破K低點，並把進場風險限制在 1.5%–3%。目標參考 ${bullGapTarget}，延伸 ${price(bullTargetLow)}–${price(bullTargetHigh)}（以區間高估算 +1.5%–2%）。${bullish ? `目前觸發K低點：${price(bullishBreakout.low)}。` : '目前尚未觸發。'}`;
             $('report-short').textContent = `觸發：開盤低於昨收、首根高點未突破；價格回到 ${price(openPrice)} 下方後，已完成 5 分K 帶至少 500 張量收在 ${price(rangeLow)} 下方。停損參考站回首根高點 ${price(first?.high)}；目標參考 ${price(bearTargetLow)}–${price(bearTargetHigh)}（區間低下方約 3%–2%）。${bearish ? `目前觸發K高點：${price(bearishBreakout.high)}。` : '目前尚未觸發。'}`;
             $('report-risk').textContent = '⚠️ 風控與執行紀律：單筆虧損不超過總資金 5%；當日累積停損 2 筆即停止；結構破壞執行停損，不凹單、不留倉隔日沖。這些是 playbook 的規則參考，不是獲利保證。';
+        } else {
+            $('report-structure').textContent = '開盤區間尚未完整；目前沒有可執行判定';
+            $('report-evidence').innerHTML = '<li>等待六個唯一的已完成開盤K棒。</li>';
+            $('report-main-plan').textContent = '目前資料不足；策略文字僅供參考。';
+            $('report-long').textContent = '等待完整開盤區間。';
+            $('report-short').textContent = '等待完整開盤區間。';
         }
 
         $('candle-rows').innerHTML = bars.length ? bars.map(bar => {
@@ -199,13 +610,15 @@
         const symbol = (localStorage.getItem('fugle_symbol') || '').trim().toUpperCase();
         if (!apiKey || !symbol) { showUnavailable('尚未設定 Fugle Key 或股票代碼'); return; }
         fetching = true;
+        const controller = new AbortController();
+        const requestTimeout = setTimeout(() => controller.abort(), Math.max(15000, refreshDelay || 30000));
         $('refresh-button').disabled = true;
         $('source-status').textContent = `${symbol} · Fugle 資料讀取中…`;
         try {
             const headers = { 'X-API-KEY': apiKey };
             const [quoteResponse, candleResponse] = await Promise.all([
-                fetch(`${API_BASE}/stock/intraday/quote/${encodeURIComponent(symbol)}`, { headers, cache: 'no-store' }),
-                fetch(`${API_BASE}/stock/intraday/candles/${encodeURIComponent(symbol)}?timeframe=5`, { headers, cache: 'no-store' })
+                fetch(`${API_BASE}/stock/intraday/quote/${encodeURIComponent(symbol)}`, { headers, cache: 'no-store', signal: controller.signal }),
+                fetch(`${API_BASE}/stock/intraday/candles/${encodeURIComponent(symbol)}?timeframe=5`, { headers, cache: 'no-store', signal: controller.signal })
             ]);
             if (!quoteResponse.ok) throw new Error(`Fugle quote HTTP ${quoteResponse.status}`);
             if (!candleResponse.ok) throw new Error(`Fugle 5分K HTTP ${candleResponse.status}`);
@@ -214,7 +627,14 @@
             $('setup-required').classList.add('hidden');
         } catch (error) {
             $('source-status').textContent = `資料讀取失敗：${error.message}`;
+            $('structure-title').textContent = '資料讀取失敗 / CHECK LATER';
+            $('structure-reason').textContent = '本次無法判定目前注意力；先前資料僅供參考。';
+            $('report-structure').textContent = '目前無有效結構判定；先前資料僅供參考';
+            $('report-main-plan').textContent = '目前沒有可執行的判定；等待有效資料。';
+            clearCurrentStructure('目前資料讀取失敗');
+            validUntil = 0;
         } finally {
+            clearTimeout(requestTimeout);
             fetching = false;
             $('refresh-button').disabled = false;
             ensureRefresh();
@@ -234,6 +654,18 @@
     $('refresh-button').addEventListener('click', refresh);
     refresh();
     ensureRefresh();
+    window.addEventListener('pageshow', event => { if (event.persisted) refresh(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+    setInterval(() => {
+        if (validUntil && Date.now() >= validUntil) {
+            validUntil = 0;
+            $('structure-title').textContent = '資料已過期 / CHECK LATER';
+            $('structure-reason').textContent = '等待新行情與完成K；先前資料僅供參考。';
+            $('report-structure').textContent = '目前無有效結構判定；先前資料僅供參考';
+            $('report-main-plan').textContent = '目前沒有可執行的判定；等待有效資料。';
+            clearCurrentStructure('目前資料已過期');
+        }
+    }, 1000);
     window.addEventListener('beforeunload', () => clearInterval(timer));
 })();
 </script>
