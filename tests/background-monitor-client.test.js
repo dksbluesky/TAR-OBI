@@ -88,7 +88,7 @@ const client = require(modulePath);
         };
         return {
             className: '',
-            set innerHTML(_html) {},
+            set innerHTML(html) { this.html = html; },
             querySelector(selector) { return elements[selector]; },
             elements
         };
@@ -132,6 +132,9 @@ const client = require(modulePath);
     const restoreContainer = { children: [], appendChild(child) { this.children.push(child); } };
     let restoredFromPanel = null;
     client.renderRestorePanel(restoreContainer, bridge => { restoredFromPanel = bridge; });
+    assert.match(restoreContainer.children[0].html, /<details data-restore-details>/);
+    assert.match(restoreContainer.children[0].html, /<\/details>\s*<p data-restore-status role="status"/,
+        'restore form is collapsed by default while connection status remains visible');
     const restoreElements = restoreContainer.children[0].elements;
     restoreElements['[data-restore-url]'].value = 'https://monitor.example';
     restoreElements['[data-restore-token]'].value = 'secret';

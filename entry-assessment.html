@@ -39,6 +39,24 @@
             </div>
         </header>
 
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-4 text-xs font-black tracking-wider text-slate-600">CURRENT MARKET DATA / 即時市場資料</h2>
+            <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+                <div><dt class="text-slate-500">Bid 1 / 買一</dt><dd id="bid" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Ask 1 / 賣一</dt><dd id="ask" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Spread / 價差</dt><dd id="spread" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Tick Size / 跳動點</dt><dd id="tick-size" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">VWAP / 成交均價</dt><dd id="vwap" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Price vs VWAP / 現價相對均價</dt><dd id="vwap-difference" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">TAR / 成交主動性</dt><dd id="tar" class="font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">OBI / 掛單不平衡</dt><dd id="obi" class="font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Current Volume / 當前成交量</dt><dd id="volume" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Volume Quality / 成交量品質</dt><dd id="volume-quality" class="font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Data Timestamp / 資料時間</dt><dd id="timestamp" class="font-mono font-bold">Unavailable</dd></div>
+                <div><dt class="text-slate-500">Data Freshness / 資料新鮮度</dt><dd id="freshness" class="font-bold">Unavailable</dd></div>
+            </dl>
+        </section>
+
         <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="mb-4 flex items-center justify-between gap-3">
                 <h2 class="text-xs font-black tracking-wider text-slate-600">ASSESSMENT SETTINGS / 評估設定</h2>
@@ -65,11 +83,19 @@
             </div>
         </section>
 
+        <section class="grid grid-cols-2 gap-3 sm:grid-cols-5" aria-label="Market snapshot / 市場概況">
+            <div class="col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-1"><span class="text-xs font-bold text-slate-500">Market State</span><strong id="market-card" class="mt-2 block text-sm">DATA UNAVAILABLE</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">TAR</span><strong id="tar-card" class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">OBI</span><strong id="obi-card" class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">VWAP Position</span><strong id="vwap-card" class="mt-2 block text-sm">Unavailable</strong></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">Volume Quality</span><strong id="volume-quality-card" class="mt-2 block text-sm">Unavailable</strong></div>
+        </section>
+
         <section id="bridge-alert" class="hidden"></section>
         <section id="execution-context" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm"></section>
 
-        <section class="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
-            <article class="flex min-h-[300px] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="space-y-5">
+            <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <section id="final-action" class="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4" aria-live="polite">
                     <p class="text-xs font-black tracking-wider text-slate-500">FINAL ACTION / 現在怎麼做</p>
                     <h2 id="final-action-title" class="mt-2 text-2xl font-black text-slate-700">WAIT</h2>
@@ -110,7 +136,7 @@
                     <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Invalidation Level / 條件失效價</dt><dd id="invalidation-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                     <div class="col-span-2 rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">Current Price / 現價</dt><dd id="current-price" class="mt-1 font-mono text-lg font-black">Unavailable</dd></div>
                 </dl>
-                <p class="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET remains the confirmed/right-side state. Left-side starter states describe execution quality for a possible left-side entry and do not trigger confirmed-entry notification logic.</p>
+                <p class="pt-4 text-[11px] leading-relaxed text-slate-400">ENTRY CONDITIONS MET remains the confirmed/right-side state. Left-side starter states describe execution quality for a possible left-side entry and do not trigger confirmed-entry notification logic.</p>
             </article>
 
             <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -122,47 +148,24 @@
         <section class="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm" aria-label="Shadow risk reward assessment">
             <h2 class="text-xs font-black tracking-wider text-indigo-700">SHADOW R&amp;R / 風險報酬觀察</h2>
             <p class="mt-1 text-xs text-slate-500">Informational only; Final Action is unchanged. Gross R&R excludes costs. USER-DEFINED STOP — NOT STRUCTURALLY VALIDATED. / 僅供參考；不改變最終判斷，毛風險報酬比未扣成本，手動停損未經結構驗證。</p>
+            <p id="shadow-rr-summary" class="mt-3 rounded-lg bg-indigo-50 p-3 text-sm font-semibold text-slate-700">Waiting for completed candles.</p>
             <div class="mt-4 rounded-lg bg-indigo-50/50 p-3"><h3 class="text-xs font-bold text-indigo-700">TRADE PLAN — Editable Anytime / 交易計畫</h3>
                 <div class="mt-2 grid gap-3 sm:grid-cols-2"><label class="text-xs">Planned Buy Price / 預計買價<input id="planned-buy" type="number" min="0" step="any" inputmode="decimal" class="mt-1 w-full rounded border border-slate-300 p-2" placeholder="Enter price"></label>
                 <label class="text-xs">Planned Stop Price / 預計停損價<input id="planned-stop" type="number" min="0" step="any" inputmode="decimal" class="mt-1 w-full rounded border border-slate-300 p-2" placeholder="Enter price"></label></div>
                 <p id="trade-plan-warning" role="status" aria-live="polite" class="mt-2 text-xs font-semibold text-red-700"></p>
                 <button id="clear-trade-plan" type="button" class="mt-2 rounded border border-slate-300 px-3 py-1 text-xs">Clear Plan / 清除計畫</button>
             </div>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2"><div><h3 class="text-xs font-bold text-indigo-700">PLANNED R&amp;R / 計畫風險報酬比</h3><dl id="planned-rr-details" class="mt-2 grid gap-2 text-xs"></dl></div>
-            <div><h3 class="text-xs font-bold text-indigo-700">EXECUTABLE R&amp;R / 即時可執行風險報酬比</h3><dl id="executable-rr-details" class="mt-2 grid gap-2 text-xs"></dl></div></div>
-            <h3 class="mt-4 text-xs font-bold text-indigo-700">REFERENCE ONLY / 僅供參考</h3>
-            <dl id="shadow-rr-details" class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3"></dl>
-            <p id="shadow-rr-summary" class="mt-3 text-xs text-slate-600">Waiting for completed candles.</p>
-            <details class="mt-2 text-xs text-slate-500"><summary class="cursor-pointer">Detailed resistance evidence / 阻力詳細依據</summary>
-                <p id="shadow-rr-evidence" class="mt-2 break-words">Waiting for completed candles.</p>
+            <p class="mt-3 text-xs font-semibold text-slate-600">USER-DEFINED STOP — NOT STRUCTURALLY VALIDATED / 手動停損未經結構驗證</p>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2"><div class="rounded-lg border border-indigo-100 p-3"><h3 class="text-xs font-bold text-indigo-700">PLANNED R&amp;R / 計畫風險報酬比</h3><div id="planned-rr-details" class="mt-2 space-y-2 text-xs"></div></div>
+            <div class="rounded-lg border border-indigo-100 p-3"><h3 class="text-xs font-bold text-indigo-700">EXECUTABLE R&amp;R / 即時可執行風險報酬比</h3><div id="executable-rr-details" class="mt-2 space-y-2 text-xs"></div></div></div>
+            <details class="mt-4 rounded-lg border border-indigo-100 p-3 text-sm text-slate-600"><summary class="cursor-pointer font-bold text-indigo-700">Reference prices &amp; candle evidence / 參考價與K線依據</summary>
+                <dl id="shadow-rr-details" class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3"></dl>
+                <p id="shadow-rr-evidence" class="mt-4 break-words text-xs">Waiting for completed candles.</p>
             </details>
         </section>
 
-        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 class="mb-4 text-xs font-black tracking-wider text-slate-600">CURRENT MARKET DATA / 即時市場資料</h2>
-            <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
-                <div><dt class="text-slate-500">Bid 1 / 買一</dt><dd id="bid" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Ask 1 / 賣一</dt><dd id="ask" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Spread / 價差</dt><dd id="spread" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Tick Size / 跳動點</dt><dd id="tick-size" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">VWAP / 成交均價</dt><dd id="vwap" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Price vs VWAP / 現價相對均價</dt><dd id="vwap-difference" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">TAR / 成交主動性</dt><dd id="tar" class="font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">OBI / 掛單不平衡</dt><dd id="obi" class="font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Current Volume / 當前成交量</dt><dd id="volume" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Volume Quality / 成交量品質</dt><dd id="volume-quality" class="font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Data Timestamp / 資料時間</dt><dd id="timestamp" class="font-mono font-bold">Unavailable</dd></div>
-                <div><dt class="text-slate-500">Data Freshness / 資料新鮮度</dt><dd id="freshness" class="font-bold">Unavailable</dd></div>
-            </dl>
-        </section>
+        <section id="restore-linked-monitor" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm"></section>
 
-        <section class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">TAR</span><strong id="tar-card" class="mt-2 block text-sm">Unavailable</strong></div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">OBI</span><strong id="obi-card" class="mt-2 block text-sm">Unavailable</strong></div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">VWAP Position</span><strong id="vwap-card" class="mt-2 block text-sm">Unavailable</strong></div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4"><span class="text-xs font-bold text-slate-500">Volume Quality</span><strong id="volume-quality-card" class="mt-2 block text-sm">Unavailable</strong></div>
-            <div class="col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-1"><span class="text-xs font-bold text-slate-500">Market State</span><strong id="market-card" class="mt-2 block text-sm">DATA UNAVAILABLE</strong></div>
-        </section>
     </div>
 </main>
 <script>
@@ -400,21 +403,54 @@
             evidenceValid: shadow.candleQuality?.status === 'OK',
             evidenceReason: 'Resistance evidence unavailable.'
         });
-        const money = number => Number.isFinite(number) ? formatPrice(number, tick) : 'N/A';
-        const renderPlan = (id, calculation, extra = null) => {
-            const lines = [
-                `Entry: ${money(calculation.entry)} · User stop: ${money(calculation.stop)} · Risk/unit: ${money(calculation.risk)}`,
-                ...calculation.targets.map((target, index) => `T${index + 1}: ${money(target.target)} · Upside: ${money(target.upside)} / ${Number.isFinite(target.upsidePct) ? target.upsidePct.toFixed(2) + '%' : 'N/A'} · Gross R&R: ${Number.isFinite(target.grossRr) ? target.grossRr.toFixed(2) + 'R' : 'N/A'}${target.reason ? ' · ' + target.reason : ''}`),
-                'USER-DEFINED STOP — NOT STRUCTURALLY VALIDATED'
-            ];
-            if (extra) lines.splice(1, 0, extra);
+        const renderPlan = (id, calculation, note = null) => {
             const list = document.getElementById(id);
-            list.replaceChildren(...lines.map(line => { const item = document.createElement('div'); item.className = 'rounded bg-indigo-50/50 p-2'; item.textContent = line; return item; }));
+            const row = (content, className) => {
+                const item = document.createElement('div');
+                item.className = className;
+                item.textContent = content;
+                return item;
+            };
+            const validTargets = calculation.targets.filter(target => Number.isFinite(target.grossRr));
+            const reasons = [...new Set(calculation.targets.map(target => target.reason).filter(Boolean))];
+            const status = validTargets.length === calculation.targets.length ? 'Gross R&R available / 毛風險報酬比可計算'
+                : `${validTargets.length ? 'Partial R&R / 部分可計算' : 'R&R unavailable / 暫無風險報酬比'} — ${reasons.join(' / ') || 'Target unavailable.'}`;
+            const nodes = [row(status, `rounded-lg p-3 font-semibold ${validTargets.length ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`)];
+            const fields = [
+                ['Entry / 進場價', calculation.entry],
+                ['User stop / 手動停損', calculation.stop],
+                ['Risk per unit / 每單位風險', calculation.risk]
+            ].filter(([, value]) => Number.isFinite(value) && value > 0);
+            if (fields.length) {
+                const values = document.createElement('div');
+                values.className = 'grid grid-cols-2 gap-2 rounded-lg bg-indigo-50/50 p-3';
+                fields.forEach(([label, value]) => {
+                    const field = document.createElement('div');
+                    const name = document.createElement('span');
+                    name.className = 'block text-slate-500';
+                    name.textContent = label;
+                    const amount = document.createElement('strong');
+                    amount.className = 'block font-mono text-sm text-slate-900';
+                    amount.textContent = formatPrice(value, tick);
+                    field.append(name, amount);
+                    values.appendChild(field);
+                });
+                nodes.push(values);
+            }
+            calculation.targets.forEach((target, index) => {
+                if (!(target.target > 0)) return;
+                const result = Number.isFinite(target.grossRr)
+                    ? `${target.grossRr.toFixed(2)}R · Upside ${formatPrice(target.upside, tick)} (${target.upsidePct.toFixed(2)}%)`
+                    : reasons.length === 1 && target.reason === reasons[0] ? null : target.reason || 'R&R unavailable';
+                nodes.push(row(`T${index + 1} ${formatPrice(target.target, tick)}${result ? `  →  ${result}` : ''}`, 'rounded-lg bg-indigo-50/50 p-3 font-medium text-slate-800'));
+            });
+            if (note) nodes.push(row(note, 'px-1 text-slate-500'));
+            list.replaceChildren(...nodes);
         };
         renderPlan('planned-rr-details', plan.planned,
-            referenceIsPriorDay ? 'Previous-session resistance reference only; not revalidated for the current session.' : null);
+            referenceIsPriorDay ? 'Previous-session resistance only; revalidate next session.' : null);
         renderPlan('executable-rr-details', plan.executable,
-            `Ask 1 vs planned buy: ${money(plan.askDifference)} / ${Number.isFinite(plan.askDifferencePct) ? plan.askDifferencePct.toFixed(2) + '%' : 'N/A'}`);
+            Number.isFinite(plan.askDifference) ? `Ask 1 vs planned buy: ${formatPrice(plan.askDifference, tick)} / ${plan.askDifferencePct.toFixed(2)}%` : null);
         const evidence = shadow.evidence.map((level, index) => {
             const target = level.price === shadow.target1?.price ? 'T1 ' : level.price === shadow.target2?.price ? 'T2 ' : '';
             const reactions = (level.rejections || []).map(item =>
@@ -697,6 +733,7 @@
             document.getElementById('planned-buy').value = ''; document.getElementById('planned-stop').value = ''; render();
         });
         const executionContext = document.getElementById('execution-context');
+        const restorePanel = document.getElementById('restore-linked-monitor');
         const bridgeAlert = document.getElementById('bridge-alert');
         const savedEntry = localStorage.getItem(ENTRY_KEY);
         const savedInvalidation = localStorage.getItem(INVALIDATION_KEY);
@@ -718,9 +755,13 @@
             });
         };
         const renderBridgeContext = () => {
+            restorePanel.replaceChildren();
+            restorePanel.classList.add('hidden');
             window.TarObiBridge?.renderContextPanel(executionContext, {
-                renderStandalone(container) {
-                    window.TarObiBackgroundMonitor?.renderRestorePanel(container, () => {
+                renderStandalone() {
+                    executionContext.classList.add('hidden');
+                    restorePanel.classList.remove('hidden');
+                    window.TarObiBackgroundMonitor?.renderRestorePanel(restorePanel, () => {
                         quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
                         renderBridgeContext();
                         render();

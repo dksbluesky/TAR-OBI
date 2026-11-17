@@ -157,20 +157,23 @@
         const wrapper = root.document.createElement('div');
         wrapper.className = 'rounded-lg border border-blue-200 bg-white p-4';
         wrapper.innerHTML = `
-            <p class="text-xs font-black tracking-wider text-blue-600">RESTORE LINKED MONITOR / 還原連結監控</p>
-            <p class="mt-2 text-xs text-slate-600">This Home Screen app has no saved ETF_DCA bridge. Connect to the PC monitor service to restore its current active bridge.</p>
-            <div class="mt-3 grid gap-3">
+            <details data-restore-details>
+                <summary class="cursor-pointer text-xs font-black tracking-wider text-blue-600">RESTORE LINKED MONITOR / 還原連結監控</summary>
+                <p class="mt-2 text-xs text-slate-600">This Home Screen app has no saved ETF_DCA bridge. Connect to the PC monitor service to restore its current active bridge.</p>
+                <div class="mt-3 grid gap-3">
                 <label class="text-xs font-bold text-slate-600">PC Monitor Service URL<input data-restore-url class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm" placeholder="https://your-monitor.example" value="${escapeHtml(cleanUrl(read(URL_KEY)))}"></label>
                 <label class="text-xs font-bold text-slate-600">Private Control Token<input data-restore-token type="password" autocomplete="off" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm" value="${escapeHtml(read(TOKEN_KEY))}"></label>
-                <div class="flex flex-wrap items-center gap-3"><button type="button" data-restore-connect class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white">Restore Current Monitor</button><span data-restore-status class="text-xs font-semibold text-slate-600">${configured() ? 'Checking PC monitor service…' : 'Enter the service details saved on your PC.'}</span></div>
-            </div>`;
+                <button type="button" data-restore-connect class="w-fit rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white">Restore Current Monitor</button>
+                </div>
+            </details>
+            <p data-restore-status role="status" class="mt-2 text-xs font-semibold text-slate-600">${configured() ? 'Checking PC monitor service…' : 'No linked monitor saved on this device.'}</p>`;
         container.appendChild(wrapper);
         const urlInput = wrapper.querySelector('[data-restore-url]');
         const tokenInput = wrapper.querySelector('[data-restore-token]');
         const statusElement = wrapper.querySelector('[data-restore-status]');
         const show = (message, error = false) => {
             statusElement.textContent = message;
-            statusElement.className = `text-xs font-semibold ${error ? 'text-red-700' : 'text-slate-600'}`;
+            statusElement.className = `mt-2 text-xs font-semibold ${error ? 'text-red-700' : 'text-slate-600'}`;
         };
         const save = () => {
             storage()?.setItem(URL_KEY, cleanUrl(urlInput.value));
