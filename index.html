@@ -124,17 +124,24 @@
   function showZoneLinkStatus() {
     const symbol = $('symbol').value.trim().toUpperCase();
     const bridge = window.TarObiBridge?.getLinkedBridge?.();
+    const link = window.TarObiRepoZone?.load?.(symbol);
     if (bridge?.ticker?.toUpperCase() === symbol) {
       const zone = bridge.activeZone;
       const valid = Number.isFinite(Number(zone?.low)) && Number.isFinite(Number(zone?.high))
         && Number(zone.low) > 0 && Number(zone.high) > Number(zone.low);
       const ended = ['COMPLETED', 'EXPIRED', 'INVALIDATED'].includes(bridge.lifecycle?.status);
+      if (valid && link && (Number(zone.low) !== Number(link.activeZone.low)
+        || Number(zone.high) !== Number(link.activeZone.high))) {
+        setZoneLinkStatus('區間不一致：目前 Bridge ' + zoneText(zone) + '；ETF_DCA GitHub ' + zoneText(link.activeZone)
+          + '（同步 ' + zoneTime(link.syncedAt) + '）。進場評估仍使用原 Bridge；請到 ETF_DCA 重新建立監控，或在進場評估頁中斷 Bridge 後重新同步 GitHub 區間。', true);
+        return;
+      }
       setZoneLinkStatus(ended ? 'ETF_DCA Bridge 已結束（' + bridge.lifecycle.status + '）；請到進場評估頁處理。'
         : valid ? 'ETF_DCA Bridge 已連結 · Active Zone ' + zoneText(zone)
+          + (link ? ' · 與 GitHub 區間一致（同步 ' + zoneTime(link.syncedAt) + '）' : ' · 尚未核對 GitHub 區間')
           : '已有 ETF_DCA Bridge，但 Active Zone 無效；請到進場評估頁處理。', ended || !valid);
       return;
     }
-    const link = window.TarObiRepoZone?.load?.(symbol);
     setZoneLinkStatus(link ? 'ETF_DCA GitHub 區間已連結 · Active Zone ' + zoneText(link.activeZone)
       + ' · ETF 儲存 ' + zoneTime(link.portfolioUpdatedAt) + ' · 同步 ' + zoneTime(link.syncedAt)
       : 'ETF_DCA 區間連結：尚未同步');
@@ -425,8 +432,6 @@
     const symbol = $('symbol').value.trim().toUpperCase();
     if (!/^[A-Z0-9]+$/.test(symbol)) { setZoneLinkStatus('請先輸入有效股票代碼。', true); return; }
     window.TarObiBridge?.handleSymbolInput?.(symbol);
-    const bridge = window.TarObiBridge?.getLinkedBridge?.();
-    if (bridge?.ticker?.toUpperCase() === symbol) { showZoneLinkStatus(); return; }
     $('zone-sync').disabled = true;
     setZoneLinkStatus('正在從 ETF_DCA GitHub 同步 ' + symbol + ' 的 Active Zone…');
     try {

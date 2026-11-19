@@ -122,8 +122,19 @@ async function until(predicate) {
     assert.equal(repoCalls(), 1);
     linkedBridge = { ticker: '006208', activeZone: { low: 203, high: 209 } };
     await emit(dashboard.element('zone-sync'), 'click');
-    assert.equal(repoCalls(), 1, 'an existing valid Bridge is kept without reading GitHub');
-    assert.match(dashboard.element('zone-link-status').textContent, /Bridge 已連結/);
+    assert.equal(repoCalls(), 2, 'sync checks GitHub even when a Bridge exists');
+    assert.match(dashboard.element('zone-link-status').textContent, /與 GitHub 區間一致/);
+    linkedBridge = { ticker: '006208', activeZone: { low: 238, high: 243 } };
+    await emit(dashboard.element('zone-sync'), 'click');
+    assert.equal(repoCalls(), 3);
+    assert.match(dashboard.element('zone-link-status').textContent,
+        /區間不一致：目前 Bridge 238\.00–243\.00；ETF_DCA GitHub 203\.00–209\.00/);
+    assert.match(dashboard.element('zone-link-status').textContent, /進場評估仍使用原 Bridge/);
+    assert.equal(dashboard.element('zone-link-status').className, 'zone-link-status error');
+    assert.deepEqual(linkedBridge.activeZone, { low: 238, high: 243 }, 'sync never rewrites an existing Bridge');
+    const reopenedWithMismatch = page('index.html', '?symbol=006208');
+    assert.match(reopenedWithMismatch.element('zone-link-status').textContent, /區間不一致/,
+        'a reopened dashboard still warns about a saved mismatch');
     linkedBridge = null;
     await emit(dashboard.element('source-form'), 'submit');
     assert.match(dashboard.element('status').textContent, /設定.*Fugle API Key/);

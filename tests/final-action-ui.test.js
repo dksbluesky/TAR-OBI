@@ -106,6 +106,8 @@ assert.equal(invalidated.zoneInvalid, true, 'only the linked ETF_DCA invalidatio
 const html = fs.readFileSync(path.join(__dirname, '..', 'entry-assessment.html'), 'utf8');
 assert.match(html, /id="final-action"/);
 assert.match(html, /id="final-action-zone-warning"/);
+assert.match(html, /id="zone-sync-mismatch"/);
+assert.match(html, /本頁 Final Action 仍依原 Bridge 計算/);
 assert.match(html, /SIGNAL MODE/);
 assert.match(html, /id="signal-mode"/);
 assert.match(html, /TarObiBridgeMonitor\?\.signalModeLabel\?\.\(assessment\.state\)/);
@@ -155,10 +157,13 @@ const element = id => {
         classList: { toggle() {} }, replaceChildren(...children) { this.children = children; } });
     return elements.get(id);
 };
+let savedLink = null;
 const context = { document: {
     getElementById: element,
     createElement: () => ({ textContent: '', children: [], append(...children) { this.children = children; } })
-}, window: { addEventListener() {}, TarObiRepoZone: repoZone, TarObiBridgeMonitor: monitor } };
+}, window: { addEventListener() {}, TarObiRepoZone: {
+    isLink: repoZone.isLink, load: symbol => savedLink?.ticker === symbol ? savedLink : null
+}, TarObiBridgeMonitor: monitor } };
 vm.createContext(context);
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
 vm.runInContext(inline, context);
@@ -177,4 +182,10 @@ context.renderFinalAction(assessment, null, 205, 0.05, true, 'live');
 assert.match(element('final-action-title').textContent, /DO NOT ENTER/);
 context.renderFinalAction(assessment, bridge({ activeZone: { low: 203, high: 209 }, invalidationLevel: 200 }), 205, 0.05, true, 'live');
 assert.match(element('final-action-title').textContent, /BUY NOW/, 'existing live Bridge behavior remains available');
+savedLink = repoLink;
+context.renderFinalAction(assessment, bridge({ ticker: '006208', activeZone: { low: 238, high: 243 } }), 240, 0.05, true, 'live');
+assert.match(element('zone-sync-mismatch').textContent, /Bridge 238\.00–243\.00；ETF_DCA GitHub 203\.00–209\.00/);
+assert.match(element('zone-sync-mismatch').textContent, /Final Action 仍依原 Bridge 計算/);
+context.renderFinalAction(assessment, bridge({ ticker: '006208', activeZone: { low: 203, high: 209 } }), 205, 0.05, true, 'live');
+assert.equal(element('zone-sync-mismatch').textContent, '', 'matching zones clear the conflict warning');
 console.log('final action UI tests passed');

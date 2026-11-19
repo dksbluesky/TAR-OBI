@@ -94,6 +94,7 @@
 
         <section id="bridge-alert" class="hidden"></section>
         <section id="execution-context" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm"></section>
+        <p id="zone-sync-mismatch" class="hidden rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700" role="alert"></p>
 
         <section class="space-y-5">
             <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -320,6 +321,17 @@
     function renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable, session) {
         const fallback = { action: 'DO_NOT_ENTER', reason: 'No valid Active Zone', zoneInvalid: false, zoneInvalidation: null, linked: Boolean(linkedBridge) };
         const repoZoneLink = window.TarObiRepoZone?.isLink?.(linkedBridge) === true;
+        const savedRepoLink = repoZoneLink ? null : window.TarObiRepoZone?.load?.(linkedBridge?.ticker);
+        const zoneMismatch = linkedBridge && savedRepoLink && linkedBridge.activeZone
+            && Number.isFinite(Number(linkedBridge.activeZone.low))
+            && Number.isFinite(Number(linkedBridge.activeZone.high))
+            && (Number(linkedBridge.activeZone?.low) !== Number(savedRepoLink.activeZone.low)
+                || Number(linkedBridge.activeZone?.high) !== Number(savedRepoLink.activeZone.high));
+        const mismatchWarning = document.getElementById('zone-sync-mismatch');
+        mismatchWarning.classList.toggle('hidden', !zoneMismatch);
+        mismatchWarning.textContent = zoneMismatch
+            ? `Active Zone 不一致：目前 Bridge ${Number(linkedBridge.activeZone.low).toFixed(2)}–${Number(linkedBridge.activeZone.high).toFixed(2)}；ETF_DCA GitHub ${Number(savedRepoLink.activeZone.low).toFixed(2)}–${Number(savedRepoLink.activeZone.high).toFixed(2)}（上次同步 ${repoZoneTime(savedRepoLink.syncedAt)}）。本頁 Final Action 仍依原 Bridge 計算。`
+            : '';
         const basePresentation = window.TarObiBridgeMonitor?.finalActionContext?.(linkedBridge, assessment.state, price, session) || fallback;
         const repoOutsideZone = repoZoneLink && session === 'live' && Number.isFinite(price)
             && (price < linkedBridge.activeZone.low - 1e-9 || price > linkedBridge.activeZone.high + 1e-9);
