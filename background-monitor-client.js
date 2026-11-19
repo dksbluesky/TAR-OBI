@@ -125,17 +125,26 @@
         let syncing = false;
         const refresh = async () => {
             const before = root.TarObiBridge?.getLinkedBridge?.();
-            if (!before || read(RESTORED_BRIDGE_KEY) !== before.bridgeId || syncing) {
-                if (!before) stopCurrentSync();
+            if (!before || read(RESTORED_BRIDGE_KEY) !== before.bridgeId
+                || read(root.TarObiBridge?.DISMISSED_KEY) === before.bridgeId || syncing) {
+                if (!before || read(root.TarObiBridge?.DISMISSED_KEY) === before?.bridgeId) stopCurrentSync();
                 return;
             }
             syncing = true;
             try {
                 let remote = await request('/api/monitors/current');
+                if (read(root.TarObiBridge?.DISMISSED_KEY) === before.bridgeId) {
+                    stopCurrentSync();
+                    return;
+                }
                 if (compareBridgeFreshness(before, remote?.bridge) > 0) {
                     remote = await syncMonitor(before);
                 }
                 const bridge = remote?.bridge;
+                if (read(root.TarObiBridge?.DISMISSED_KEY) === before.bridgeId) {
+                    stopCurrentSync();
+                    return;
+                }
                 if (!bridge || compareBridgeFreshness(bridge, before) < 0) return;
                 if (!root.TarObiBridge?.linkBridge?.(bridge)) return;
                 storage()?.setItem(RESTORED_BRIDGE_KEY, bridge.bridgeId);

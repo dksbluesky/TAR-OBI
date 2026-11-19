@@ -6,6 +6,7 @@
     'use strict';
 
     const STORAGE_KEY = 'tarObi.repoActiveZoneLink.v1';
+    const ETF_CACHE_BACKUP_KEY = 'tarObi.etfDcaCacheBeforeSync.v1';
     const SOURCE = 'ETF_DCA-plan GitHub';
     const PORTFOLIO_URL = 'https://api.github.com/repos/dksbluesky/ETF_DCA-plan/contents/portfolio-data.json?ref=main';
     const validSymbol = value => /^[A-Z0-9]+$/.test(String(value || '').trim().toUpperCase());
@@ -63,6 +64,11 @@
     async function sync(symbol) {
         const ticker = String(symbol || '').trim().toUpperCase();
         if (!validSymbol(ticker)) throw new Error('請先輸入有效股票代碼。');
+        const configuredRepo = root.localStorage?.getItem('p_repo') || 'dksbluesky/ETF_DCA-plan';
+        const configuredFile = root.localStorage?.getItem('p_file') || 'portfolio-data.json';
+        if (configuredRepo !== 'dksbluesky/ETF_DCA-plan' || configuredFile !== 'portfolio-data.json') {
+            throw new Error('ETF_DCA 設定使用不同的 GitHub 資料檔，無法從 TAR-OBI 同步此瀏覽器。');
+        }
         const response = await root.fetch(PORTFOLIO_URL, {
             headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store'
         });
@@ -78,10 +84,46 @@
         catch (error) { if (load(ticker)) clear(); throw error; }
         const link = { version: 1, source: SOURCE, ...zone,
             syncedAt: new Date().toISOString() };
-        root.localStorage?.setItem(STORAGE_KEY, JSON.stringify(link));
-        if (!load(ticker)) throw new Error('此瀏覽器無法儲存 ETF_DCA 區間連結。');
+        const storage = root.localStorage;
+        if (!storage) throw new Error('此瀏覽器無法儲存 ETF_DCA 同步資料。');
+        const previous = {
+            cache: storage.getItem('p_cache'),
+            githubTime: storage.getItem('p_github_ts'),
+            link: storage.getItem(STORAGE_KEY)
+        };
+        const portfolioCache = JSON.stringify(portfolio);
+        try {
+            if (previous.cache && previous.cache !== portfolioCache
+                && (!previous.githubTime || !storage.getItem('p_local_ts')
+                    || Number(storage.getItem('p_local_ts')) > Number(previous.githubTime))) {
+                let backupKey = ETF_CACHE_BACKUP_KEY;
+                if (storage.getItem(backupKey) && storage.getItem(backupKey) !== previous.cache) {
+                    let suffix = Date.now();
+                    while (storage.getItem(`${backupKey}.${suffix}`)) suffix++;
+                    backupKey = `${backupKey}.${suffix}`;
+                }
+                if (storage.getItem(backupKey) !== previous.cache) {
+                    storage.setItem(backupKey, previous.cache);
+                }
+            }
+            storage.setItem('p_cache', portfolioCache);
+            storage.setItem('p_github_ts', String(Math.max(Date.now(),
+                Number(storage.getItem('p_local_ts')) || 0)));
+            storage.setItem(STORAGE_KEY, JSON.stringify(link));
+            if (storage.getItem('p_cache') !== portfolioCache || !load(ticker)) {
+                throw new Error('同步資料驗證失敗。');
+            }
+        } catch (_error) {
+            for (const [key, value] of [['p_cache', previous.cache],
+                ['p_github_ts', previous.githubTime], [STORAGE_KEY, previous.link]]) {
+                try { if (value === null) storage.removeItem(key); else storage.setItem(key, value); }
+                catch (_restoreError) { /* Keep the original cache backup for recovery. */ }
+            }
+            throw new Error('此瀏覽器無法儲存 ETF_DCA 同步資料；舊資料仍保留。');
+        }
         return link;
     }
 
-    return Object.freeze({ STORAGE_KEY, PORTFOLIO_URL, appliedManualZone, isLink: validLink, load, clear, sync });
+    return Object.freeze({ STORAGE_KEY, ETF_CACHE_BACKUP_KEY, PORTFOLIO_URL,
+        appliedManualZone, isLink: validLink, load, clear, sync });
 });

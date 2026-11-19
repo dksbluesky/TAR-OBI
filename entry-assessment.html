@@ -847,6 +847,12 @@
         window.addEventListener('storage', event => {
             if (event.key === REFRESH_REQUEST_KEY && event.newValue) fetchData();
             if (event.key === window.TarObiRepoZone?.STORAGE_KEY) { renderBridgeContext(); render(); }
+            if (event.key === window.TarObiBridge?.DISMISSED_KEY) {
+                window.TarObiBridge.refreshLinkedBridge();
+                window.TarObiBackgroundMonitor?.stopCurrentSync?.();
+                void window.TarObiBridgeMonitor?.syncMobileSupport?.();
+                renderBridgeContext(); render();
+            }
         });
     }
     window.addEventListener('load', setup);

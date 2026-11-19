@@ -18,7 +18,9 @@ const localStorage = {
 };
 const requests = [];
 let rejectIntraday = false;
+let rejectRepo = false;
 let linkedBridge = null;
+let storedBridge = null;
 const savedPortfolio = { dca: [{ ticker: '006208', watchCriteria: {
     zoneMode: 'manual', activeZoneSource: 'manual_reassessment',
     manualReassessment: { manualZoneSource: 'MANUAL', manualAppliedAt: '2026-11-18T08:00:00.000Z',
@@ -38,6 +40,7 @@ const candles = { data: [
 async function fetchFixture(url, options) {
     requests.push({ url, key: options?.headers?.['X-API-KEY'] });
     if (url.includes('api.github.com/repos/dksbluesky/ETF_DCA-plan/contents/portfolio-data.json')) {
+        if (rejectRepo) throw new Error('GitHub unavailable');
         return { ok: true, status: 200, json: async () => ({ encoding: 'base64',
             content: Buffer.from(JSON.stringify(savedPortfolio), 'utf8').toString('base64') }) };
     }
@@ -74,7 +77,13 @@ function page(file, search = '', hash = '') {
         document: { getElementById: element, createElement: () => ({ value: '', textContent: '' }),
             querySelectorAll: () => [], hidden: false, addEventListener() {} },
         addEventListener() {}, TarObiBridge: {
-            populateLinkedTicker() {}, handleSymbolInput() {}, getLinkedBridge() { return linkedBridge; }
+            DISMISSED_KEY: 'tarObi.executionBridge.dismissedBridgeId.v1',
+            populateLinkedTicker() {}, handleSymbolInput() {}, getLinkedBridge() { return linkedBridge; },
+            readBridge() { return storedBridge; },
+            disconnectBridge() {
+                localStorage.setItem(this.DISMISSED_KEY, linkedBridge.bridgeId);
+                linkedBridge = null;
+            }
         }
     };
     context.window = context;
@@ -118,23 +127,30 @@ async function until(predicate) {
     await emit(dashboard.element('zone-sync'), 'click');
     assert.match(dashboard.element('zone-link-status').textContent, /GitHub 區間已連結.*203\.00–209\.00/);
     assert.equal(JSON.parse(saved.get('tarObi.repoActiveZoneLink.v1')).ticker, '006208');
+    assert.equal(JSON.parse(saved.get('p_cache')).dca[0].watchCriteria.manualReassessment.activeManualZone.low, 203);
     const repoCalls = () => requests.filter(request => request.url.includes('api.github.com/repos/dksbluesky/ETF_DCA-plan')).length;
     assert.equal(repoCalls(), 1);
-    linkedBridge = { ticker: '006208', activeZone: { low: 203, high: 209 } };
+    linkedBridge = { bridgeId: 'bridge-current', ticker: '006208', activeZone: { low: 203, high: 209 } };
+    storedBridge = linkedBridge;
     await emit(dashboard.element('zone-sync'), 'click');
     assert.equal(repoCalls(), 2, 'sync checks GitHub even when a Bridge exists');
     assert.match(dashboard.element('zone-link-status').textContent, /與 GitHub 區間一致/);
-    linkedBridge = { ticker: '006208', activeZone: { low: 238, high: 243 } };
+    linkedBridge = { bridgeId: 'bridge-old', ticker: '006208', activeZone: { low: 238, high: 243 } };
+    storedBridge = linkedBridge;
+    rejectRepo = true;
     await emit(dashboard.element('zone-sync'), 'click');
-    assert.equal(repoCalls(), 3);
+    assert.deepEqual(linkedBridge.activeZone, { low: 238, high: 243 }, 'a failed fetch keeps the old Bridge');
+    rejectRepo = false;
+    await emit(dashboard.element('zone-sync'), 'click');
+    assert.equal(repoCalls(), 4);
     assert.match(dashboard.element('zone-link-status').textContent,
-        /區間不一致：目前 Bridge 238\.00–243\.00；ETF_DCA GitHub 203\.00–209\.00/);
-    assert.match(dashboard.element('zone-link-status').textContent, /進場評估仍使用原 Bridge/);
-    assert.equal(dashboard.element('zone-link-status').className, 'zone-link-status error');
-    assert.deepEqual(linkedBridge.activeZone, { low: 238, high: 243 }, 'sync never rewrites an existing Bridge');
+        /GitHub Active Zone 203\.00–209\.00 已啟用.*舊 Bridge 238\.00–243\.00 已停用/);
+    assert.equal(saved.get('tarObi.executionBridge.dismissedBridgeId.v1'), 'bridge-old');
+    assert.equal(linkedBridge, null, 'the old Bridge is no longer used for entry assessment');
+    assert.deepEqual(storedBridge.activeZone, { low: 238, high: 243 }, 'old Bridge storage remains recoverable');
     const reopenedWithMismatch = page('index.html', '?symbol=006208');
-    assert.match(reopenedWithMismatch.element('zone-link-status').textContent, /區間不一致/,
-        'a reopened dashboard still warns about a saved mismatch');
+    assert.match(reopenedWithMismatch.element('zone-link-status').textContent, /舊 Bridge 238\.00–243\.00 已停用/,
+        'a reopened dashboard keeps the GitHub zone authoritative');
     linkedBridge = null;
     await emit(dashboard.element('source-form'), 'submit');
     assert.match(dashboard.element('status').textContent, /設定.*Fugle API Key/);

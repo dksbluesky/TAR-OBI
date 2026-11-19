@@ -142,6 +142,16 @@
           : '已有 ETF_DCA Bridge，但 Active Zone 無效；請到進場評估頁處理。', ended || !valid);
       return;
     }
+    const oldBridge = window.TarObiBridge?.readBridge?.();
+    if (link && oldBridge?.ticker?.toUpperCase() === symbol
+      && localStorage.getItem(window.TarObiBridge.DISMISSED_KEY) === oldBridge.bridgeId) {
+      setZoneLinkStatus('ETF_DCA GitHub Active Zone ' + zoneText(link.activeZone) + ' 已啟用'
+        + ' · 同步 ' + zoneTime(link.syncedAt)
+        + '；此瀏覽器舊 Bridge '
+        + (oldBridge.activeZone ? zoneText(oldBridge.activeZone) : '無有效區間')
+        + ' 已停用；進場評估改用 GitHub 區間，完整監控確認暫不可用。');
+      return;
+    }
     setZoneLinkStatus(link ? 'ETF_DCA GitHub 區間已連結 · Active Zone ' + zoneText(link.activeZone)
       + ' · ETF 儲存 ' + zoneTime(link.portfolioUpdatedAt) + ' · 同步 ' + zoneTime(link.syncedAt)
       : 'ETF_DCA 區間連結：尚未同步');
@@ -435,11 +445,21 @@
     $('zone-sync').disabled = true;
     setZoneLinkStatus('正在從 ETF_DCA GitHub 同步 ' + symbol + ' 的 Active Zone…');
     try {
-      await window.TarObiRepoZone.sync(symbol);
+      const link = await window.TarObiRepoZone.sync(symbol);
       if ($('symbol').value.trim().toUpperCase() !== symbol) { showZoneLinkStatus(); return; }
+      const bridge = window.TarObiBridge?.getLinkedBridge?.();
+      if (bridge?.ticker?.toUpperCase() === symbol
+        && (Number(bridge.activeZone?.low) !== Number(link.activeZone.low)
+          || Number(bridge.activeZone?.high) !== Number(link.activeZone.high))) {
+        window.TarObiBridge.disconnectBridge();
+        if (localStorage.getItem(window.TarObiBridge.DISMISSED_KEY) !== bridge.bridgeId) {
+          throw new Error('GitHub 區間已讀取，但此瀏覽器無法停用舊 Bridge。');
+        }
+      }
       localStorage.setItem('fugle_symbol', symbol);
       updatePageLinks();
       showZoneLinkStatus();
+      setZoneLinkStatus($('zone-link-status').textContent + ' · ETF_DCA 本機快取已更新；重新開啟時會讀取 GitHub。');
     } catch (error) {
       const cached = window.TarObiRepoZone?.load?.(symbol);
       setZoneLinkStatus(error.message + (cached ? ' 前次快照仍在，請核對同步時間。' : ' 尚未建立區間連結。'), true);
