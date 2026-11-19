@@ -48,6 +48,7 @@
 <main class="app">
   <header><h1>TAR-OBI <small>盤中儀表板</small></h1><div class="header-actions"><button id="zone-sync" class="settings-toggle" type="button">↻ 同步 Active Zone</button><button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">⚙ 設定</button></div></header>
   <p id="zone-link-status" class="zone-link-status" role="status" aria-live="polite">ETF_DCA 區間連結：尚未同步</p>
+  <button id="bridge-update-reload" class="settings-toggle" type="button" hidden>載入新 Bridge / Reload</button>
   <nav aria-label="TAR-OBI 頁面"><span class="active">總覽 Dashboard</span><a id="calculator-link" href="./calculator.html">TAR/OBI 計算器</a><a id="entry-link" href="./entry-assessment.html?source=fugle">盤中進場評估</a><a id="structure-link" href="./daytrade-30m-playbook.html">盤中市場結構</a></nav>
   <section class="source settings-panel" id="settings-panel" aria-label="Fugle 設定" hidden>
     <h2>Fugle API Key 設定</h2>
@@ -123,6 +124,12 @@
   }
   function showZoneLinkStatus() {
     const symbol = $('symbol').value.trim().toUpperCase();
+    const replacement = window.TarObiBridge?.getAvailableReplacement?.();
+    $('bridge-update-reload').hidden = replacement?.ticker?.toUpperCase() !== symbol;
+    if (!$('bridge-update-reload').hidden) {
+      setZoneLinkStatus('ETF_DCA 已提供新的 ' + symbol + ' Bridge；按「載入新 Bridge」更新此頁。');
+      return;
+    }
     const bridge = window.TarObiBridge?.getLinkedBridge?.();
     const link = window.TarObiRepoZone?.load?.(symbol);
     if (bridge?.ticker?.toUpperCase() === symbol) {
@@ -464,6 +471,12 @@
       const cached = window.TarObiRepoZone?.load?.(symbol);
       setZoneLinkStatus(error.message + (cached ? ' 前次快照仍在，請核對同步時間。' : ' 尚未建立區間連結。'), true);
     } finally { $('zone-sync').disabled = false; }
+  });
+  $('bridge-update-reload').addEventListener('click', () => location.reload());
+  window.addEventListener('focus', showZoneLinkStatus);
+  window.addEventListener('storage', event => {
+    if ([window.TarObiBridge?.STORAGE_KEY, window.TarObiBridge?.DISMISSED_KEY,
+      window.TarObiRepoZone?.STORAGE_KEY].includes(event.key)) showZoneLinkStatus();
   });
   $('settings-toggle').addEventListener('click', () => showSettings($('settings-panel').hidden));
   $('settings-close').addEventListener('click', () => showSettings(false));

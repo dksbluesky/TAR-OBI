@@ -168,6 +168,25 @@ assert.equal(restoredPanel.innerHTML, 'Restore monitor');
 const restored = consumer.linkBridge(validBridge({ bridgeId: 'bridge-restored' }));
 assert.equal(restored.mode, 'linked');
 assert.equal(consumer.getLinkedBridge().bridgeId, 'bridge-restored');
+const oldPageStorage = createStorage({
+    'etfDca.executionBridge.v1': JSON.stringify(validBridge({ bridgeId: 'bridge-old' })),
+    'tarObi.executionBridge.dismissedBridgeId.v1': 'bridge-old'
+});
+const oldPage = loadConsumer(oldPageStorage);
+assert.equal(oldPage.getAvailableReplacement(), null, 'a dismissed Bridge is not offered again');
+oldPageStorage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({ bridgeId: 'bridge-new' })));
+assert.equal(oldPage.getAvailableReplacement()?.bridgeId, 'bridge-new',
+    'an already-open standalone page can detect a new ETF handoff');
+oldPageStorage.values.set('tarObi.executionBridge.dismissedBridgeId.v1', 'bridge-new');
+assert.equal(oldPage.getAvailableReplacement(), null, 'the current dismissal is still respected');
+const linkedPageStorage = createStorage({
+    'etfDca.executionBridge.v1': JSON.stringify(validBridge({ bridgeId: 'bridge-old' }))
+});
+const linkedPage = loadConsumer(linkedPageStorage);
+assert.equal(linkedPage.getLinkedBridge()?.bridgeId, 'bridge-old');
+linkedPageStorage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({ bridgeId: 'bridge-new' })));
+assert.equal(linkedPage.getAvailableReplacement()?.bridgeId, 'bridge-new',
+    'an already-open linked page detects a replacement without silently switching');
 assert.equal(JSON.parse(emptyStorage.getItem('etfDca.executionBridge.v1')).bridgeId, 'bridge-restored');
 
 console.log('bridge loader tests passed');

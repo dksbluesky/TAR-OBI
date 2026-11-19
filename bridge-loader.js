@@ -387,6 +387,13 @@
         initialize();
         return linkedBridge;
     }
+    /** Returns an explicitly available Bridge that this page has not adopted yet. */
+    function getAvailableReplacement() {
+        const stored = readBridge();
+        const current = getLinkedBridge();
+        return stored && stored.bridgeId !== current?.bridgeId
+            && storageGet(DISMISSED_KEY) !== stored.bridgeId ? stored : null;
+    }
     /**
      * Restores an authenticated server bridge into this app's local storage context.
      * @param {object} bridge Validated v1 execution bridge.
@@ -812,6 +819,7 @@
         readBridge,
         initialize,
         getLinkedBridge,
+        getAvailableReplacement,
         linkBridge,
         refreshLinkedBridge,
         returnToEtfDca,
