@@ -3,7 +3,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const monitor = require('../bridge-monitor.js');
+const repoZone = require('../repo-zone-link.js');
 
 function bridge(overrides = {}) {
     return {
@@ -81,6 +83,13 @@ const noLinkedZone = monitor.finalActionContext(null, 'ENTRY CONDITIONS MET', 29
 assert.equal(noLinkedZone.action, 'DO_NOT_ENTER');
 assert.equal(noLinkedZone.reason, 'No valid Active Zone');
 assert.equal(noLinkedZone.zoneInvalid, false, 'an absent linked zone is not invalidation');
+const repoLink = { version: 1, source: 'ETF_DCA-plan GitHub', ticker: '006208',
+    activeZone: { low: 203, high: 209 }, zoneMode: 'manual_reassessment',
+    appliedAt: '2026-11-18T08:00:00.000Z', portfolioUpdatedAt: '2026-11-18T08:30:00.000Z',
+    syncedAt: '2026-11-18T09:00:00.000Z' };
+assert.equal(repoZone.isLink(repoLink), true);
+assert.equal(monitor.finalActionContext(repoLink, 'ENTRY CONDITIONS MET', 205, 'live').action, 'WAIT',
+    'a saved GitHub zone cannot create a live monitor BUY NOW confirmation');
 
 const closedSession = monitor.finalActionContext(bridge(), 'ENTRY CONDITIONS MET', 29.1, 'closed');
 assert.equal(closedSession.action, 'WAIT');
@@ -140,4 +149,32 @@ assert.doesNotMatch(html, /\['Shadow Assessment \/ 模擬評估', shadow\.rrAsse
 assert.doesNotMatch(html, /Net R&R \/ 淨風險報酬比/);
 assert.match(html, /Candles analysed \/ 已分析五分K/);
 assert.match(html, /completedFiveMinuteBars\(null, intradayCandles, shadow\.asOf\)\.length/);
+const elements = new Map();
+const element = id => {
+    if (!elements.has(id)) elements.set(id, { textContent: '', className: '', children: [],
+        classList: { toggle() {} }, replaceChildren(...children) { this.children = children; } });
+    return elements.get(id);
+};
+const context = { document: {
+    getElementById: element,
+    createElement: () => ({ textContent: '', children: [], append(...children) { this.children = children; } })
+}, window: { addEventListener() {}, TarObiRepoZone: repoZone, TarObiBridgeMonitor: monitor } };
+vm.createContext(context);
+const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+vm.runInContext(inline, context);
+const assessment = { state: 'ENTRY CONDITIONS MET', factors: [] };
+context.renderFinalAction(assessment, repoLink, 205, 0.05, true, 'live');
+assert.match(element('final-action-title').textContent, /WAIT/);
+assert.match(element('final-action-reason').textContent, /GitHub Active Zone 已同步/);
+assert.match(element('signal-mode').textContent, /NO LIVE ETF MONITOR/);
+assert.deepEqual(element('final-action-details').children.map(item => [item.children[0].textContent, item.children[1].textContent])
+    .filter(([label]) => ['Active Zone', 'Zone Source'].includes(label)),
+    [['Active Zone', '203.00–209.00'], ['Zone Source', 'ETF_DCA GitHub / MANUAL']]);
+context.renderFinalAction(assessment, repoLink, 210, 0.05, true, 'live');
+assert.match(element('final-action-title').textContent, /DO NOT ENTER/);
+assert.match(element('final-action-reason').textContent, /現價不在 ETF_DCA GitHub Active Zone/);
+context.renderFinalAction(assessment, null, 205, 0.05, true, 'live');
+assert.match(element('final-action-title').textContent, /DO NOT ENTER/);
+context.renderFinalAction(assessment, bridge({ activeZone: { low: 203, high: 209 }, invalidationLevel: 200 }), 205, 0.05, true, 'live');
+assert.match(element('final-action-title').textContent, /BUY NOW/, 'existing live Bridge behavior remains available');
 console.log('final action UI tests passed');

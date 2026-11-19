@@ -6,6 +6,7 @@
   <title>TAR-OBI 盤中儀表板</title>
   <script src="./shared-market.js?v=hl-signals-20261118"></script>
   <script src="./bridge-loader.js"></script>
+  <script src="./repo-zone-link.js"></script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#2563eb">
@@ -17,9 +18,9 @@
   <style>
     :root{font-family:system-ui,'Microsoft JhengHei',sans-serif;color:#17233a;background:#f6f8fc}
     *{box-sizing:border-box}body{margin:0}.app{max-width:1100px;margin:auto;padding:20px}
-    header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #dce5ef;padding-bottom:14px}
+    header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #dce5ef;padding-bottom:14px}
     h1{font-size:22px;margin:0}h1 small{font-size:13px;font-weight:400;color:#64748b}
-    .settings-toggle{font-size:13px;white-space:nowrap}
+    .settings-toggle{font-size:13px;white-space:nowrap}.header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.zone-link-status{font-size:12px;color:#475569;margin:7px 0 0}.zone-link-status.error{color:#b91c1c}
     nav{display:flex;gap:7px;overflow:auto;padding:14px 0}nav span,nav a{white-space:nowrap;padding:8px 12px;border-radius:8px;color:#64748b;text-decoration:none}nav a{color:#1d4ed8}nav a:hover{background:#eaf2ff}nav .active{color:#1d4ed8;background:#eaf2ff;font-weight:700}
     .source,.card{background:#fff;border:1px solid #dce5ef;border-radius:12px;padding:16px}.source{margin-bottom:14px}
     form{display:flex;flex-wrap:wrap;align-items:end;gap:10px}label{font-size:12px;color:#475569;font-weight:700;display:grid;gap:4px}
@@ -45,7 +46,8 @@
 </head>
 <body>
 <main class="app">
-  <header><h1>TAR-OBI <small>盤中儀表板</small></h1><button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">⚙ 設定</button></header>
+  <header><h1>TAR-OBI <small>盤中儀表板</small></h1><div class="header-actions"><button id="zone-sync" class="settings-toggle" type="button">↻ 同步 Active Zone</button><button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">⚙ 設定</button></div></header>
+  <p id="zone-link-status" class="zone-link-status" role="status" aria-live="polite">ETF_DCA 區間連結：尚未同步</p>
   <nav aria-label="TAR-OBI 頁面"><span class="active">總覽 Dashboard</span><a id="calculator-link" href="./calculator.html">TAR/OBI 計算器</a><a id="entry-link" href="./entry-assessment.html?source=fugle">盤中進場評估</a><a id="structure-link" href="./daytrade-30m-playbook.html">盤中市場結構</a></nav>
   <section class="source settings-panel" id="settings-panel" aria-label="Fugle 設定" hidden>
     <h2>Fugle API Key 設定</h2>
@@ -113,6 +115,30 @@
   const taipei = date => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).reduce((result, part) => { result[part.type] = part.value; return result; }, {});
   const timeLabel = ms => ms ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms)) : '—';
   function setStatus(message, kind = '') { $('status').textContent = message; $('status').className = kind; }
+  function zoneText(zone) { return Number(zone.low).toFixed(2) + '–' + Number(zone.high).toFixed(2); }
+  function zoneTime(value) { return new Date(value).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }); }
+  function setZoneLinkStatus(message, error = false) {
+    $('zone-link-status').textContent = message;
+    $('zone-link-status').className = 'zone-link-status' + (error ? ' error' : '');
+  }
+  function showZoneLinkStatus() {
+    const symbol = $('symbol').value.trim().toUpperCase();
+    const bridge = window.TarObiBridge?.getLinkedBridge?.();
+    if (bridge?.ticker?.toUpperCase() === symbol) {
+      const zone = bridge.activeZone;
+      const valid = Number.isFinite(Number(zone?.low)) && Number.isFinite(Number(zone?.high))
+        && Number(zone.low) > 0 && Number(zone.high) > Number(zone.low);
+      const ended = ['COMPLETED', 'EXPIRED', 'INVALIDATED'].includes(bridge.lifecycle?.status);
+      setZoneLinkStatus(ended ? 'ETF_DCA Bridge 已結束（' + bridge.lifecycle.status + '）；請到進場評估頁處理。'
+        : valid ? 'ETF_DCA Bridge 已連結 · Active Zone ' + zoneText(zone)
+          : '已有 ETF_DCA Bridge，但 Active Zone 無效；請到進場評估頁處理。', ended || !valid);
+      return;
+    }
+    const link = window.TarObiRepoZone?.load?.(symbol);
+    setZoneLinkStatus(link ? 'ETF_DCA GitHub 區間已連結 · Active Zone ' + zoneText(link.activeZone)
+      + ' · ETF 儲存 ' + zoneTime(link.portfolioUpdatedAt) + ' · 同步 ' + zoneTime(link.syncedAt)
+      : 'ETF_DCA 區間連結：尚未同步');
+  }
   function setDataStale(stale) { ['tar-obi-stale', 'entry-stale', 'structure-stale'].forEach(id => { $(id).hidden = !stale; }); }
   function updatePageLinks() {
     const symbol = $('symbol').value.trim().toUpperCase();
@@ -395,6 +421,25 @@
     } finally { clearTimeout(timeout); fetching = false; $('refresh').disabled = false; }
   }
   $('source-form').addEventListener('submit', refresh);
+  $('zone-sync').addEventListener('click', async () => {
+    const symbol = $('symbol').value.trim().toUpperCase();
+    if (!/^[A-Z0-9]+$/.test(symbol)) { setZoneLinkStatus('請先輸入有效股票代碼。', true); return; }
+    window.TarObiBridge?.handleSymbolInput?.(symbol);
+    const bridge = window.TarObiBridge?.getLinkedBridge?.();
+    if (bridge?.ticker?.toUpperCase() === symbol) { showZoneLinkStatus(); return; }
+    $('zone-sync').disabled = true;
+    setZoneLinkStatus('正在從 ETF_DCA GitHub 同步 ' + symbol + ' 的 Active Zone…');
+    try {
+      await window.TarObiRepoZone.sync(symbol);
+      if ($('symbol').value.trim().toUpperCase() !== symbol) { showZoneLinkStatus(); return; }
+      localStorage.setItem('fugle_symbol', symbol);
+      updatePageLinks();
+      showZoneLinkStatus();
+    } catch (error) {
+      const cached = window.TarObiRepoZone?.load?.(symbol);
+      setZoneLinkStatus(error.message + (cached ? ' 前次快照仍在，請核對同步時間。' : ' 尚未建立區間連結。'), true);
+    } finally { $('zone-sync').disabled = false; }
+  });
   $('settings-toggle').addEventListener('click', () => showSettings($('settings-panel').hidden));
   $('settings-close').addEventListener('click', () => showSettings(false));
   $('settings-form').addEventListener('submit', event => {
@@ -409,6 +454,7 @@
   $('symbol').addEventListener('input', event => {
     window.TarObiBridge?.handleSymbolInput(event.target.value);
     updatePageLinks();
+    showZoneLinkStatus();
   });
   ['calculator-link', 'entry-link', 'structure-link'].forEach(id => $(id).addEventListener('click', () => {
     const symbol = $('symbol').value.trim().toUpperCase();
@@ -422,6 +468,7 @@
   if (/^[A-Z0-9]+$/i.test(initialSymbol)) $('symbol').value = initialSymbol.toUpperCase();
   window.TarObiBridge?.populateLinkedTicker($('symbol'));
   updatePageLinks();
+  showZoneLinkStatus();
   if (location.hash === '#settings') showSettings(true);
   if (localStorage.getItem('fugle_api_key')) void refresh();
   const interval = Number(localStorage.getItem('fugle_interval'));

@@ -8,6 +8,7 @@
     <script src="./shared-market.js"></script>
     <script src="./shadow-risk-reward.js"></script>
     <script src="./bridge-loader.js"></script>
+    <script src="./repo-zone-link.js"></script>
     <script src="./assessment-journal.js"></script>
     <script src="./mobile-support.js"></script>
     <script src="./background-monitor-client.js"></script>
@@ -312,9 +313,21 @@
         }));
     }
 
+    function repoZoneTime(value) {
+        return new Date(value).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+    }
+
     function renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable, session) {
         const fallback = { action: 'DO_NOT_ENTER', reason: 'No valid Active Zone', zoneInvalid: false, zoneInvalidation: null, linked: Boolean(linkedBridge) };
-        const presentation = window.TarObiBridgeMonitor?.finalActionContext?.(linkedBridge, assessment.state, price, session) || fallback;
+        const repoZoneLink = window.TarObiRepoZone?.isLink?.(linkedBridge) === true;
+        const basePresentation = window.TarObiBridgeMonitor?.finalActionContext?.(linkedBridge, assessment.state, price, session) || fallback;
+        const repoOutsideZone = repoZoneLink && session === 'live' && Number.isFinite(price)
+            && (price < linkedBridge.activeZone.low - 1e-9 || price > linkedBridge.activeZone.high + 1e-9);
+        const presentation = repoOutsideZone
+            ? { ...basePresentation, action: 'DO_NOT_ENTER', reason: '現價不在 ETF_DCA GitHub Active Zone 內。' }
+            : repoZoneLink && session === 'live' && assessment.state === 'ENTRY CONDITIONS MET'
+                ? { ...basePresentation, action: 'WAIT', reason: 'ETF_DCA GitHub Active Zone 已同步；尚無 Entry Watch 即時監控確認。' }
+                : basePresentation;
         const labels = {
             BUY_NOW: ['🟢 BUY NOW', 'text-emerald-700'],
             WAIT: ['🟡 WAIT', 'text-amber-700'],
@@ -325,12 +338,14 @@
         titleEl.textContent = title;
         titleEl.className = `mt-2 text-2xl font-black ${color}`;
         document.getElementById('final-action-reason').textContent = finalActionReason(assessment, presentation);
-        document.getElementById('signal-mode').textContent = window.TarObiBridgeMonitor?.signalModeLabel?.(assessment.state) || 'NO ENTRY MODE';
+        document.getElementById('signal-mode').textContent = repoZoneLink && assessment.state === 'ENTRY CONDITIONS MET'
+            ? 'RIGHT — RAW ASSESSMENT (NO LIVE ETF MONITOR)'
+            : window.TarObiBridgeMonitor?.signalModeLabel?.(assessment.state) || 'NO ENTRY MODE';
         document.getElementById('final-action-zone-warning').classList.toggle('hidden', !presentation.zoneInvalid);
 
         const zone = linkedBridge?.activeZone;
         const hasZone = Number.isFinite(Number(zone?.low)) && Number.isFinite(Number(zone?.high));
-        const zoneSource = !linkedBridge ? 'Not linked' : ({
+        const zoneSource = !linkedBridge ? 'Not linked' : repoZoneLink ? 'ETF_DCA GitHub / MANUAL' : ({
             automatic_context: 'AUTO / CONTEXT',
             manual: 'MANUAL',
             manual_reassessment: 'MANUAL',
@@ -347,6 +362,7 @@
             ['Active Zone', hasZone ? `${formatPrice(Number(zone.low), tick)}–${formatPrice(Number(zone.high), tick)}` : 'Unavailable'],
             ['Zone Source', zoneSource]
         ];
+        if (repoZoneLink) rows.push(['GitHub Zone Synced', repoZoneTime(linkedBridge.syncedAt)]);
         if (hasZone && presentation.zoneInvalidation !== null) rows.push(['ETF_DCA Manual / Trailing Invalidation', formatPrice(presentation.zoneInvalidation, tick)]);
         if (presentation.action === 'DO_NOT_ENTER' || presentation.zoneInvalid) rows.push(['Current Price', priceValue]);
         setFinalActionDetails(rows);
@@ -474,6 +490,7 @@
         const linkedBridge = window.TarObiBridge?.refreshLinkedBridge?.()
             || window.TarObiBridge?.getLinkedBridge?.()
             || null;
+        const repoZoneLink = linkedBridge ? null : window.TarObiRepoZone?.load?.(settings.symbol);
         const tick = MarketData.inferTickSize(quoteData);
         const price = currentPrice();
         const bid = firstLevel('bids');
@@ -535,7 +552,7 @@
         document.getElementById('closed-note').classList.toggle('hidden', session !== 'closed');
 
         const pricesActionable = !['stale', 'unavailable'].includes(session);
-        renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable, session);
+        renderFinalAction(assessment, linkedBridge || repoZoneLink, price, tick, pricesActionable, session);
         document.getElementById('entry-range').textContent = pricesActionable && Number.isFinite(assessment.lower) ? `${formatPrice(assessment.lower, tick)}–${formatPrice(assessment.upper, tick)}` : 'Unavailable / 資料不足';
         const distanceEl = document.getElementById('entry-distance');
         const hasPreferredRange = pricesActionable && Number.isFinite(price) && Number.isFinite(assessment.lower) && Number.isFinite(assessment.upper);
@@ -759,6 +776,24 @@
             restorePanel.classList.add('hidden');
             window.TarObiBridge?.renderContextPanel(executionContext, {
                 renderStandalone() {
+                    const repoLink = window.TarObiRepoZone?.load?.(querySettings().symbol);
+                    if (repoLink) {
+                        executionContext.classList.remove('hidden');
+                        executionContext.innerHTML = `
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div><p class="text-xs font-black tracking-wider text-blue-600">ETF_DCA GITHUB ACTIVE ZONE LINK</p>
+                                    <p class="mt-1 text-xs text-slate-600">GitHub 儲存的手動區間快照；尚無 Entry Watch 即時監控確認。</p></div>
+                                <button data-repo-zone-disconnect type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">中斷區間連結</button>
+                            </div>
+                            <div class="mt-3 text-sm font-bold">${repoLink.ticker} · NT$${Number(repoLink.activeZone.low).toFixed(2)}–${Number(repoLink.activeZone.high).toFixed(2)}</div>
+                            <p class="mt-2 text-xs text-slate-600">ETF_DCA 套用：${repoZoneTime(repoLink.appliedAt)} · ETF 儲存：${repoZoneTime(repoLink.portfolioUpdatedAt)} · GitHub 同步：${repoZoneTime(repoLink.syncedAt)}（台灣時間）</p>`;
+                        executionContext.querySelector('[data-repo-zone-disconnect]')?.addEventListener('click', () => {
+                            window.TarObiRepoZone.clear();
+                            renderBridgeContext();
+                            render();
+                        });
+                        return;
+                    }
                     executionContext.classList.add('hidden');
                     restorePanel.classList.remove('hidden');
                     window.TarObiBackgroundMonitor?.renderRestorePanel(restorePanel, () => {
@@ -779,8 +814,10 @@
                     }
                 },
                 onDisconnect() {
+                    window.TarObiRepoZone?.clear?.();
                     quoteData = null; metrics = null; candleData = null; acceptedTimestamp = null;
                     window.TarObiBridgeMonitor?.syncMobileSupport?.();
+                    renderBridgeContext();
                     render();
                 }
             });
@@ -795,7 +832,10 @@
         render(); fetchData();
         ensureRefreshTimer('unavailable');
         document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchData(); });
-        window.addEventListener('storage', event => { if (event.key === REFRESH_REQUEST_KEY && event.newValue) fetchData(); });
+        window.addEventListener('storage', event => {
+            if (event.key === REFRESH_REQUEST_KEY && event.newValue) fetchData();
+            if (event.key === window.TarObiRepoZone?.STORAGE_KEY) { renderBridgeContext(); render(); }
+        });
     }
     window.addEventListener('load', setup);
 </script>

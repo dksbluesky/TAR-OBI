@@ -18,6 +18,12 @@ const localStorage = {
 };
 const requests = [];
 let rejectIntraday = false;
+let linkedBridge = null;
+const savedPortfolio = { dca: [{ ticker: '006208', watchCriteria: {
+    zoneMode: 'manual', activeZoneSource: 'manual_reassessment',
+    manualReassessment: { manualZoneSource: 'MANUAL', manualAppliedAt: '2026-11-18T08:00:00.000Z',
+        activeManualZone: { low: 203, high: 209 } }
+} }], direct: [], lastUpdated: '2026-11-18T08:30:00.000Z' };
 const quoteFor = symbol => ({
     date: '2026-11-18', symbol, name: '測試標的', lastUpdated: fixedNow,
     lastPrice: 101, closePrice: 101, previousClose: 100, openPrice: 100,
@@ -31,6 +37,10 @@ const candles = { data: [
 ] };
 async function fetchFixture(url, options) {
     requests.push({ url, key: options?.headers?.['X-API-KEY'] });
+    if (url.includes('api.github.com/repos/dksbluesky/ETF_DCA-plan/contents/portfolio-data.json')) {
+        return { ok: true, status: 200, json: async () => ({ encoding: 'base64',
+            content: Buffer.from(JSON.stringify(savedPortfolio), 'utf8').toString('base64') }) };
+    }
     if (rejectIntraday && url.includes('/intraday/')) throw new Error('fixture offline');
     const symbol = url.match(/\/([^/?]+)(?:\?|$)/)?.[1] || '006208';
     const payload = url.includes('/intraday/quote/') ? quoteFor(symbol)
@@ -58,18 +68,19 @@ function page(file, search = '', hash = '') {
     element('opening-replay').options.push({ value: 'current' });
     element('settings-panel').hidden = true;
     const context = {
-        Date: FixedDate, Intl, Number, Math, console, URLSearchParams, AbortController,
+        Date: FixedDate, Intl, Number, Math, console, URLSearchParams, AbortController, atob, TextDecoder,
         setTimeout, clearTimeout, setInterval: callback => { intervals.push(callback); return intervals.length; }, clearInterval() {},
         localStorage, location: { search, hash }, fetch: fetchFixture,
         document: { getElementById: element, createElement: () => ({ value: '', textContent: '' }),
             querySelectorAll: () => [], hidden: false, addEventListener() {} },
         addEventListener() {}, TarObiBridge: {
-            populateLinkedTicker() {}, handleSymbolInput() {}
+            populateLinkedTicker() {}, handleSymbolInput() {}, getLinkedBridge() { return linkedBridge; }
         }
     };
     context.window = context;
     vm.createContext(context);
     vm.runInContext(fs.readFileSync(path.join(root, 'shared-market.js'), 'utf8'), context);
+    vm.runInContext(fs.readFileSync(path.join(root, 'repo-zone-link.js'), 'utf8'), context);
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     const scripts = [...html.matchAll(/<script>\s*([\s\S]*?)<\/script>/g)].map(match => match[1]);
     vm.runInContext(scripts.at(-1).replace(/\}\)\(\);\s*$/, 'window.dashboardTest = { aggregate }; })();'), context);
@@ -103,6 +114,17 @@ async function until(predicate) {
     }
     assert.equal(dashboard.element('symbol').value, '006208');
     assert.match(dashboard.html, /id="settings-api-key"/);
+    assert.match(dashboard.html, /id="zone-sync"[^>]*>[^<]*同步 Active Zone<\/button><button id="settings-toggle"/);
+    await emit(dashboard.element('zone-sync'), 'click');
+    assert.match(dashboard.element('zone-link-status').textContent, /GitHub 區間已連結.*203\.00–209\.00/);
+    assert.equal(JSON.parse(saved.get('tarObi.repoActiveZoneLink.v1')).ticker, '006208');
+    const repoCalls = () => requests.filter(request => request.url.includes('api.github.com/repos/dksbluesky/ETF_DCA-plan')).length;
+    assert.equal(repoCalls(), 1);
+    linkedBridge = { ticker: '006208', activeZone: { low: 203, high: 209 } };
+    await emit(dashboard.element('zone-sync'), 'click');
+    assert.equal(repoCalls(), 1, 'an existing valid Bridge is kept without reading GitHub');
+    assert.match(dashboard.element('zone-link-status').textContent, /Bridge 已連結/);
+    linkedBridge = null;
     await emit(dashboard.element('source-form'), 'submit');
     assert.match(dashboard.element('status').textContent, /設定.*Fugle API Key/);
     assert.equal(dashboard.element('settings-panel').hidden, false);
