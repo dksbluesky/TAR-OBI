@@ -8,6 +8,7 @@
     <script src="./shared-market.js"></script>
     <script src="./shadow-risk-reward.js"></script>
     <script src="./bridge-loader.js"></script>
+    <script src="./cloud-bridge.js"></script>
     <script src="./repo-zone-link.js"></script>
     <script src="./assessment-journal.js"></script>
     <script src="./mobile-support.js"></script>
@@ -93,6 +94,7 @@
         </section>
 
         <section id="bridge-alert" class="hidden"></section>
+        <p id="cloud-bridge-status" class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs font-bold" role="status" hidden></p>
         <section id="execution-context" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm"></section>
         <p id="zone-sync-mismatch" class="hidden rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700" role="alert"></p>
         <div id="bridge-update-notice" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800" role="status">
@@ -325,7 +327,8 @@
     function renderFinalAction(assessment, linkedBridge, price, tick, pricesActionable, session) {
         const fallback = { action: 'DO_NOT_ENTER', reason: 'No valid Active Zone', zoneInvalid: false, zoneInvalidation: null, linked: Boolean(linkedBridge) };
         const repoZoneLink = window.TarObiRepoZone?.isLink?.(linkedBridge) === true;
-        const savedRepoLink = repoZoneLink ? null : window.TarObiRepoZone?.load?.(linkedBridge?.ticker);
+        const savedRepoLink = repoZoneLink || window.TarObiCloudBridge?.isVerified?.(linkedBridge?.bridgeId)
+            ? null : window.TarObiRepoZone?.load?.(linkedBridge?.ticker);
         const zoneMismatch = linkedBridge && savedRepoLink && linkedBridge.activeZone
             && Number.isFinite(Number(linkedBridge.activeZone.low))
             && Number.isFinite(Number(linkedBridge.activeZone.high))
@@ -859,6 +862,10 @@
             onUiRefresh: renderBridgeContext
         });
         renderBridgeContext();
+        window.TarObiCloudBridge?.start({
+            statusElement: document.getElementById('cloud-bridge-status'),
+            onUpdated: () => { renderBridgeContext(); render(); }
+        });
         startRestoredBridgeSync();
         render(); fetchData();
         checkBridgeUpdate();

@@ -6,6 +6,7 @@
   <title>TAR-OBI 盤中儀表板</title>
   <script src="./shared-market.js?v=hl-signals-20261118"></script>
   <script src="./bridge-loader.js"></script>
+  <script src="./cloud-bridge.js"></script>
   <script src="./repo-zone-link.js"></script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -48,6 +49,7 @@
 <main class="app">
   <header><h1>TAR-OBI <small>盤中儀表板</small></h1><div class="header-actions"><button id="zone-sync" class="settings-toggle" type="button">↻ 同步 Active Zone</button><button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">⚙ 設定</button></div></header>
   <p id="zone-link-status" class="zone-link-status" role="status" aria-live="polite">ETF_DCA 區間連結：尚未同步</p>
+  <p id="cloud-bridge-status" class="zone-link-status" role="status" hidden></p>
   <button id="bridge-update-reload" class="settings-toggle" type="button" hidden>載入新 Bridge / Reload</button>
   <nav aria-label="TAR-OBI 頁面"><span class="active">總覽 Dashboard</span><a id="calculator-link" href="./calculator.html">TAR/OBI 計算器</a><a id="entry-link" href="./entry-assessment.html?source=fugle">盤中進場評估</a><a id="structure-link" href="./daytrade-30m-playbook.html">盤中市場結構</a></nav>
   <section class="source settings-panel" id="settings-panel" aria-label="Fugle 設定" hidden>
@@ -137,6 +139,12 @@
       const valid = Number.isFinite(Number(zone?.low)) && Number.isFinite(Number(zone?.high))
         && Number(zone.low) > 0 && Number(zone.high) > Number(zone.low);
       const ended = ['COMPLETED', 'EXPIRED', 'INVALIDATED'].includes(bridge.lifecycle?.status);
+      if (window.TarObiCloudBridge?.isVerified?.(bridge.bridgeId)) {
+        setZoneLinkStatus(ended ? 'ETF_DCA Cloud Bridge 已結束（' + bridge.lifecycle.status + '）。'
+          : valid ? 'ETF_DCA Cloud Bridge 已連結 · Active Zone ' + zoneText(zone)
+          : 'ETF_DCA Cloud Bridge 已連結，但 Active Zone 無效。', ended || !valid);
+        return;
+      }
       if (valid && link && (Number(zone.low) !== Number(link.activeZone.low)
         || Number(zone.high) !== Number(link.activeZone.high))) {
         setZoneLinkStatus('區間不一致：目前 Bridge ' + zoneText(zone) + '；ETF_DCA GitHub ' + zoneText(link.activeZone)
@@ -446,6 +454,14 @@
   }
   $('source-form').addEventListener('submit', refresh);
   $('zone-sync').addEventListener('click', async () => {
+    if (window.TarObiCloudBridge?.enabled?.()) {
+      $('zone-sync').disabled = true;
+      try {
+        const synced = await window.TarObiCloudBridge.pull();
+        if (synced) showZoneLinkStatus();
+      } finally { $('zone-sync').disabled = false; }
+      return;
+    }
     const symbol = $('symbol').value.trim().toUpperCase();
     if (!/^[A-Z0-9]+$/.test(symbol)) { setZoneLinkStatus('請先輸入有效股票代碼。', true); return; }
     window.TarObiBridge?.handleSymbolInput?.(symbol);
@@ -519,6 +535,8 @@
   window.TarObiBridge?.populateLinkedTicker($('symbol'));
   updatePageLinks();
   showZoneLinkStatus();
+  window.TarObiCloudBridge?.mountSettings($('settings-panel'));
+  window.TarObiCloudBridge?.start({ statusElement: $('cloud-bridge-status'), onUpdated: showZoneLinkStatus });
   if (location.hash === '#settings') showSettings(true);
   if (localStorage.getItem('fugle_api_key')) void refresh();
   const interval = Number(localStorage.getItem('fugle_interval'));

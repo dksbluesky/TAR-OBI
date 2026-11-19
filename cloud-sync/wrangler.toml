@@ -1,0 +1,8 @@
+name = "tar-obi-bridge-sync"
+main = "worker.mjs"
+compatibility_date = "2026-11-19"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tar-obi-bridge-sync"
+database_id = "5a3613cd-25e9-4c19-8dc9-2b58d3f26a89"

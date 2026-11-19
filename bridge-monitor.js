@@ -1387,10 +1387,12 @@
             return false;
         }
 
-        return storageSet(
+        const written = storageSet(
             STORAGE_KEY,
             JSON.stringify(bridge)
         );
+        if (written) void root.TarObiCloudBridge?.publishResult?.(bridge);
+        return written;
     }
     /**
      * Appends optional lifecycle data to a legacy linked bridge and applies expiration.
