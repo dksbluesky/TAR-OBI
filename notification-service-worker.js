@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'tar-obi-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 const PWA_ASSETS = [
     './manifest.webmanifest',
     './icons/icon-192.png',

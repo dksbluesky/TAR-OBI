@@ -1686,7 +1686,7 @@
                 && bar.low >= open && bar.low < first.high)
             && latest.low >= open);
         const secondAttempt = Boolean(pullbackHoldsOpen && latest.close > previous.close);
-        const rapidBreakBelowOpen = Boolean(initialRally && previous && latest.close < open
+        const rapidBreakBelowOpen = Boolean(initialRally && latest && previous && latest.close < open
             && previous.close > latest.close && latest.start - previous.start <= 300000);
         const failedReclaim = Boolean(initialDecline && latest && after.length >= 2
             && after.some(bar => bar.high >= open) && latest.close < open && latest.high <= open);
@@ -1720,6 +1720,168 @@
             failedGapRecovery, breakdownFailedRetest, divergence };
     }
 
+    // Opening observations use only the completed 09:00–09:25 candles supplied by the caller.
+    // OR30 breakout decisions remain in analyzePriceAction and begin after 09:30.
+    function analyzeOpeningRules(bars, openPrice) {
+        const opening = Array.isArray(bars) ? bars.slice(0, 6) : [];
+        const count = opening.length;
+        const states = ['待資料', '待資料', '待資料', '待資料'];
+        const messages = ['等待首根完成 K。', '等待首根完成 K。', '等待首根完成 K。', '等待三根完成 K 與逐根均價。'];
+        const high = count ? Math.max(...opening.map(bar => bar.high)) : null;
+        const low = count ? Math.min(...opening.map(bar => bar.low)) : null;
+        const latest = opening.at(-1) || null;
+        if (!count || !Number.isFinite(openPrice) || openPrice <= 0) {
+            return { count, high, low, latest, summary: '等待開盤證據', states, messages };
+        }
+        const first = opening[0], previous = opening.at(-2);
+        const beganUp = first.close > openPrice;
+        const beganDown = first.close < openPrice;
+        const afterFirst = opening.slice(1);
+        const pulledBack = afterFirst.some((bar, index) => bar.close < opening[index].close);
+        const pullbackLow = afterFirst.length ? Math.min(...afterFirst.map(bar => bar.low)) : null;
+        const heldOpen = beganUp && pulledBack && afterFirst.every(bar => bar.low >= openPrice);
+        const lostOpen = beganUp && afterFirst.some(bar => bar.low < openPrice);
+        const lossBar = beganUp ? afterFirst.find((bar, index) =>
+            opening[index].close >= openPrice && bar.close < openPrice
+            && bar.start - opening[index].start === 300000) : null;
+        const failedReclaimBar = beganDown ? afterFirst.find(bar =>
+            bar.high >= openPrice && bar.close < openPrice) : null;
+        const lastThree = opening.slice(-3);
+        const volumeRatio = previous?.volume > 0 ? latest.volume / previous.volume : null;
+        const gentleRise = lastThree.length === 3
+            && lastThree.every(bar => Number.isFinite(bar.average) && bar.close > bar.average)
+            && lastThree[0].close < lastThree[1].close && lastThree[1].close < lastThree[2].close
+            && (lastThree[2].close - lastThree[0].close) / lastThree[0].close <= 0.015
+            && lastThree[2].volume >= lastThree[0].volume
+            && Number.isFinite(volumeRatio) && volumeRatio >= 1 && volumeRatio < 2;
+        const fmt = value => Number(value).toFixed(2);
+        states[0] = heldOpen ? '守住，觀察再攻' : lostOpen ? latest.close >= openPrice ? '曾失守，已站回'
+            : '開盤價已失守' : beganUp ? '等待回落' : '不適用';
+        messages[0] = heldOpen ? `回落低點 ${fmt(pullbackLow)} 未破開盤 ${fmt(openPrice)}；觀察下一次上攻。`
+            : lostOpen ? `回落曾低於開盤 ${fmt(openPrice)}；最新收 ${fmt(latest.close)}，不能判作全程守住。`
+                : beganUp ? `首根收 ${fmt(first.close)} 高於開盤；尚待回落測試。` : '首根未先漲，不能套用此情境。';
+        states[1] = lossBar && latest.close < openPrice ? '跌破警示' : lossBar ? '曾跌破，已站回' : beganUp ? '未出現' : '不適用';
+        messages[1] = lossBar ? `相鄰完成 K 由開盤價上方收至 ${fmt(lossBar.close)}；最新收 ${fmt(latest.close)}。`
+            : beganUp ? `尚無相鄰完成 K 跌破開盤 ${fmt(openPrice)}。` : '首根未先漲，不能套用此情境。';
+        states[2] = failedReclaimBar && latest.close < openPrice ? '反彈受阻' : failedReclaimBar ? '曾受阻，已站回'
+            : beganDown ? '等待反彈' : '不適用';
+        messages[2] = failedReclaimBar ? `反彈曾觸及開盤 ${fmt(openPrice)} 卻收於下方；最新收 ${fmt(latest.close)}。`
+            : beganDown ? `首根收 ${fmt(first.close)} 低於開盤；尚待反彈測試。` : '首根未先跌，不能套用此情境。';
+        states[3] = gentleRise ? '溫和價量上行' : lastThree.length < 3 || lastThree.some(bar => !Number.isFinite(bar.average)) ? '資料不足' : '未符合';
+        messages[3] = gentleRise ? `近三根收盤緩升，均高於各自當根均價；最新量為前根 ${volumeRatio.toFixed(2)} 倍。`
+            : states[3] === '資料不足' ? '等待三根完成 K 與各根當時的均價。' : '緩升、逐根均價上方與溫和放量尚未同時成立。';
+        const summary = states[1] === '跌破警示' ? '先漲後失守開盤價，偏多假設受損'
+            : states[2] === '反彈受阻' ? '先跌後反彈受阻，短線偏弱'
+                : gentleRise ? '緩升且價量配合，等待延續確認'
+                    : heldOpen ? '回落守住開盤價，觀察第二次上攻'
+                        : beganUp ? '首根偏強，等待回落測試'
+                            : beganDown ? '首根偏弱，等待反彈測試' : '首根方向尚未明確';
+        return { count, high, low, latest, summary, states, messages };
+    }
+
+    // Reference images are examples. Report only measurable price/volume evidence.
+    function analyzeReferencePattern({ bars = [], action }) {
+        const none = { title: '尚無可核對的圖型', evidence: '需要連續已完成 K 與可比較的價量證據。', pending: '下一根完成 K 後再檢查。', reference: null };
+        if (!action?.openingComplete || !action.latest || !action.candleFresh) return none;
+        const latest = action.latest;
+        const ratio = Number.isFinite(action.ratio) ? action.ratio : null;
+        const ratioText = ratio === null ? '相對量未知' : `相對量 ${ratio.toFixed(2)} 倍`;
+        const fmt = value => Number(value).toFixed(2);
+        if (action.breakdown && Number.isFinite(action.currentPrice) && action.currentPrice > 0
+            && action.currentPrice < action.rangeLow) return {
+            title: `${ratio !== null && ratio >= 1.4 ? '跌破支撐' : '跌破支撐，放量待確認'} · 圖 5/5`, reference: 5,
+            evidence: `完成 K 收 ${fmt(latest.close)}、現價 ${fmt(action.currentPrice)}，均低於 OR30 下緣 ${fmt(action.rangeLow)}；${ratioText}。`,
+            pending: ratio !== null && ratio >= 1.4 ? '觀察後續是否延續或重新站回支撐。' : '圖中放量跌破條件尚未確認；觀察後續量能。'
+        };
+        if (action.falseBreakout && action.currentPrice <= action.rangeHigh) return { title: '上破後收回 · 圖 3/5', reference: 3,
+            evidence: `先前完成 K 上破 OR30 高點 ${fmt(action.rangeHigh)}，最新收 ${fmt(latest.close)} 返回其下。`,
+            pending: '等待後續 K 確認是否持續失守；不能只憑一根稱為完整假突破。' };
+        if (action.breakout && action.currentPrice > action.rangeHigh) return { title: `${action.acceptedBreakout ? '上破後持續站穩' : '初次帶量上破'} · 圖 3/5`, reference: 3,
+            evidence: `完成 K 收 ${fmt(latest.close)} 高於 OR30 高點 ${fmt(action.rangeHigh)}；${ratioText}。`,
+            pending: action.acceptedBreakout ? '觀察回測能否守住。' : '等待後續完成 K 站穩或回測。' };
+        if (action.resistanceRejection || action.failedGapRecovery || action.breakdownFailedRetest) return {
+            title: '阻力受阻線索 · 圖 1/5', reference: 1,
+            evidence: `最新完成 K 收 ${fmt(latest.close)}，出現近端阻力、缺口或跌破回測受阻。`,
+            pending: '僅有價格結構證據；無法由 K 線確認機構訂單塊。'
+        };
+        const consecutive = sequence => sequence.every((bar, index) => index === 0
+            || Number.isFinite(bar.start) && bar.start - sequence[index - 1].start === 300000);
+        const pivots = field => bars.flatMap((bar, index) => index > 0 && index < bars.length - 1
+            && consecutive(bars.slice(index - 1, index + 2))
+            && (field === 'high' ? bar.high > bars[index - 1].high && bar.high > bars[index + 1].high
+                : bar.low < bars[index - 1].low && bar.low < bars[index + 1].low) ? [{ bar, index }] : []);
+        for (const field of ['high', 'low']) {
+            const points = pivots(field), first = points.at(-2), second = points.at(-1);
+            if (!first || !second || second.index < bars.length - 5 || first.bar.volume <= 0) continue;
+            const priceExtends = field === 'high' ? second.bar.high > first.bar.high : second.bar.low < first.bar.low;
+            if (priceExtends && second.bar.volume <= first.bar.volume * 0.8) return {
+                title: `${field === 'high' ? '頂' : '底'}背離線索 · 圖 4/5`, reference: 4,
+                evidence: `已確認${field === 'high' ? '高' : '低'}點 ${fmt(first.bar[field])} → ${fmt(second.bar[field])}，對應量 ${Math.round(first.bar.volume)} → ${Math.round(second.bar.volume)} 張。`,
+                pending: '量能背離僅是警示；等待後續價格結構確認。'
+            };
+        }
+        const recent = bars.slice(-4);
+        if (recent.length === 4 && consecutive(recent)
+            && recent[0].close < recent[1].close && recent[1].close < recent[2].close
+            && recent[3].close < recent[2].close && recent[3].low >= action.openPrice
+            && recent[2].volume > 0 && recent[3].volume <= recent[2].volume * 0.8) return {
+            title: '上升後縮量回調 · 圖 5/5', reference: 5,
+            evidence: `前三根收盤走高，最新收 ${fmt(recent[3].close)} 回落但未破開盤 ${fmt(action.openPrice)}；量為前根 ${(recent[3].volume / recent[2].volume).toFixed(2)} 倍。`,
+            pending: '尚待支撐穩定及重新放量上攻，不能稱為趨勢延續。'
+        };
+        const three = bars.slice(-3);
+        if (three.length === 3 && consecutive(three) && three[0].volume > 0) {
+            const rising = three[0].close < three[1].close && three[1].close < three[2].close;
+            const falling = three[0].close > three[1].close && three[1].close > three[2].close;
+            const change = three[2].volume / three[0].volume;
+            if ((rising || falling) && (change >= 1.2 || change <= 0.8)) return {
+                title: `價${rising ? '漲' : '跌'}量${change >= 1.2 ? '增' : '縮'} · 圖 2/5`, reference: 2,
+                evidence: `近三根收盤 ${fmt(three[0].close)} → ${fmt(three[2].close)}；成交量 ${Math.round(three[0].volume)} → ${Math.round(three[2].volume)} 張。`,
+                pending: '仍是短窗價量觀察，等待後續 K 確認趨勢。'
+            };
+        }
+        return none;
+    }
+
+    // Use completed candles in chronological order. Earlier sessions may warm EMA20,
+    // while callers decide which session's marks to display.
+    function calculateHlSignals(data, period = 20) {
+        const ema = new Array(data.length).fill(null);
+        if (data.length >= period) {
+            let sum = 0;
+            for (let i = 0; i < period; i++) sum += data[i].close;
+            ema[period - 1] = sum / period;
+            for (let i = period; i < data.length; i++)
+                ema[i] = data[i].close * (2 / (period + 1)) + ema[i - 1] * (1 - 2 / (period + 1));
+        }
+        let hi = null, lo = null, legs = 0, dir = 0, waiting = false, prevBull = null, prevBear = null;
+        const signals = [];
+        for (let i = 1; i < data.length; i++) {
+            if (ema[i] === null) continue;
+            const c = data[i], p = data[i - 1], bull = c.close > ema[i], bear = c.close < ema[i];
+            let newHi = false, newLo = false, label = null;
+            if (bull && (hi === null || c.high > hi)) { hi = c.high; newHi = true; }
+            if (bear && (lo === null || c.low < lo)) { lo = c.low; newLo = true; }
+            if (prevBull !== null && ((bull && !prevBull) || (bear && !prevBear))) {
+                legs = 0; dir = 0; waiting = false; newHi = false; newLo = false;
+                hi = bull ? c.high : null; lo = bear ? c.low : null;
+            }
+            if (bull) {
+                if (newHi) { legs = 0; dir = 0; waiting = false; }
+                if (c.high < p.high && c.low < p.low && dir !== -1) { legs = legs === 0 ? 1 : 2; dir = -1; waiting = true; }
+                if (dir === -1 && c.high > p.high) { if (waiting) label = legs === 1 ? 'H1' : 'H2'; if (legs === 1) dir = 0; waiting = false; }
+            }
+            if (bear) {
+                if (newLo) { legs = 0; dir = 0; waiting = false; }
+                if (c.low > p.low && c.high > p.high && dir !== 1) { legs = legs === 0 ? 1 : 2; dir = 1; waiting = true; }
+                if (dir === 1 && c.low < p.low) { if (waiting) label = legs === 1 ? 'L1' : 'L2'; if (legs === 1) dir = 0; waiting = false; }
+            }
+            prevBull = bull; prevBear = bear;
+            if (label) signals.push({ start: c.start, label });
+        }
+        return { ema, signals };
+    }
+
     global.MarketData =
         Object.freeze({
             OBI_THRESHOLD,
@@ -1740,6 +1902,9 @@
             inferTickSize,
             roundToTick,
             calculateEntryAssessment,
-            analyzePriceAction
+            analyzePriceAction,
+            analyzeOpeningRules,
+            analyzeReferencePattern,
+            calculateHlSignals
         });
 })(window);

@@ -1,650 +1,435 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💻DK 邏輯交易計算器</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="./shared-market.js"></script>
-    <script src="./bridge-loader.js"></script>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#2563eb">
-    <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="shortcut icon" href="./icons/icon-192.png">
-    <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./notification-service-worker.js').catch(() => {}));</script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        input[type='number']::-webkit-inner-spin-button,
-        input[type='number']::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-        .animate-pulse { animation: pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TAR-OBI 盤中儀表板</title>
+  <script src="./shared-market.js?v=hl-signals-20261118"></script>
+  <script src="./bridge-loader.js"></script>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="shortcut icon" href="./icons/icon-192.png">
+  <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./notification-service-worker.js').catch(() => {}));</script>
+  <style>
+    :root{font-family:system-ui,'Microsoft JhengHei',sans-serif;color:#17233a;background:#f6f8fc}
+    *{box-sizing:border-box}body{margin:0}.app{max-width:1100px;margin:auto;padding:20px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #dce5ef;padding-bottom:14px}
+    h1{font-size:22px;margin:0}h1 small{font-size:13px;font-weight:400;color:#64748b}
+    .settings-toggle{font-size:13px;white-space:nowrap}
+    nav{display:flex;gap:7px;overflow:auto;padding:14px 0}nav span,nav a{white-space:nowrap;padding:8px 12px;border-radius:8px;color:#64748b;text-decoration:none}nav a{color:#1d4ed8}nav a:hover{background:#eaf2ff}nav .active{color:#1d4ed8;background:#eaf2ff;font-weight:700}
+    .source,.card{background:#fff;border:1px solid #dce5ef;border-radius:12px;padding:16px}.source{margin-bottom:14px}
+    form{display:flex;flex-wrap:wrap;align-items:end;gap:10px}label{font-size:12px;color:#475569;font-weight:700;display:grid;gap:4px}
+    input{font:inherit;border:1px solid #bfcde0;border-radius:8px;padding:10px 11px;min-height:42px;background:#fff;color:#17233a}
+    #symbol{width:110px}#settings-api-key{width:min(350px,70vw)}button{font:inherit;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px 15px;min-height:42px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+    .settings-panel{margin-bottom:14px}.settings-panel[hidden]{display:none}.settings-panel h2{font-size:16px;margin:0 0 12px}.settings-panel p{font-size:12px;color:#64748b;margin:8px 0 0}.settings-panel .secondary{background:#eef3fa;color:#334155}
+    #status{font-size:13px;color:#475569;margin:10px 0 0}#status.error{color:#b42318}#status.ok{color:#087040}
+    .topline{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:18px 0 10px}.topline h2{margin:0;font-size:17px}.time{font-size:12px;color:#64748b;text-align:right}
+    .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.kpi small{display:block;color:#64748b}.kpi strong{display:block;font-size:23px;margin:5px 0}.kpi span{font-size:12px;color:#475569}
+    .messagebar{margin:12px 0 16px;padding:12px 16px;background:#eaf2ff;border-radius:9px;font-weight:700;color:#184991}
+    .opening{margin:0 0 16px}.opening[hidden]{display:none}.opening-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.opening-head h2{font-size:17px;margin:0}.opening-head select{font:inherit;border:1px solid #bfcde0;border-radius:7px;background:#fff;padding:7px;color:#17233a}.opening-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opening-badge{font-size:12px;color:#33527b;background:#eef4fd;border-radius:6px;padding:7px 9px}
+    .opening-grid{display:grid;grid-template-columns:minmax(0,1fr) 1.5fr;gap:12px;margin-top:14px}.opening-focus{border-left:3px solid #2563eb;padding:6px 12px}.opening-focus small{color:#64748b}.opening-focus strong{display:block;font-size:18px;line-height:1.35;margin:6px 0}.opening-focus p{font-size:13px;color:#475569;margin:8px 0 0}.opening-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.opening-facts>div{background:#f6f8fc;border-radius:8px;padding:9px 11px;min-width:0}.opening-facts dt{font-size:11px;color:#64748b}.opening-facts dd{font-size:17px;font-weight:750;margin:4px 0 0;word-break:break-word}.opening-facts small{display:block;font-size:11px;font-weight:400;color:#64748b;margin-top:3px}.opening-levels{font-size:12px;color:#475569;padding:10px 0;border-bottom:1px solid #e5ebf2}.opening-rules{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.opening-rule{padding:9px 11px;background:#f6f8fc;border-left:3px solid #cbd5e1;border-radius:8px;font-size:12px}.opening-rule[data-tone="alert"]{border-left-color:#dc2626}.opening-rule[data-tone="positive"]{border-left-color:#059669}.opening-rule b{display:block;color:#334155}.opening-rule span{display:block;color:#2563eb;font-weight:700;margin:4px 0}.opening-rule[data-tone="alert"] span{color:#b42318}.opening-rule[data-tone="positive"] span{color:#087040}.opening-rule small{display:block;color:#64748b;line-height:1.4}
+    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}.card h3{font-size:15px;margin:0 0 10px}.big{font-size:18px;font-weight:800;min-height:27px}.detail{font-size:12px;color:#64748b;min-height:33px}
+    .stale-badge{display:inline-block;margin-left:5px;padding:2px 6px;border-radius:5px;background:#fff1f2;color:#b42318;font-size:11px}.stale-badge[hidden]{display:none}
+    .bounds{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#64748b;margin-top:10px}.card p{font-size:13px;color:#334155;border-top:1px solid #e5ebf2;padding-top:10px;margin:11px 0 0;min-height:55px}
+    .chart-card{margin-top:16px}.chart-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.chart-head h2{font-size:17px;margin:0}.tf{display:flex;gap:5px;flex-wrap:wrap}.tf button{background:#eef3fa;color:#334155;padding:7px 10px;min-height:36px}.tf button[aria-pressed=true]{background:#2563eb;color:#fff}
+    .chart-grid{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:16px;margin-top:12px}.plot{min-width:0}svg{width:100%;height:320px;display:block}.chart-note{font-size:12px;color:#64748b;margin-top:4px}
+    .reading{border-left:1px solid #dce5ef;padding-left:15px}.reading small{color:#64748b}.reading strong{display:block;font-size:17px;margin:3px 0 5px}.reading p{font-size:13px;color:#475569;margin:0 0 15px}.reading .pattern{border-top:1px solid #dce5ef;padding-top:12px}
+    .foot{font-size:12px;color:#64748b;margin-top:14px}
+    @media(max-width:760px){.app{padding:12px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.cards,.chart-grid,.opening-grid{grid-template-columns:1fr}.reading{border-left:0;border-top:1px solid #dce5ef;padding:12px 0 0}.topline{align-items:start;flex-direction:column;gap:4px}.time{text-align:left}}
+    @media(max-width:450px){.opening-rules{grid-template-columns:1fr}}
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-900">
-
-    <div id="app" class="min-h-screen pb-10 p-4 sm:p-6 flex justify-center">
-        <div class="max-w-lg w-full space-y-5">
-
-            <!-- Header -->
-            <div class="bg-gradient-to-r from-blue-700 to-blue-500 p-4 rounded-xl shadow-md">
-                <div class="flex items-center gap-3">
-                    <div class="bg-white/20 p-3 rounded-xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white w-6 h-6"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-extrabold text-white tracking-wide">DK 交易邏輯計算器</h1>
-                        <p class="text-xs text-blue-100">TAR (成交主動性) 與 OBI (掛單不平衡) 分析</p>
-                    </div>
-                </div>
-            </div>
-
-            <a id="entry-assessment-link" href="./entry-assessment.html?source=fugle" target="_blank" rel="noopener noreferrer"
-               class="flex items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-blue-200 shadow-sm text-blue-700 hover:bg-blue-50 transition-colors">
-                <div>
-                    <span class="text-sm font-bold">Intraday Entry Assessment / 盤中進場評估</span>
-                    <span class="block text-[10px] text-gray-500 mt-0.5">Open dedicated page / 在新分頁開啟</span>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-            </a>
-            <a id="daytrade-playbook-link" href="./daytrade-30m-playbook.html" target="_blank" rel="noopener noreferrer"
-               class="flex items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-indigo-200 shadow-sm text-indigo-700 hover:bg-indigo-50 transition-colors">
-                <div>
-                    <span class="text-sm font-bold">Intraday Market Structure / 盤中市場結構分析</span>
-                    <span class="block text-[10px] text-gray-500 mt-0.5">09:30 初判與盤中重新評估 / Fugle 5分K</span>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-            </a>
-            <!-- ===== Fugle API 區塊 ===== -->
-            <div class="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
-                <!-- 標題列 -->
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
-                        <span class="text-sm font-bold text-blue-600 uppercase tracking-wider">Fugle 行情 API</span>
-                    </div>
-                    <button id="toggle-api-panel" class="text-xs text-gray-400 hover:text-gray-600 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-gray-300">
-                        <span id="toggle-api-text">收起</span>
-                    </button>
-                </div>
-
-                <!-- 可收合面板 -->
-                <div id="api-settings-panel" class="space-y-3">
-
-                    <!-- 股票代碼 + 立即取得 -->
-                    <div class="flex gap-2">
-                        <div class="flex-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-bold tracking-wider block mb-1">股票代碼</label>
-                            <input id="symbol-input" type="text" maxlength="6" placeholder="如 2330、0050"
-                                   class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:outline-none uppercase"/>
-                        </div>
-                        <div class="flex flex-col justify-end">
-                            <label class="text-[10px] text-transparent uppercase font-bold tracking-wider block mb-1">.</label>
-                            <button id="fetch-btn"
-                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span id="fetch-btn-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="11" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
-                                </span>
-                                <span id="fetch-btn-text">立即取得</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- API Key -->
-                    <div>
-                        <label class="text-[10px] text-gray-500 uppercase font-bold tracking-wider block mb-1">Fugle API Key</label>
-                        <div class="relative">
-                            <input id="api-key-input" type="password" placeholder="輸入您的 Fugle Market Data API Key"
-                                   class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-600 font-mono text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:outline-none pr-10"/>
-                            <button id="toggle-key-visibility" title="顯示/隱藏"
-                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                                <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                <svg id="eye-off-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                            </button>
-                        </div>
-                        <p class="text-[10px] text-gray-400 mt-1">
-                            API Key 僅儲存於本機瀏覽器 (localStorage)，不會上傳。
-                            取得方式：<a href="https://developer.fugle.tw" target="_blank" class="text-blue-500 hover:text-blue-700 underline">developer.fugle.tw</a>
-                        </p>
-                    </div>
-
-                    <!-- 自動更新 + 狀態 -->
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer select-none">
-                            <div class="relative">
-                                <input type="checkbox" id="auto-refresh-toggle" class="sr-only peer"/>
-                                <div class="w-9 h-5 bg-gray-200 peer-checked:bg-blue-500 rounded-full transition-colors"></div>
-                                <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow"></div>
-                            </div>
-                            <span class="text-xs text-gray-500">每 <select id="refresh-interval" class="bg-transparent text-gray-600 text-xs focus:outline-none cursor-pointer">
-                                <option value="10">10</option>
-                                <option value="30" selected>30</option>
-                                <option value="60">60</option>
-                            </select> 秒自動更新</span>
-                        </label>
-                        <div id="api-status" class="text-xs text-gray-400 text-right max-w-[160px] truncate"></div>
-                    </div>
-
-                    <!-- 資料來源說明 -->
-                    <div class="text-[10px] text-gray-400 border-t border-gray-100 pt-2 leading-relaxed">
-                        外盤 ← <code class="text-gray-500">total.tradeVolumeAtAsk</code> &nbsp;|&nbsp;
-                        內盤 ← <code class="text-gray-500">total.tradeVolumeAtBid</code> &nbsp;|&nbsp;
-                        掛單 ← <code class="text-gray-500">bids/asks[].size</code> 加總
-                    </div>
-                </div>
-            </div>
-            <!-- ===== End Fugle API 區塊 ===== -->
-
-            <!-- VWAP 卡片（取得行情後顯示） -->
-            <div id="vwap-card" class="hidden bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">VWAP 均價 <span id="vwap-symbol" class="text-gray-300"></span></span>
-                        <span id="vwap-value" class="text-xl font-black text-gray-900 font-mono leading-tight">--</span>
-                    </div>
-                    <div class="flex flex-col items-end">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">現價</span>
-                        <span id="vwap-last-price" class="text-base font-bold text-gray-700 font-mono leading-tight">--</span>
-                        <span id="vwap-deviation" class="text-xs font-mono font-bold"></span>
-                    </div>
-                </div>
-                <div id="vwap-position" class="mt-2 text-xs font-bold text-center py-1 rounded-lg"></div>
-            </div>
-
-            <!-- 輸入區塊 -->
-            <div id="input-section" class="grid grid-cols-2 gap-4">
-                <!-- TAR Inputs -->
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                    <div class="flex items-center gap-2 text-yellow-600 mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                        <span class="text-sm font-bold uppercase tracking-wider">成交量 (TAR)</span>
-                    </div>
-                    <div id="ask-prints-container"></div>
-                    <div id="bid-prints-container"></div>
-                </div>
-
-                <!-- OBI Inputs -->
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                    <div class="flex items-center gap-2 text-purple-600 mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        <span class="text-sm font-bold uppercase tracking-wider">掛單量 (OBI)</span>
-                    </div>
-                    <div id="bid-qty-container"></div>
-                    <div id="ask-qty-container"></div>
-                </div>
-            </div>
-
-            <!-- 結果區塊 -->
-            <div id="results-area-top"></div>
-            <div id="results-area-bottom"></div>
-
-            <div class="text-xs text-center text-gray-400 mt-8">
-                <p>請將此頁面加入手機主畫面，以獲得最佳 App 體驗。</p>
-            </div>
-        </div>
+<body>
+<main class="app">
+  <header><h1>TAR-OBI <small>盤中儀表板</small></h1><button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">⚙ 設定</button></header>
+  <nav aria-label="TAR-OBI 頁面"><span class="active">總覽 Dashboard</span><a id="calculator-link" href="./calculator.html">TAR/OBI 計算器</a><a id="entry-link" href="./entry-assessment.html?source=fugle">盤中進場評估</a><a id="structure-link" href="./daytrade-30m-playbook.html">盤中市場結構</a></nav>
+  <section class="source settings-panel" id="settings-panel" aria-label="Fugle 設定" hidden>
+    <h2>Fugle API Key 設定</h2>
+    <form id="settings-form" autocomplete="off">
+      <label>Fugle API Key<input id="settings-api-key" type="password" autocomplete="off" spellcheck="false" required></label>
+      <button type="submit">儲存 Key</button>
+      <button id="settings-close" class="secondary" type="button">關閉</button>
+    </form>
+    <p id="settings-status" role="status" aria-live="polite">Key 儲存在此瀏覽器，供三個頁面共用。</p>
+  </section>
+  <section class="source" aria-label="股票選擇">
+    <form id="source-form" autocomplete="off">
+      <label>股票代碼<input id="symbol" value="2330" inputmode="text" spellcheck="false" required></label>
+      <button id="refresh" type="submit">取得即時資料</button>
+    </form>
+    <p id="status" role="status" aria-live="polite">選擇股票後取得行情；Fugle Key 可由右上角「設定」管理。</p>
+  </section>
+  <div class="topline"><h2 id="heading">今日盤中總覽</h2><span class="time" id="source-time">尚未取得行情</span></div>
+  <div class="kpis">
+    <section class="card kpi"><small>現價 / 對昨收</small><strong id="price">—</strong><span id="change">等待資料</span></section>
+    <section class="card kpi"><small>VWAP / 現價距離</small><strong id="vwap">—</strong><span id="vwap-diff">等待資料</span></section>
+    <section class="card kpi"><small>市場狀態</small><strong id="market-session">—</strong><span id="last-bar">完成K：—</span></section>
+    <section class="card kpi"><small>最新相對量</small><strong id="volume-ratio">—</strong><span id="volume-caption">等待資料</span></section>
+  </div>
+  <div class="messagebar" id="overall-message">輸入 Key 取得今日行情後，這裡會同時顯示盤勢觀察與進場評估的重點。</div>
+  <section class="card opening" id="opening-section" hidden>
+    <div class="opening-head"><h2>09:00–09:30 開盤觀察</h2><div class="opening-tools"><span class="opening-badge" id="opening-progress-text">等待首根完成 K</span><label>已完成 K 回看<select id="opening-replay"><option value="current">目前可用</option></select></label></div></div>
+    <div class="opening-grid"><div class="opening-focus"><small>開盤判讀</small><strong id="opening-read">等待開盤 K</strong><p id="opening-next">首根完成 K 後顯示價位與規則證據。</p></div>
+      <dl class="opening-facts" id="opening-evidence">
+        <div><dt>今日開盤</dt><dd id="opening-open">—</dd></div>
+        <div><dt>最新完成 K 收盤</dt><dd id="opening-last">—</dd></div>
+        <div><dt>當根累計均價</dt><dd id="opening-average">—</dd></div>
+        <div><dt>當根成交量</dt><dd id="opening-volume">—</dd><small id="opening-volume-relative">等待前根量</small></div>
+      </dl></div>
+    <div class="opening-levels" id="opening-range">暫定區間：等待開盤 K</div>
+    <div class="opening-rules">
+        <div class="opening-rule"><b>先漲後跌 · 守住開盤價</b><span id="opening-rule-1-state">待資料</span><small id="opening-rule-1-evidence">觀察回落是否守住開盤價與第二次上攻。</small></div>
+        <div class="opening-rule"><b>先漲後跌 · 快速跌破開盤價</b><span id="opening-rule-2-state">待資料</span><small id="opening-rule-2-evidence">觀察偏多假設是否失效。</small></div>
+        <div class="opening-rule"><b>先跌後反彈 · 過不了開盤價</b><span id="opening-rule-3-state">待資料</span><small id="opening-rule-3-evidence">觀察反彈能否站回開盤價。</small></div>
+        <div class="opening-rule"><b>小幅拉升 · 均價上方 · 溫和放量</b><span id="opening-rule-4-state">待資料</span><small id="opening-rule-4-evidence">使用每根 K 當時的均價與量能。</small></div>
     </div>
-
-    <script>
-        // ─── Data Maps ───────────────────────────────────────────────────────────
-
-        const MAP_DETAILED = {
-          "Strong Bid TAR|Bid-heavy OBI": { en: "Very strong buy pressure; breakout or sharp squeeze likely.", zh: "買盤極度強勢；極可能出現突破或軋空噴出。", pb_en: "Can chase long or add; use tight trailing stop above breakout level.", pb_zh: "可順勢追多或加碼；利用移動停損守在突破點之上。" },
-          "Strong Bid TAR|Balanced OBI": { en: "Aggressive buyers in control, but book not yet stretched.", zh: "主動買盤掌控局面，但掛單尚未過度延伸。", pb_en: "Buy pullbacks toward intraday support; trail stop under last swing low.", pb_zh: "拉回至盤中支撐位時做多；停損設在前波低點下方。" },
-          "Strong Bid TAR|Ask-heavy OBI": { en: "Strong buying vs a heavy ask wall (absorption).", zh: "強力買盤對抗厚重賣牆（籌碼吸收中）。", pb_en: "Only buy near strong support; partial size and quick to cut if wall holds.", pb_zh: "僅在強支撐附近小量試單；若賣牆遲遲不破，應快速離場。" },
-          "Bid-biased TAR|Bid-heavy OBI": { en: "Upward tilt; dip buyers and strong book support.", zh: "趨勢向上；低接買盤與掛單支撐強勁。", pb_en: "Buy on mild pullbacks; target VWAP/upper range; can hold with confidence.", pb_zh: "淺回檔即可做多；目標看向 VWAP 或區間上緣；持單信心度高。" },
-          "Bid-biased TAR|Balanced OBI": { en: "Gentle bullish bias; orderly uptrend or grind higher.", zh: "溫和偏多；有序上漲或盤堅。", pb_en: "Light long bias; buy near VWAP/support, avoid chasing highs.", pb_zh: "輕倉偏多操作；在 VWAP 或支撐附近買進，切勿追高。" },
-          "Bid-biased TAR|Ask-heavy OBI": { en: "Buyers active but facing strong overhead supply.", zh: "買方活躍但面臨上方沉重賣壓。", pb_en: "Range trade long near support, take profits quickly into resistance.", pb_zh: "區間操作：支撐做多，接近壓力區迅速獲利了結。" },
-          "Neutral TAR|Bid-heavy OBI": { en: "Quiet tape but strong bids parked below.", zh: "成交清淡但下方有強力買單停泊。", pb_en: "Buy near support/previous low with tight stop; fade breakdown attempts.", pb_zh: "在前低或支撐附近做多（嚴格停損）；若出現假跌破可逆勢做多。" },
-          "Neutral TAR|Balanced OBI": { en: "Sideways/mean-reversion regime.", zh: "橫盤整理/均值回歸狀態。", pb_en: "Range trade around VWAP; avoid breakout trades and oversized positions.", pb_zh: "圍繞 VWAP 區間操作；避免做突破單，部位不宜過大。" },
-          "Neutral TAR|Ask-heavy OBI": { en: "Passive ask pressure; slow drift or range with downward skew.", zh: "被動賣壓；緩跌或區間偏弱。", pb_en: "Scalp short near resistance; avoid aggressive longs until book relaxes.", pb_zh: "壓力區極短線放空；在賣壓減輕前避免積極做多。" },
-          "Ask-biased TAR|Bid-heavy OBI": { en: "Tape leaning down but book still supports on the bid.", zh: "成交偏弱但內盤掛單仍有支撐。", pb_en: "Only tactical longs near strong support; or very small shorts above VWAP.", pb_zh: "僅在強支撐附近嘗試戰術性做多；或在 VWAP 上方極輕倉放空。" },
-          "Ask-biased TAR|Balanced OBI": { en: "Mild selling pressure; slow bleed or choppy downside.", zh: "輕微賣壓；緩步盤跌或震盪向下。", pb_en: "Short bounces toward VWAP/resistance; keep targets modest.", pb_zh: "反彈至 VWAP 或壓力位時做空；獲利目標不宜過大。" },
-          "Ask-biased TAR|Ask-heavy OBI": { en: "Sellers pressing with a heavy ask wall.", zh: "賣方施壓且有厚重賣牆。", pb_en: "Short into pops; add near resistance; respect hard stops above wall.", pb_zh: "逢反彈做空；接近壓力區加碼；突破賣牆嚴格停損。" },
-          "Strong Ask TAR|Bid-heavy OBI": { en: "Aggressive selling into a strong bid base (possible battle/absorption).", zh: "強力賣壓撞擊強勁買盤基底（多空交戰/吸收）。", pb_en: "Wait for resolution; scalp both sides only at clear levels.", pb_zh: "等待方向明確；僅在明確的關鍵價位進行雙向極短線操作。" },
-          "Strong Ask TAR|Balanced OBI": { en: "Downside momentum dominant.", zh: "下跌動能主導。", pb_en: "Favour shorts; sell failed bounces; trail stop above last lower high.", pb_zh: "偏空操作；反彈失敗時放空；移動停損設在前波反彈高點上方。" },
-          "Strong Ask TAR|Ask-heavy OBI": { en: "Capitulation-style sell pressure; trend-down / potential flush.", zh: "投降式賣壓；趨勢向下或可能急殺。", pb_en: "Short rallies; can size up but lock in profits into spikes or key support.", pb_zh: "反彈即空；可放大部位，但急跌或遇關鍵支撐時需鎖定獲利。" }
-        };
-
-        const MAP_CORE = {
-          "Strong Bullish|Buy-heavy": { en: "Aggressive buyers + stacked bids; trend-up continuation most likely.", zh: "主動買盤 + 買牆偏多，續漲機率高。", pb_en: "Buy pullbacks above VWAP; add on ask-lifts that hold. Stop: below VWAP/last swing. Targets: HOD then +1~2 ticks.", pb_zh: "VWAP上方回檔偏多；遇抬價不回落可加碼。停損：VWAP或前低；目標：當日高、再上1~2檔。" },
-          "Strong Bullish|Balanced": { en: "Buy pressure strong; book neutral — can grind up but whips possible.", zh: "買壓強、簿平衡；偏磨高但易震盪。", pb_en: "Staggered scale‑in on dips above VWAP; avoid chasing. Stop: VWAP‑0.3~0.5%.", pb_zh: "VWAP上方分批承接，避免追價；停損：VWAP下方0.3~0.5%。" },
-          "Strong Bullish|Ask-heavy": { en: "Buy prints lead but asks reload — potential cap unless asks thin out.", zh: "買單主動但賣壓補量，可能壓頂。", pb_en: "Only buy after visible ask de‑queue at key level; quick stop if refills return.", pb_zh: "需見賣檔明顯消化再進；若再度補量立即停損。" },
-          "Neutral|Buy-heavy": { en: "Tape mixed but book supports — mean‑revert up toward VWAP/resistance.", zh: "成交中性、簿偏多；容易回升至VWAP/壓力位。", pb_en: "Fade weak dips into bid walls; take profits at VWAP/prev swing.", pb_zh: "靠買牆回補短多，於VWAP或前波高減碼。" },
-          "Neutral|Balanced": { en: "Two‑way chop; no edge without a catalyst/level.", zh: "雙向震盪；無明顯勝率。", pb_en: "Liquidity scalp only at mapped levels; tight stops.", pb_zh: "僅在關鍵價做流動性短單；嚴格停損。" },
-          "Neutral|Ask-heavy": { en: "Tape mixed but book leans ask — pops likely to fade.", zh: "成交中性、簿偏空；反彈易回落。", pb_en: "Fade pops into ask walls; cover near VWAP/prev swing low.", pb_zh: "靠賣牆逢高放空，回到VWAP或前低回補。" },
-          "Strong Bearish|Buy-heavy": { en: "Sellers hit tape but bids reload — risk of bear trap/bounce.", zh: "賣壓強但買牆補量，易假跌真彈。", pb_en: "Avoid chasing down; wait for failed breakdowns then quick long to VWAP.", pb_zh: "不追空！等破而不下後搶反彈至VWAP。" },
-          "Strong Bearish|Balanced": { en: "Sellers control tape, book neutral. Likely slow bleed lower.", zh: "賣方主控、簿平衡。走勢易緩跌。", pb_en: "Sell rallies towards VWAP; don't short the hole.", pb_zh: "反彈至VWAP附近做空；避免殺低。" },
-          "Strong Bearish|Ask-heavy": { en: "Aggressive selling + heavy asks pushing down. Trend continuation.", zh: "主動賣壓強 + 上方賣牆壓頂。空頭趨勢明確。", pb_en: "Short breakouts/breakdowns; add on bid-failures. Stop above recent lower-high.", pb_zh: "順勢做空；見買單竭盡加碼。停損設在近期反彈高點之上。" }
-        };
-
-        // ─── App State ───────────────────────────────────────────────────────────
-
-        let state = {
-            askPrints: 12570,
-            bidPrints: 17847,
-            bidQty: 11713,
-            askQty: 7270,
-        };
-
-        const inputFields = [
-            { key: 'askPrints', label: '外盤 (Ask Prints)', containerId: 'ask-prints-container', bull: true  },
-            { key: 'bidPrints', label: '內盤 (Bid Prints)', containerId: 'bid-prints-container', bull: false },
-            { key: 'bidQty',    label: '委託買入 (Bid Qty)', containerId: 'bid-qty-container',    bull: true  },
-            { key: 'askQty',    label: '委託賣出 (Ask Qty)', containerId: 'ask-qty-container',    bull: false },
-        ];
-
-        const resultAreaTop = document.getElementById('results-area-top');
-        const resultAreaBottom = document.getElementById('results-area-bottom');
-
-        // ─── Fugle API ────────────────────────────────────────────────────────────
-
-        const FUGLE_API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
-        const ASSESSMENT_REFRESH_KEY = 'tarObi.entryAssessment.refreshRequest';
-        let autoRefreshTimer = null;
-        let apiPanelOpen = true;
-
-        function updateEntryAssessmentLink() {
-            const symbol = (document.getElementById('symbol-input').value || '2330').trim().toUpperCase();
-            const interval = document.getElementById('refresh-interval').value || '30';
-            document.getElementById('entry-assessment-link').href = `./entry-assessment.html?symbol=${encodeURIComponent(symbol)}&source=fugle&interval=${encodeURIComponent(interval)}`;
-        }
-
-        function loadApiSettings() {
-            const savedKey      = localStorage.getItem('fugle_api_key')      || '';
-            const querySymbol   = new URLSearchParams(location.search).get('symbol');
-            const savedSymbol   = querySymbol || localStorage.getItem('fugle_symbol') || '2330';
-            const savedAuto     = localStorage.getItem('fugle_auto_refresh') === 'true';
-            const savedInterval = localStorage.getItem('fugle_interval')     || '30';
-
-            document.getElementById('api-key-input').value        = savedKey;
-            document.getElementById('symbol-input').value         = savedSymbol;
-            document.getElementById('auto-refresh-toggle').checked = savedAuto;
-            document.getElementById('refresh-interval').value     = savedInterval;
-            updateEntryAssessmentLink();
-
-            if (savedAuto && savedKey) startAutoRefresh();
-        }
-
-        function showApiStatus(msg, type) {
-            const el = document.getElementById('api-status');
-            const colors = {
-                success: 'text-green-600',
-                error:   'text-red-500',
-                loading: 'text-yellow-600',
-                info:    'text-gray-500',
-            };
-            el.className = `text-xs text-right max-w-[160px] truncate ${colors[type] || 'text-gray-500'}`;
-            el.textContent = msg;
-        }
-
-        function setFetchBtnState(loading) {
-            const btn      = document.getElementById('fetch-btn');
-            const iconSlot = document.getElementById('fetch-btn-icon');
-            const txtSlot  = document.getElementById('fetch-btn-text');
-            btn.disabled = loading;
-            if (loading) {
-                iconSlot.innerHTML = `<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
-                txtSlot.textContent = '取得中…';
-            } else {
-                iconSlot.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="11" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>`;
-                txtSlot.textContent = '立即取得';
-            }
-        }
-
-        async function fetchFugleData(notifyAssessment = false) {
-            if (document.getElementById('fetch-btn').disabled) return;
-            const apiKey = document.getElementById('api-key-input').value.trim();
-            const symbol = document.getElementById('symbol-input').value.trim().toUpperCase();
-
-            if (!symbol) { showApiStatus('請輸入股票代碼', 'error'); return; }
-            if (!apiKey)  { showApiStatus('請輸入 API Key',  'error'); return; }
-
-            localStorage.setItem('fugle_api_key', apiKey);
-            localStorage.setItem('fugle_symbol',  symbol);
-            if (notifyAssessment) localStorage.setItem(ASSESSMENT_REFRESH_KEY, JSON.stringify({ symbol, requestedAt: Date.now() }));
-            updateEntryAssessmentLink();
-
-            setFetchBtnState(true);
-            showApiStatus('連線中…', 'loading');
-
-            try {
-                const res = await fetch(
-                    `${FUGLE_API_BASE}/stock/intraday/quote/${symbol}`,
-                    { headers: { 'X-API-KEY': apiKey } }
-                );
-
-                if (res.status === 401) throw new Error('API Key 無效或過期');
-                if (res.status === 403) throw new Error('無存取權限');
-                if (res.status === 404) throw new Error(`找不到股票代碼 ${symbol}`);
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    throw new Error(body.message || `HTTP ${res.status}`);
-                }
-
-                const data = await res.json();
-
-                const askPrints = data.total?.tradeVolumeAtAsk ?? 0;
-                const bidPrints = data.total?.tradeVolumeAtBid ?? 0;
-                const bidQty    = (data.bids || []).reduce((s, b) => s + (b.size || 0), 0);
-                const askQty    = (data.asks || []).reduce((s, a) => s + (a.size || 0), 0);
-
-                if (askPrints === 0 && bidPrints === 0) {
-                    showApiStatus('資料全為 0，可能尚未開盤', 'info');
-                } else {
-                    const now = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    showApiStatus(`✓ ${symbol}  ${now}`, 'success');
-                }
-
-                state.askPrints = askPrints;
-                state.bidPrints = bidPrints;
-                state.bidQty    = bidQty;
-                state.askQty    = askQty;
-
-                ['askPrints','bidPrints','bidQty','askQty'].forEach(k => {
-                    const el = document.getElementById(`${k}-input`);
-                    if (el) el.value = state[k];
-                });
-
-                updateVwapCard(data, symbol);
-                updateResults();
-
-            } catch (err) {
-                console.error('[Fugle]', err);
-                const msg = err.message || '';
-                if (err instanceof TypeError || msg.toLowerCase().includes('fetch')) {
-                    showApiStatus('網路/CORS 錯誤：確認 Key 或本機開啟', 'error');
-                } else {
-                    showApiStatus(`錯誤：${msg}`, 'error');
-                }
-            } finally {
-                setFetchBtnState(false);
-            }
-        }
-
-        function updateVwapCard(data, symbol) {
-            const card      = document.getElementById('vwap-card');
-            const lastPrice = data.lastPrice ?? data.closePrice ?? null;
-
-            const vwap = MarketData.getVwap(data);
-
-
-            if (vwap == null || !(vwap > 0)) {
-                card.classList.add('hidden');
-                return;
-            }
-
-            document.getElementById('vwap-symbol').textContent     = symbol ? `(${symbol})` : '';
-            document.getElementById('vwap-value').textContent      = vwap.toFixed(2);
-            document.getElementById('vwap-last-price').textContent = lastPrice != null ? lastPrice.toFixed(2) : '--';
-
-            const devEl = document.getElementById('vwap-deviation');
-            const posEl = document.getElementById('vwap-position');
-
-            if (lastPrice != null) {
-                const devPct = ((lastPrice - vwap) / vwap) * 100;
-                const vwapPosition = MarketData.getVwapPosition(lastPrice, vwap);
-                const above = vwapPosition === 'Above VWAP', below = vwapPosition === 'Below VWAP';
-                devEl.textContent = `${devPct >= 0 ? '+' : ''}${devPct.toFixed(2)}% vs VWAP`;
-                devEl.className   = `text-xs font-mono font-bold ${above ? 'text-green-600' : below ? 'text-red-600' : 'text-blue-600'}`;
-                posEl.textContent = above ? '現價高於 VWAP（多方控盤區）' : below ? '現價低於 VWAP（空方控盤區）' : '現價貼近 VWAP（均衡區）';
-                posEl.className   = `mt-2 text-xs font-bold text-center py-1 rounded-lg ${above ? 'bg-green-50 text-green-700' : below ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`;
-            } else {
-                devEl.textContent = '';
-                posEl.textContent = '';
-                posEl.className   = 'mt-2';
-            }
-
-            card.classList.remove('hidden');
-        }
-
-        function startAutoRefresh() {
-            stopAutoRefresh();
-            const secs = parseInt(document.getElementById('refresh-interval').value, 10) || 30;
-            autoRefreshTimer = setInterval(fetchFugleData, secs * 1000);
-        }
-
-        function stopAutoRefresh() {
-            if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-        }
-
-        function bindApiControls() {
-            document.getElementById('fetch-btn').addEventListener('click', () => fetchFugleData(true));
-
-            document.getElementById('toggle-api-panel').addEventListener('click', () => {
-                apiPanelOpen = !apiPanelOpen;
-                document.getElementById('api-settings-panel').style.display = apiPanelOpen ? '' : 'none';
-                document.getElementById('toggle-api-text').textContent = apiPanelOpen ? '收起' : '展開';
-            });
-
-            document.getElementById('toggle-key-visibility').addEventListener('click', () => {
-                const inp = document.getElementById('api-key-input');
-                const isPassword = inp.type === 'password';
-                inp.type = isPassword ? 'text' : 'password';
-                document.getElementById('eye-icon').classList.toggle('hidden', isPassword);
-                document.getElementById('eye-off-icon').classList.toggle('hidden', !isPassword);
-            });
-
-            document.getElementById('auto-refresh-toggle').addEventListener('change', e => {
-                localStorage.setItem('fugle_auto_refresh', e.target.checked);
-                e.target.checked ? startAutoRefresh() : stopAutoRefresh();
-            });
-
-            document.getElementById('refresh-interval').addEventListener('change', e => {
-                localStorage.setItem('fugle_interval', e.target.value);
-                updateEntryAssessmentLink();
-                if (document.getElementById('auto-refresh-toggle').checked) startAutoRefresh();
-            });
-
-            document.getElementById('symbol-input').addEventListener('input', event => {
-                window.TarObiBridge?.handleSymbolInput(event.target.value);
-                updateEntryAssessmentLink();
-            });
-            document.getElementById('symbol-input').addEventListener('keydown', e => {
-                if (e.key === 'Enter') fetchFugleData(true);
-            });
-        }
-
-        // ─── Input Fields ─────────────────────────────────────────────────────────
-
-        function initInputField(field) {
-            const container = document.getElementById(field.containerId);
-            if (!container) return;
-
-            const color       = field.bull ? 'text-green-600' : 'text-red-600';
-            const focusBorder = field.bull ? 'focus:border-green-500' : 'focus:border-red-500';
-            const focusRing   = field.bull ? 'focus:ring-green-500/20' : 'focus:ring-red-500/20';
-            const labelColor  = field.bull ? 'text-green-600' : 'text-red-600';
-
-            container.innerHTML = `
-                <div>
-                    <div class="flex justify-between text-[10px] uppercase mb-1">
-                        <span class="${labelColor} font-bold">${field.label}</span>
-                        <span id="${field.key}-pct" class="${color} font-mono"></span>
-                    </div>
-                    <input
-                        type="number"
-                        id="${field.key}-input"
-                        value="${state[field.key]}"
-                        class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 ${color} font-mono text-base ${focusBorder} focus:ring-1 ${focusRing} focus:outline-none"
-                        min="0"
-                    />
-                </div>
-            `;
-
-            document.getElementById(`${field.key}-input`).addEventListener('input', e => {
-                state[field.key] = Number(e.target.value);
-                updateResults();
-            });
-        }
-
-        function updateInputPercentages(pcts) {
-            if (!pcts) return;
-            inputFields.forEach(field => {
-                const pctSpan = document.getElementById(`${field.key}-pct`);
-                let v = null;
-                if      (field.key === 'askPrints') v = pcts.tarAskPct;
-                else if (field.key === 'bidPrints') v = pcts.tarBidPct;
-                else if (field.key === 'bidQty')    v = pcts.obiBidPct;
-                else if (field.key === 'askQty')    v = pcts.obiAskPct;
-                if (pctSpan && v !== null) pctSpan.textContent = (v * 100).toFixed(1) + '%';
-            });
-        }
-
-        // ─── Rendering ────────────────────────────────────────────────────────────
-
-        function renderAnalysisBlock(title, data, tarKey, obiKey, isDetailed) {
-            let themeColor  = 'text-gray-600';
-            let themeBorder = 'border-gray-400';
-            let themeBg     = 'bg-gray-50';
-
-            if (isDetailed) {
-                if (tarKey.includes('Strong Bid') || tarKey.includes('Bid-biased'))
-                    { themeColor='text-green-700'; themeBorder='border-green-400'; themeBg='bg-green-50'; }
-                else if (tarKey.includes('Strong Ask') || tarKey.includes('Ask-biased'))
-                    { themeColor='text-red-700';   themeBorder='border-red-400';   themeBg='bg-red-50'; }
-                else { themeColor='text-blue-700'; themeBorder='border-blue-400';  themeBg='bg-blue-50'; }
-            } else {
-                if (tarKey.includes('Strong Bullish'))
-                    { themeColor='text-green-700'; themeBorder='border-green-400'; themeBg='bg-green-50'; }
-                else if (tarKey.includes('Strong Bearish'))
-                    { themeColor='text-red-700';   themeBorder='border-red-400';   themeBg='bg-red-50'; }
-                else { themeColor='text-blue-700'; themeBorder='border-blue-400';  themeBg='bg-blue-50'; }
-            }
-
-            const interpretationBorder = isDetailed ? 'border-gray-400'   : 'border-gray-500';
-            const playbookBorder       = isDetailed ? 'border-blue-400'   : 'border-yellow-400';
-
-            let obiDisplay = obiKey;
-            if (isDetailed) {
-                obiDisplay = obiKey.replace('Bid-heavy OBI','買厚').replace('Ask-heavy OBI','賣厚').replace('Balanced OBI','均衡');
-            } else {
-                obiDisplay = obiKey.replace('Buy-heavy','買厚').replace('Ask-heavy','賣厚').replace('Balanced','均衡');
-            }
-
-            const keyDisplay = isDetailed
-                ? tarKey.replace(' TAR','').replace('Bid','多頭').replace('Ask','空頭').replace('Neutral','中性').replace('biased','偏') + ' / ' + obiDisplay
-                : tarKey.replace('Bullish','多頭').replace('Bearish','空頭').replace('Neutral','中性') + ' / ' + obiDisplay;
-
-            return `
-                <div class="space-y-3">
-                    <div class="px-4 py-2 rounded-lg ${themeBg} border ${themeBorder}">
-                        <h3 class="text-base font-bold ${themeColor} leading-tight">${title}</h3>
-                        <p class="text-xs text-gray-500 font-medium">組合鍵: ${keyDisplay}</p>
-                    </div>
-                    <div class="bg-gray-50 p-3 rounded-lg border-l-4 ${interpretationBorder}">
-                        <div class="flex items-center gap-2 text-gray-500 font-bold uppercase tracking-widest mb-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 4 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 4 0 0 1 3-3h7z"/></svg>
-                            <span class="text-[10px]">趨勢解讀 (Interpretation)</span>
-                        </div>
-                        <p class="text-sm text-gray-900 font-bold mb-1 leading-snug">${data.zh}</p>
-                        <p class="text-xs text-gray-500 italic font-serif leading-snug">${data.en}</p>
-                    </div>
-                    <div class="bg-gray-50 p-3 rounded-lg border-l-4 ${playbookBorder}">
-                        <div class="flex items-center gap-2 font-bold uppercase tracking-widest mb-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            <span class="text-[10px] text-gray-500">DK 戰略提示 (Playbook Hint)</span>
-                        </div>
-                        <p class="text-sm text-gray-900 font-bold mb-1 leading-snug">${data.pb_zh}</p>
-                        <p class="text-xs text-gray-500 italic font-serif leading-snug">${data.pb_en}</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderIndexIndicator(label, index, bucketKey) {
-            const indexColor  = index > 0.1 ? 'text-green-600' : index < -0.1 ? 'text-red-600' : 'text-blue-600';
-            const maxAbsIndex = label === 'TAR' ? 0.40 : 0.20;
-            const barWidth    = Math.min((Math.abs(index) / maxAbsIndex) * 50, 50);
-            const barMargin   = index > 0 ? '50%' : `${50 - barWidth}%`;
-            const barBg       = index > 0 ? 'bg-green-500' : 'bg-red-500';
-
-            let zhBucketKey = bucketKey;
-            if (label === 'TAR') {
-                if      (zhBucketKey.includes('Strong Bid'))   zhBucketKey = '強勢多頭(≥+0.40)';
-                else if (zhBucketKey.includes('Bid-biased'))   zhBucketKey = '偏多區(+0.20~+0.40)';
-                else if (zhBucketKey.includes('Neutral'))      zhBucketKey = '中性區間(-0.10~+0.20)';
-                else if (zhBucketKey.includes('Ask-biased'))   zhBucketKey = '偏空區(-0.20~-0.10]';
-                else if (zhBucketKey.includes('Strong Ask'))   zhBucketKey = '強勢空頭(< -0.20)';
-            } else {
-                zhBucketKey = zhBucketKey.replace('Bid-heavy OBI','買厚(>+0.20)').replace('Ask-heavy OBI','賣厚(<-0.20)').replace('Balanced OBI','均衡區(±0.20)');
-            }
-
-            return `
-                <div class="bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
-                    <div class="flex flex-col">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">${label} 指數與分級</span>
-                        <span class="text-sm font-black ${indexColor} leading-tight">${zhBucketKey}</span>
-                    </div>
-                    <div class="w-32 flex flex-col items-end">
-                        <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden relative mb-1">
-                            <div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-gray-400/40"></div>
-                            <div style="width:${barWidth}%; margin-left:${barMargin};" class="h-full transition-all ${barBg}"></div>
-                        </div>
-                        <span class="text-sm text-gray-500 font-mono font-bold">${index.toFixed(4)}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        // ─── Core Calculation ─────────────────────────────────────────────────────
-
-        function updateResults() {
-            const { askPrints, bidPrints, bidQty, askQty } = state;
-            const metrics = MarketData.calculateTarObi(askPrints, bidPrints, bidQty, askQty);
-
-            if (!metrics) {
-                resultAreaTop.innerHTML = '<p class="text-center text-gray-400 mt-6">請輸入大於零的數據以計算結果。</p>';
-                resultAreaBottom.innerHTML = '';
-                updateInputPercentages(null);
-                return;
-            }
-
-            const { tarAskPct, tarBidPct, tarIndex, obiBidPct, obiAskPct, obiIndex, obiKey, detTarKey, coreTarKey, coreObiKey } = metrics;
-            const keyDetailed  = `${detTarKey}|${obiKey}`;
-            const dataDetailed = MAP_DETAILED[keyDetailed] || { en:'N/A', zh:'N/A', pb_en:'N/A', pb_zh:'N/A' };
-
-            const keyCore  = `${coreTarKey}|${coreObiKey}`;
-            const dataCore = MAP_CORE[keyCore] || { en:'N/A', zh:'N/A', pb_en:'N/A', pb_zh:'N/A' };
-
-            updateInputPercentages({ tarAskPct, tarBidPct, obiBidPct, obiAskPct });
-
-            resultAreaTop.innerHTML = `
-                <div class="space-y-5">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        ${renderIndexIndicator('TAR', tarIndex, detTarKey)}
-                        ${renderIndexIndicator('OBI', obiIndex, obiKey)}
-                    </div>
-                    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden p-5">
-                        ${renderAnalysisBlock('15-Key 詳細組合分析 (五級分判斷)', dataDetailed, detTarKey, obiKey, true)}
-                    </div>
-                </div>
-            `;
-            resultAreaBottom.innerHTML = `
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden p-5">
-                    ${renderAnalysisBlock('9-Key 核心趨勢分析 (三級分判斷 ±0.10)', dataCore, coreTarKey, coreObiKey, false)}
-                </div>
-            `;
-        }
-
-        // ─── Init ─────────────────────────────────────────────────────────────────
-
-        function setupApp() {
-            inputFields.forEach(initInputField);
-            bindApiControls();
-            loadApiSettings();
-            window.TarObiBridge?.populateLinkedTicker(document.getElementById('symbol-input'));
-            updateEntryAssessmentLink();
-            updateResults();
-        }
-
-        window.onload = setupApp;
-    </script>
+  </section>
+  <section class="card chart-card"><div class="chart-head"><h2>今日 K 線與趨勢</h2><div class="tf" role="group" aria-label="K 線週期"><button type="button" data-tf="5" aria-pressed="true">5 分</button><button type="button" data-tf="15" aria-pressed="false">15 分</button><button type="button" data-tf="30" aria-pressed="false">30 分</button><button type="button" data-tf="60" aria-pressed="false">60 分</button><button type="button" data-tf="120" aria-pressed="false">120 分</button></div></div>
+    <div class="chart-grid"><div class="plot"><svg id="chart" role="img" aria-label="今日 K 線圖"></svg><div class="chart-note" id="chart-note">僅顯示今日；EMA20 與 H1/H2/L1/L2 可使用前日已完成 K 預熱。</div></div>
+      <aside class="reading"><div><small>所選週期趨勢</small><strong id="trend">等待 K 線</strong><p id="trend-evidence">僅以已完成 K 棒判讀；形成中的 K 棒只在圖上標示。</p></div><div class="pattern"><small>Price Action/價格行為</small><strong id="pattern-title">等待資料</strong><p id="pattern-evidence">只顯示可核對的價格與量能線索。</p><p id="pattern-pending">—</p></div></aside></div>
+  </section>
+  <div class="cards">
+    <section class="card"><h3>TAR/OBI 計算器 <span id="tar-obi-stale" class="stale-badge" hidden>已過期</span></h3><div class="big" id="tar-obi">—</div><div class="detail" id="tar-obi-detail">等待成交與五檔資料</div><p id="tar-obi-message">等待資料。</p></section>
+    <section class="card"><h3>盤中進場評估 <span id="entry-stale" class="stale-badge" hidden>已過期</span></h3><div class="big" id="entry-state">—</div><div class="detail" id="entry-detail">等待即時報價與評估</div><div class="bounds"><span id="entry-low">區間低 —</span><span id="entry-high">區間高 —</span></div><p id="entry-message">等待資料。</p></section>
+    <section class="card"><h3>盤中市場結構 · OR30 位置 <span id="structure-stale" class="stale-badge" hidden>已過期</span></h3><div class="big" id="structure-state">—</div><div class="detail" id="structure-detail">等待六根已完成開盤 5 分K</div><div class="bounds"><span id="or-low">OR30 低 —</span><span id="or-high">OR30 高 —</span></div><p id="structure-message">等待資料。</p></section>
+  </div>
+  <p class="foot">開盤規則與價格行為判讀和 Market Structure 子頁共用；Entry Assessment 仍使用原規則。歷史資料不可用時顯示缺口，不以形成中的 K 棒產生 H/L 訊號。</p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const API = 'https://api.fugle.tw/marketdata/v1.0/stock';
+  const periods = [5, 15, 30, 60, 120];
+  let selected = 5;
+  let snapshot = null;
+  let fetching = false;
+  let historyCache = { symbol: '', date: '', payload: null, loading: false, retryAfter: 0 };
+  const format = value => Number.isFinite(value) ? value.toFixed(2) : '—';
+  const taipei = date => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).reduce((result, part) => { result[part.type] = part.value; return result; }, {});
+  const timeLabel = ms => ms ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms)) : '—';
+  function setStatus(message, kind = '') { $('status').textContent = message; $('status').className = kind; }
+  function setDataStale(stale) { ['tar-obi-stale', 'entry-stale', 'structure-stale'].forEach(id => { $(id).hidden = !stale; }); }
+  function updatePageLinks() {
+    const symbol = $('symbol').value.trim().toUpperCase();
+    if (!/^[A-Z0-9]+$/.test(symbol)) return;
+    const encoded = encodeURIComponent(symbol);
+    $('calculator-link').href = './calculator.html?symbol=' + encoded;
+    $('entry-link').href = './entry-assessment.html?symbol=' + encoded + '&source=fugle';
+    $('structure-link').href = './daytrade-30m-playbook.html?symbol=' + encoded;
+  }
+  function showSettings(open) {
+    $('settings-panel').hidden = !open;
+    $('settings-toggle').setAttribute('aria-expanded', String(open));
+    if (open) {
+      $('settings-status').textContent = localStorage.getItem('fugle_api_key')
+        ? '已儲存 Key；輸入新 Key 可更新。' : '尚未設定 Fugle Key。';
+      $('settings-api-key').focus();
+    }
+  }
+  function barsFrom(payload) {
+    const seen = new Set();
+    return (Array.isArray(payload?.data) ? payload.data : []).map(item => {
+      const start = Date.parse(item?.date || '');
+      const open = Number(item?.open), high = Number(item?.high), low = Number(item?.low), close = Number(item?.close), volume = Number(item?.volume);
+      if (!Number.isFinite(start) || ![open, high, low, close, volume].every(Number.isFinite) || volume < 0 || seen.has(start)) return null;
+      seen.add(start);
+      const p = taipei(new Date(start));
+      const average = Number(item?.average);
+      return { start, date: p.year + '-' + p.month + '-' + p.day, minute: Number(p.hour) * 60 + Number(p.minute), open, high, low, close, volume, average: Number.isFinite(average) && average > 0 ? average : null };
+    }).filter(Boolean).sort((a, b) => a.start - b.start);
+  }
+  function openingEvidence(rules, latest, openPrice) {
+    if (!latest || !Number.isFinite(openPrice)) return '首根完成 K 後顯示價位與規則證據。';
+    const comparison = (label, value) => latest.close === value ? '與' + label + ' ' + format(value) + ' 持平'
+      : '較' + label + ' ' + format(value) + (latest.close > value ? ' 高 ' : ' 低 ') + format(Math.abs(latest.close - value));
+    const prices = ['收盤 ' + format(latest.close)];
+    if (Number.isFinite(latest.average)) prices.push(comparison('當根累計均價', latest.average));
+    prices.push(comparison('開盤價', openPrice));
+    if (Number.isFinite(rules.low)) prices.push('暫定低點 ' + format(rules.low));
+    const state = rules.states[1] === '跌破警示' ? '第二條已出現：相鄰完成 K 由開盤價上方收至下方。'
+      : rules.states[2] === '反彈受阻' ? '第三條已出現：反彈曾觸及開盤價並收於其下。'
+        : rules.states[1] === '曾跌破，已站回' ? '第二條曾出現，之後已站回開盤價。'
+          : rules.states[2] === '曾受阻，已站回' ? '第三條曾出現，之後已站回開盤價。'
+            : rules.states[0] === '守住，觀察再攻' ? '第一條的回落守價條件已出現。'
+              : rules.states[3] === '溫和價量上行' ? '第四條的緩升、均價與量能條件已出現。'
+                : rules.states[2] === '等待反彈' ? '第三條未觸發：首根後尚無反彈 K 觸及開盤價並收於其下。'
+                  : '四條規則尚無已確認的完整情境。';
+    return prices.join('；') + '。' + state;
+  }
+  function renderOpening(quote, today, session) {
+    const start = Date.parse(quote.date + 'T09:00:00+08:00');
+    const prefix = [];
+    for (let i = 0; i < 6; i++) {
+      const bar = today.find(item => item.start === start + i * 300000);
+      if (!bar) break;
+      prefix.push(bar);
+    }
+    const select = $('opening-replay'), previousSelection = select.value;
+    while (select.options.length > 1) select.remove(1);
+    for (let i = 1; i <= prefix.length; i++) {
+      const option = document.createElement('option');
+      option.value = String(i);
+      option.textContent = '截至 ' + timeLabel(prefix[i - 1].start + 300000) + '（' + i + '/6）';
+      select.appendChild(option);
+    }
+    select.value = previousSelection !== 'current' && Number(previousSelection) <= prefix.length ? previousSelection : 'current';
+    const count = select.value === 'current' ? prefix.length : Number(select.value);
+    const observed = prefix.slice(0, count);
+    const quoteOpen = Number(quote.openPrice);
+    const openPrice = Number.isFinite(quoteOpen) && quoteOpen > 0 ? quoteOpen : observed[0]?.open;
+    const rules = MarketData.analyzeOpeningRules(observed, openPrice);
+    const high = rules.high, low = rules.low;
+    $('opening-section').hidden = false;
+    $('opening-read').textContent = rules.summary;
+    const latest = observed.at(-1), prior = observed.at(-2);
+    $('opening-open').textContent = format(openPrice);
+    $('opening-last').textContent = latest ? format(latest.close) : '—';
+    $('opening-average').textContent = latest ? format(latest.average) : '—';
+    $('opening-volume').textContent = latest ? Math.round(latest.volume).toLocaleString('en-US') + ' 張' : '—';
+    $('opening-volume-relative').textContent = prior?.volume > 0 ? '前根 ' + (latest.volume / prior.volume).toFixed(2) + ' 倍' : '等待前根量';
+    $('opening-range').textContent = latest ? (count === 6 ? 'OR30' : '暫定區間') + '：高 ' + format(high) + '／低 ' + format(low)
+      + ' · 最新收盤較開盤 ' + (latest.close >= openPrice ? '+' : '') + format(latest.close - openPrice) : '暫定區間：等待開盤 K';
+    $('opening-next').textContent = openingEvidence(rules, latest, openPrice);
+    $('opening-progress-text').textContent = (latest ? '截至 ' + timeLabel(latest.start + 300000) + ' · ' : '')
+      + count + '/6' + (select.value === 'current' ? '' : ' · 回看') + (session === 'live' ? '' : ' · 非即時');
+    for (let i = 0; i < 4; i++) {
+      $('opening-rule-' + (i + 1) + '-state').textContent = rules.states[i];
+      $('opening-rule-' + (i + 1) + '-evidence').textContent = rules.messages[i];
+      const tone = ['跌破警示', '反彈受阻', '開盤價已失守'].includes(rules.states[i]) ? 'alert'
+        : ['守住，觀察再攻', '溫和價量上行'].includes(rules.states[i]) ? 'positive' : 'neutral';
+      $('opening-rule-' + (i + 1) + '-state').parentElement.dataset.tone = tone;
+    }
+    return { count, summary: rules.summary, high, low };
+  }
+  function aggregate(source, period, today, asOf) {
+    if (period === 5) return source.filter(bar => bar.start + 300000 <= asOf).map(bar => ({ ...bar, complete: true, sessionShort: bar.minute === 810 }));
+    const groups = new Map();
+    for (const bar of source) {
+      if (bar.minute < 540 || bar.minute >= 810) continue;
+      const bucket = Math.floor((bar.minute - 540) / period);
+      const key = bar.date + ':' + bucket;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(bar);
+    }
+    return [...groups.values()].map(group => {
+      const first = group[0], last = group.at(-1), bucket = Math.floor((first.minute - 540) / period);
+      const start = Date.parse(first.date + 'T09:00:00+08:00') + bucket * period * 60000;
+      const endMinute = Math.min(540 + (bucket + 1) * period, 810);
+      const end = Date.parse(first.date + 'T00:00:00+08:00') + endMinute * 60000;
+      return { start, date: first.date, minute: 540 + bucket * period, open: first.open, high: Math.max(...group.map(b => b.high)), low: Math.min(...group.map(b => b.low)), close: last.close, volume: group.reduce((sum, b) => sum + b.volume, 0), average: last.average, complete: first.date !== today || asOf >= end, sessionShort: endMinute - (540 + bucket * period) < period };
+    }).sort((a, b) => a.start - b.start);
+  }
+  function drawChart(bars, emaValues, signals, vwap, openPrice, orHigh, orLow, period, currentPrice) {
+    const svg = $('chart');
+    const w = Math.max(300, Math.round(svg.clientWidth) || 660), h = 320, left = 44, right = w - 72, top = 20, bottom = 238;
+    if (!bars.length) { svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); svg.innerHTML = '<text x="20" y="145" fill="#64748b">此週期尚無今日 K 棒</text>'; return; }
+    const levels = [vwap, openPrice, orHigh, orLow, currentPrice].filter(Number.isFinite);
+    const low = Math.min(...bars.map(b => b.low), ...levels);
+    const high = Math.max(...bars.map(b => b.high), ...levels);
+    const pad = Math.max((high - low) * .12, high * .001), lo = low - pad, hi = high + pad;
+    const y = value => top + (hi - value) / (hi - lo) * (bottom - top);
+    const step = (right - left) / bars.length, x = i => left + step * (i + .5), body = Math.max(2, Math.min(11, step * .54));
+    let html = '<title>今日 ' + period + ' 分 K、成交量及指標</title>';
+    for (let i = 0; i < 4; i++) { const price = lo + (hi - lo) * (3 - i) / 3, yy = y(price); html += '<line x1="' + left + '" y1="' + yy + '" x2="' + right + '" y2="' + yy + '" stroke="#e2e8f0"/><text x="2" y="' + (yy + 4) + '" font-size="11" fill="#64748b">' + format(price) + '</text>'; }
+    if (Number.isFinite(openPrice)) html += '<line x1="' + left + '" y1="' + y(openPrice) + '" x2="' + right + '" y2="' + y(openPrice) + '" stroke="#475569" stroke-dasharray="2 4"/>';
+    if (Number.isFinite(orHigh)) html += '<line x1="' + left + '" y1="' + y(orHigh) + '" x2="' + right + '" y2="' + y(orHigh) + '" stroke="#74869e" stroke-dasharray="4 4"/>';
+    if (Number.isFinite(orLow)) html += '<line x1="' + left + '" y1="' + y(orLow) + '" x2="' + right + '" y2="' + y(orLow) + '" stroke="#74869e" stroke-dasharray="4 4"/>';
+    if (Number.isFinite(vwap)) html += '<line x1="' + left + '" y1="' + y(vwap) + '" x2="' + right + '" y2="' + y(vwap) + '" stroke="#db9030" stroke-dasharray="6 4"/>';
+    if (Number.isFinite(currentPrice)) html += '<line x1="' + left + '" y1="' + y(currentPrice) + '" x2="' + right + '" y2="' + y(currentPrice) + '" stroke="#0284c7" stroke-dasharray="2 3"/><text x="' + (right + 5) + '" y="' + (y(currentPrice) + 4) + '" font-size="11" font-weight="700" fill="#0284c7">現價 ' + format(currentPrice) + '</text>';
+    const maxVolume = Math.max(...bars.map(b => b.volume), 1);
+    bars.forEach((b, i) => { const color = b.close >= b.open ? '#149965' : '#cb4f4f', xx = x(i), y1 = y(b.high), y2 = y(b.low), bt = Math.min(y(b.open), y(b.close)), bh = Math.max(2, Math.abs(y(b.open) - y(b.close))), volH = b.volume / maxVolume * 52; html += '<line x1="' + xx + '" y1="' + y1 + '" x2="' + xx + '" y2="' + y2 + '" stroke="' + color + '"' + (b.complete ? '' : ' stroke-dasharray="3 2"') + '/><rect x="' + (xx - body / 2) + '" y="' + bt + '" width="' + body + '" height="' + bh + '" fill="' + (b.complete ? color : 'none') + '" stroke="' + color + '"/><rect x="' + (xx - body / 2) + '" y="' + (296 - volH) + '" width="' + body + '" height="' + volH + '" fill="' + color + '" opacity=".55"/>'; });
+    const emaPoints = bars.map((b, i) => Number.isFinite(emaValues.get(b.start)) ? x(i) + ',' + y(emaValues.get(b.start)) : null).filter(Boolean);
+    if (emaPoints.length > 1) html += '<polyline fill="none" stroke="#2763d6" stroke-width="2" points="' + emaPoints.join(' ') + '"/>';
+    const averagePoints = bars.map((b, i) => Number.isFinite(b.average) ? x(i) + ',' + y(b.average) : null).filter(Boolean);
+    if (averagePoints.length > 1) html += '<polyline fill="none" stroke="#7c3aed" stroke-width="1.8" points="' + averagePoints.join(' ') + '"/>';
+    signals.forEach(signal => { const i = bars.findIndex(b => b.start === signal.start); if (i >= 0) html += '<text x="' + Math.max(left, x(i) - 11) + '" y="' + Math.max(13, y(bars[i].high) - 8) + '" font-size="11" font-weight="700" fill="' + (signal.label[0] === 'H' ? '#0b70be' : '#b35a19') + '">' + signal.label + '</text>'; });
+    html += '<text x="' + left + '" y="314" font-size="11" fill="#64748b">09:00</text><text x="' + (right - 48) + '" y="314" font-size="11" fill="#64748b">' + timeLabel(bars.at(-1).start) + '</text>';
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); svg.innerHTML = html;
+  }
+  function renderChart() {
+    if (!snapshot) return;
+    const { quote, today, history, asOf, vwap, orHigh, orLow, openingHigh, openingLow, session } = snapshot;
+    const all = aggregate([...history, ...today], selected, quote.date, asOf);
+    const chartBars = all.filter(b => b.date === quote.date);
+    const calculation = all.filter(b => b.complete && !b.sessionShort);
+    const { ema, signals: allSignals } = MarketData.calculateHlSignals(calculation);
+    const emaValues = new Map(calculation.map((b, i) => [b.start, ema[i]]));
+    const signals = allSignals.filter(s => chartBars.some(b => b.start === s.start));
+    const openPrice = Number(quote.openPrice);
+    const current = Number(quote.lastPrice ?? quote.closePrice);
+    const currentPrice = session === 'live' && Number.isFinite(current) && current > 0 ? current : null;
+    drawChart(chartBars, emaValues, signals, vwap, Number.isFinite(openPrice) && openPrice > 0 ? openPrice : null,
+      orHigh ?? openingHigh, orLow ?? openingLow, selected, currentPrice);
+    const last = calculation.filter(b => b.date === quote.date).at(-1);
+    const lastIndex = last ? calculation.indexOf(last) : -1;
+    const bias = last && Number.isFinite(ema[lastIndex]) ? last.close > ema[lastIndex] ? 'EMA20 上方' : last.close < ema[lastIndex] ? 'EMA20 下方' : '接近 EMA20' : 'EMA20 資料不足';
+    $('trend').textContent = last ? selected + ' 分 · ' + bias : selected + ' 分 · 尚無完成 K';
+    $('trend-evidence').textContent = last ? '最新完成K ' + timeLabel(last.start) + ' 收 ' + format(last.close) + '；' + bias + '。' + (signals.length ? '今日曾標記 ' + signals.at(-1).label + '（' + timeLabel(signals.at(-1).start) + '），是當時事件，非目前進場訊號。' : '今日尚無 H/L 標記。') : '此週期目前只有形成中的 K；等待完成後才判讀。';
+    $('chart-note').textContent = '今日 ' + selected + ' 分 K ' + chartBars.length + ' 根（' + (chartBars.some(b => !b.complete) ? '含形成中 K' : '均已完成') + '）' + (selected === 5 ? '' : '；由 5 分 K 合成') + '；EMA20 與 H/L 使用 ' + (history.length ? '前日已完成 K 預熱' : '今日可用 K，歷史資料未取得') + '。' + (chartBars.some(b => b.sessionShort) ? '尾盤不足 ' + selected + ' 分的 K 會顯示，但不參與趨勢及 EMA20/H/L 判讀。' : '') + '藍線 EMA20、紫線逐根均價、橘線目前 VWAP、深灰開盤、淺灰' + (Number.isFinite(orHigh) ? ' OR30' : '暫定區間') + '高低' + (Number.isFinite(currentPrice) ? '、天藍虛線現價' : '') + '。';
+    document.querySelectorAll('[data-tf]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.tf) === selected)));
+  }
+  function render(quote, candlePayload, historicalPayload) {
+    const now = Date.now();
+    const quoteTime = MarketData.timestampToMs(quote?.lastUpdated || quote?.lastTrade?.time || quote?.closeTime);
+    const asOf = Math.min(now, quoteTime || 0);
+    const session = MarketData.getMarketSession(quote, 30000, new Date(now));
+    const today = barsFrom(candlePayload).filter(bar => bar.date === quote.date && bar.start + 300000 <= asOf);
+    const history = barsFrom(historicalPayload).filter(bar => bar.date < quote.date);
+    const completedOpening = Array.from({ length: 6 }, (_, i) => today.find(bar => bar.start === Date.parse(quote.date + 'T09:00:00+08:00') + i * 300000));
+    const readyOpening = completedOpening.every(Boolean);
+    const orHigh = readyOpening ? Math.max(...completedOpening.map(b => b.high)) : null;
+    const orLow = readyOpening ? Math.min(...completedOpening.map(b => b.low)) : null;
+    const current = Number(quote.lastPrice ?? quote.closePrice), previousClose = Number(quote.previousClose);
+    const price = Number.isFinite(current) && current > 0 ? current : null;
+    const vwap = MarketData.getVwap(quote);
+    const askPrints = Number(quote.total?.tradeVolumeAtAsk) || 0, bidPrints = Number(quote.total?.tradeVolumeAtBid) || 0;
+    const bidQty = (quote.bids || []).reduce((sum, item) => sum + (Number(item.size) || 0), 0);
+    const askQty = (quote.asks || []).reduce((sum, item) => sum + (Number(item.size) || 0), 0);
+    const metrics = MarketData.calculateTarObi(askPrints, bidPrints, bidQty, askQty);
+    const quality = MarketData.calculateVolumeQuality(candlePayload, quoteTime, session);
+    const assessment = MarketData.calculateEntryAssessment({ current: price, bid: Number(quote.bids?.[0]?.price), ask: Number(quote.asks?.[0]?.price), vwap, tick: MarketData.inferTickSize(quote), timestamp: quoteTime, session, tar: MarketData.getTarContext(metrics?.detTarKey), obi: MarketData.getObiContext(metrics?.obiKey), openingContext: { previousClose: quote.previousClose, openPrice: quote.openPrice, openTime: quote.openTime, marketDate: quote.date, candles: candlePayload }, entryBasis: 'combined', invalidationBasis: 'match', volumeQuality: quality.quality });
+    const action = MarketData.analyzePriceAction({ candles: candlePayload, quote, vwap, now });
+    snapshot = { quote, today, history, asOf, vwap, orHigh, orLow, session };
+    $('opening-replay').value = 'current';
+    const openingView = renderOpening(quote, today, session);
+    snapshot.openingHigh = openingView.high;
+    snapshot.openingLow = openingView.low;
+    $('heading').textContent = quote.symbol + (quote.name ? ' · ' + quote.name : '') + ' · 今日盤中總覽';
+    $('source-time').textContent = 'Fugle 報價 ' + timeLabel(quoteTime) + ' · 已完成 5 分 K ' + timeLabel(today.at(-1)?.start + 300000 || 0);
+    $('price').textContent = format(price);
+    const diff = Number.isFinite(price) && Number.isFinite(previousClose) ? price - previousClose : null;
+    $('change').textContent = Number.isFinite(diff) && previousClose > 0 ? (diff >= 0 ? '+' : '') + format(diff) + ' / ' + (diff / previousClose * 100).toFixed(2) + '%' : '昨收資料不足';
+    $('vwap').textContent = format(vwap);
+    $('vwap-diff').textContent = Number.isFinite(price) && Number.isFinite(vwap) ? '現價相對 VWAP ' + (price >= vwap ? '+' : '') + format(price - vwap) : 'VWAP 資料不足';
+    $('market-session').textContent = session === 'live' ? 'LIVE' : session.toUpperCase();
+    $('last-bar').textContent = '完成K：' + timeLabel(today.at(-1)?.start + 300000 || 0);
+    $('volume-ratio').textContent = Number.isFinite(action.ratio) ? action.ratio.toFixed(2) + '×' : '—';
+    $('volume-caption').textContent = Number.isFinite(action.ratio) ? '最新完成K相對當日量能基準' : '量能資料不足';
+    $('tar-obi').textContent = metrics ? 'TAR ' + metrics.tarIndex.toFixed(3) + ' · OBI ' + metrics.obiIndex.toFixed(3) : '資料不足';
+    $('tar-obi-detail').textContent = metrics ? metrics.detTarKey + ' / ' + metrics.obiKey : '等待成交與五檔資料';
+    $('tar-obi-message').textContent = metrics ? 'TAR 與 OBI 依目前累計成交與五檔計算；現價相對 VWAP ' + (price >= vwap ? '在上方。' : '在下方。') : '成交或五檔資料不足，無法計算。';
+    $('entry-state').textContent = assessment.state;
+    $('entry-detail').textContent = Number.isFinite(assessment.lower) ? '偏好進場 ' + format(assessment.lower) + '–' + format(assessment.upper) + ' · 最高可接受 ' + format(assessment.maximum) : '偏好進場區資料不足';
+    $('entry-low').textContent = '低 ' + format(assessment.lower); $('entry-high').textContent = '高 ' + format(assessment.upper);
+    $('entry-message').textContent = assessment.state === 'WAIT FOR PULLBACK' && Number.isFinite(assessment.upper) ? '現價高於偏好區上緣 ' + format(price - assessment.upper) + '；等待回落並重新確認。' : assessment.blockingReason || assessment.factors?.[0] || '依原有 Entry Assessment 規則計算；詳情見子頁。';
+    const displayedLow = readyOpening ? orLow : openingView.low, displayedHigh = readyOpening ? orHigh : openingView.high;
+    $('or-low').textContent = (readyOpening ? 'OR30 低 ' : '暫定低 ') + format(displayedLow); $('or-high').textContent = (readyOpening ? 'OR30 高 ' : '暫定高 ') + format(displayedHigh);
+    $('structure-detail').textContent = readyOpening ? 'OR30 ' + format(orLow) + '–' + format(orHigh) : '暫定區間 ' + format(displayedLow) + '–' + format(displayedHigh) + ' · ' + openingView.count + '/6 根';
+    const structureLabel = session !== 'live' ? '非即時資料' : !readyOpening ? '開盤觀察 ' + openingView.count + '/6' : action.acceptedBreakout ? 'OR30 上方站穩' : action.breakout ? 'OR30 初次上破' : action.falseBreakout ? '上破後回區間' : action.breakdown && price < orLow ? '已跌破 OR30 下緣' : price < orLow ? '現價在 OR30 下方' : 'OR30 區間內';
+    $('structure-state').textContent = structureLabel;
+    $('structure-message').textContent = session !== 'live' ? '報價不是即時狀態；只可回顧歷史結構。' : !readyOpening ? openingView.summary + '；09:30 前區間仍在形成。' : action.acceptedBreakout ? '完成 K 持續站上 OR30 高點；仍需追蹤後續是否守住。' : action.falseBreakout ? '先前上破後收回區間，等待新完成 K 再確認。' : action.breakdown && price < orLow ? '最新完成 5 分 K 與現價均在 OR30 下緣 ' + format(orLow) + ' 以下；觀察能否重新站回。' : price < orLow ? '現價低於 OR30 下緣 ' + format(orLow) + '，等待完成 K 確認。' : '目前價格仍在 OR30 區間內；完整盤中結構以原子頁為準。';
+    const pattern = readyOpening && session === 'live'
+      ? MarketData.analyzeReferencePattern({ bars: today, action })
+      : { title: session === 'live' ? '開盤四規則更新中' : '資料非即時', evidence: session === 'live' ? openingView.summary : '目前不能判讀即時圖型。', pending: 'OR30 完成且報價新鮮後比對區間後圖型。' };
+    $('pattern-title').textContent = pattern.title; $('pattern-evidence').textContent = pattern.evidence; $('pattern-pending').textContent = pattern.pending;
+    $('overall-message').textContent = session !== 'live' ? '目前資料非即時；盤中判斷停用，以下僅供回顧。' : !readyOpening ? '開盤四規則（' + openingView.count + '/6）：' + openingView.summary + '。09:30 前不判完整 OR30；進場評估：' + assessment.state + '。' : '市場結構：' + structureLabel + '。進場評估：' + assessment.state + '。兩者須分開判讀。';
+    setDataStale(session === 'stale');
+    renderChart();
+  }
+  async function loadHistory(key, symbol, marketDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(marketDate || '')) return;
+    if (historyCache.symbol === symbol && historyCache.date === marketDate
+      && (historyCache.loading || historyCache.payload || Date.now() < historyCache.retryAfter)) return;
+    historyCache = { symbol, date: marketDate, payload: null, loading: true, retryAfter: 0 };
+    const midday = Date.parse(marketDate + 'T12:00:00+08:00');
+    const dateText = ms => { const p = taipei(new Date(ms)); return p.year + '-' + p.month + '-' + p.day; };
+    const historyUrl = API + '/historical/candles/' + encodeURIComponent(symbol) + '?timeframe=5&from='
+      + dateText(midday - 45 * 86400000) + '&to=' + dateText(midday - 86400000) + '&sort=asc';
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await fetch(historyUrl, { headers: { 'X-API-KEY': key }, cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('歷史K HTTP ' + response.status);
+      const payload = await response.json();
+      if (!Array.isArray(payload?.data) || !payload.data.length) throw new Error('歷史K資料不足');
+      if (historyCache.symbol !== symbol || historyCache.date !== marketDate) return;
+      historyCache = { symbol, date: marketDate, payload, loading: false, retryAfter: 0 };
+      if (snapshot?.quote?.date === marketDate && snapshot.quote.symbol === symbol) {
+        snapshot.history = barsFrom(payload).filter(bar => bar.date < marketDate);
+        renderChart();
+        setStatus(symbol + ' · 已取得 Fugle ' + marketDate + ' 行情；前日 K 已載入。', 'ok');
+      }
+    } catch (_error) {
+      if (historyCache.symbol === symbol && historyCache.date === marketDate)
+        historyCache = { symbol, date: marketDate, payload: null, loading: false, retryAfter: Date.now() + 300000 };
+      if (snapshot?.quote?.date === marketDate && snapshot.quote.symbol === symbol)
+        setStatus(symbol + ' · 行情已載入；歷史 K 不可用，H/L 訊號可能不足。', 'ok');
+    } finally { clearTimeout(timeout); }
+  }
+  async function refresh(event) {
+    event?.preventDefault();
+    if (fetching) return;
+    const symbol = $('symbol').value.trim().toUpperCase(), key = localStorage.getItem('fugle_api_key') || '';
+    if (!/^[A-Z0-9]+$/.test(symbol)) { setStatus('股票代碼格式不正確。', 'error'); return; }
+    if (!key) { setStatus('請先在右上角「設定」儲存 Fugle API Key。', 'error'); showSettings(true); return; }
+    localStorage.setItem('fugle_symbol', symbol);
+    window.TarObiBridge?.handleSymbolInput(symbol);
+    updatePageLinks();
+    fetching = true; $('refresh').disabled = true; setStatus(symbol + ' · 正在取得 Fugle 資料…');
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+      const headers = { 'X-API-KEY': key };
+      const quoteUrl = API + '/intraday/quote/' + encodeURIComponent(symbol);
+      const candleUrl = API + '/intraday/candles/' + encodeURIComponent(symbol) + '?timeframe=5';
+      const options = { headers, cache: 'no-store', signal: controller.signal };
+      const [quoteResponse, candleResponse] = await Promise.all([fetch(quoteUrl, options), fetch(candleUrl, options)]);
+      if (!quoteResponse.ok || !candleResponse.ok) throw new Error('Fugle 回應 ' + (!quoteResponse.ok ? quoteResponse.status : candleResponse.status));
+      const [quote, candles] = await Promise.all([quoteResponse.json(), candleResponse.json()]);
+      const historical = historyCache.symbol === symbol && historyCache.date === quote.date ? historyCache.payload : null;
+      render(quote, candles, historical);
+      setStatus(symbol + ' · 已取得 Fugle ' + quote.date + ' 行情' + (historical ? '；前日 K 已載入。' : '；前日 K 待載入。'), 'ok');
+      void loadHistory(key, symbol, quote.date);
+    } catch (error) {
+      if (snapshot) {
+        $('market-session').textContent = 'STALE';
+        $('overall-message').textContent = '本次更新失敗；下方保留上次資料供回顧，不能視為即時判讀。';
+        $('source-time').textContent = '上次資料 · ' + $('source-time').textContent;
+        setDataStale(true);
+      }
+      snapshot = null;
+      setStatus(error.name === 'AbortError' ? 'Fugle 請求逾時，請再試。' : error.message.includes('401') ? 'Fugle Key 未通過驗證（HTTP 401）。' : error.message.includes('403') ? 'Fugle Key 無此資料權限（HTTP 403）。' : error.message, 'error');
+    } finally { clearTimeout(timeout); fetching = false; $('refresh').disabled = false; }
+  }
+  $('source-form').addEventListener('submit', refresh);
+  $('settings-toggle').addEventListener('click', () => showSettings($('settings-panel').hidden));
+  $('settings-close').addEventListener('click', () => showSettings(false));
+  $('settings-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const key = $('settings-api-key').value.trim();
+    if (!key) { $('settings-status').textContent = '請輸入 Fugle API Key。'; return; }
+    localStorage.setItem('fugle_api_key', key);
+    $('settings-api-key').value = '';
+    $('settings-status').textContent = 'Key 已儲存於此瀏覽器。';
+    void refresh();
+  });
+  $('symbol').addEventListener('input', event => {
+    window.TarObiBridge?.handleSymbolInput(event.target.value);
+    updatePageLinks();
+  });
+  ['calculator-link', 'entry-link', 'structure-link'].forEach(id => $(id).addEventListener('click', () => {
+    const symbol = $('symbol').value.trim().toUpperCase();
+    if (/^[A-Z0-9]+$/.test(symbol)) localStorage.setItem('fugle_symbol', symbol);
+  }));
+  $('opening-replay').addEventListener('change', () => { if (snapshot) renderOpening(snapshot.quote, snapshot.today, snapshot.session); });
+  document.querySelectorAll('[data-tf]').forEach(button => button.addEventListener('click', () => { selected = Number(button.dataset.tf); renderChart(); }));
+  window.addEventListener('resize', () => { if (snapshot) renderChart(); });
+  const requestedSymbol = new URLSearchParams(location.search).get('symbol');
+  const initialSymbol = requestedSymbol || localStorage.getItem('fugle_symbol') || '2330';
+  if (/^[A-Z0-9]+$/i.test(initialSymbol)) $('symbol').value = initialSymbol.toUpperCase();
+  window.TarObiBridge?.populateLinkedTicker($('symbol'));
+  updatePageLinks();
+  if (location.hash === '#settings') showSettings(true);
+  if (localStorage.getItem('fugle_api_key')) void refresh();
+  const interval = Number(localStorage.getItem('fugle_interval'));
+  setInterval(() => {
+    const p = taipei(new Date()), minutes = Number(p.hour) * 60 + Number(p.minute);
+    if (!document.hidden && minutes >= 540 && minutes < 815 && localStorage.getItem('fugle_api_key')) void refresh();
+  }, [10, 30, 60].includes(interval) ? interval * 1000 : 30000);
+})();
+</script>
 </body>
 </html>

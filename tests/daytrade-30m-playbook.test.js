@@ -14,7 +14,7 @@ function element(id) {
     return elements.get(id);
 }
 const context = {
-    console, Date, Intl, Number, Math,
+    console, Date, Intl, Number, Math, URLSearchParams, location: { search: '' },
     document: { getElementById: element, addEventListener() {} },
     localStorage: { getItem: () => null },
     setInterval: () => 1, clearInterval() {},
@@ -26,8 +26,8 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'shared-market.js'), 
 const html = fs.readFileSync(path.join(__dirname, '..', 'daytrade-30m-playbook.html'), 'utf8');
 const source = html.match(/<script>\s*(\(\(\) => \{[\s\S]*?)<\/script>/)?.[1];
 assert.ok(source, 'playbook script is available');
-vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'window.playbookTest = { completedTodayBars, openingHypothesis, confirmedSwings, intradayStructure, reassessPostOr30, renderPriceAction, render }; })();'), context);
-const { completedTodayBars, openingHypothesis, confirmedSwings, intradayStructure, reassessPostOr30, renderPriceAction, render } = context.playbookTest;
+vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'window.playbookTest = { completedTodayBars, historicalHlBars, openingHypothesis, confirmedSwings, intradayStructure, reassessPostOr30, renderPriceAction, renderStructureChart, setHlHistory: value => { hlHistory = value; }, render }; })();'), context);
+const { completedTodayBars, historicalHlBars, openingHypothesis, confirmedSwings, intradayStructure, reassessPostOr30, renderPriceAction, renderStructureChart, setHlHistory, render } = context.playbookTest;
 
 const day = '2026-07-27';
 const at = (time) => Date.parse(`${day}T${time}:00+08:00`);
@@ -50,6 +50,10 @@ assert.equal(completedTodayBars({ data: opening }, new Date(at('09:29'))).length
     'the 09:25 candle is incomplete at 09:29');
 assert.equal(completedTodayBars({ data: [opening[1], ...opening, bar('09:30', 102)] },
     new Date(at('09:30'))).length, 6, 'duplicates and the unfinished 09:30 candle are excluded');
+const risingOr30Opening = [{ ...opening[0], close: 100.5 }, ...opening.slice(1)];
+assert.doesNotThrow(() => title(risingOr30Opening, '09:31', 100.2),
+    'OR30 completion before the first post-opening candle must not read a missing latest candle');
+assert.match(element('reference-title').textContent, /尚無可核對的圖型/);
 assert.equal(completedTodayBars({ data: [...opening,
     { ...opening[0], date: '2026-07-24T09:00:00+08:00' }] },
     new Date(at('09:30'))).length, 6, 'previous-day candles are excluded');
@@ -175,18 +179,99 @@ assert.equal(title([...opening, ...quietLate, bar('10:25', 100.8, 100.1, 100.9, 
 assert.match(element('structure-reason').textContent, /收回/);
 assert.equal(title([...opening, ...quietLate, bar('10:30', 100.8, 100.1, 100.9, 900)],
     '10:36', 100.8), '資料不足 / CHECK LATER', 'a missing 10:25 candle blocks trend reassessment');
-const pattern = { candleFresh: true, latest: { close: 101 }, ratio: 1.5,
-    priceVolume: 'RISING_EXPANDING', rangeHigh: 102 };
-renderPriceAction(null, false);
+const openingRule = context.MarketData.analyzeOpeningRules;
+const sample = (time, close, low, high, volume, average) => ({
+    start: at(time), close, low, high, volume, average
+});
+const risingFirst = sample('09:00', 100.5, 100, 100.8, 500, 100.2);
+assert.equal(title([{ ...bar('09:00', 100.5, 100, 100.8, 500), average: 100.2 }], '09:05', 100.5),
+    '開盤觀察 · 首根偏強，等待回落測試');
+assert.match(element('intraday-evidence').textContent, /最新完成 K 收 100\.50.*暫定高低/);
+assert.match(element('structure-chart').innerHTML, /rect/);
+assert.equal(element('pa-second-state').textContent, '等待回落');
+assert.match(element('chart-evidence').textContent, /量 500 張/);
+assert.match(element('chart-evidence').textContent, /當根均價 100\.20/);
+assert.equal(openingRule([risingFirst, sample('09:05', 100.2, 100, 100.5, 450, 100.1)], 100).states[0],
+    '守住，觀察再攻');
+assert.equal(openingRule([risingFirst, sample('09:05', 99.9, 99.7, 100.3, 450, 100),
+    sample('09:10', 100.4, 100.1, 100.5, 500, 100.1)], 100).states[0], '曾失守，已站回',
+    'a later recovery must not erase a broken opening-price hold');
+assert.equal(openingRule([risingFirst, sample('09:05', 99.8, 99.6, 100.3, 600, 100)], 100).states[1],
+    '跌破警示');
+assert.equal(openingRule([sample('09:00', 99.5, 99.2, 100, 500, 99.8),
+    sample('09:05', 99.8, 99.5, 100.2, 550, 99.9)], 100).states[2], '反彈受阻');
+assert.equal(openingRule([sample('09:00', 100.1, 100, 100.2, 500, 100),
+    sample('09:05', 100.2, 100, 100.3, 550, 100.1),
+    sample('09:10', 100.3, 100.1, 100.4, 600, 100.2)], 100).states[3], '溫和價量上行');
+assert.equal(openingRule([risingFirst], 100).states[1], '未出現',
+    'later opening candles cannot affect an earlier replay');
+const reference = context.MarketData.analyzeReferencePattern;
+const breakdown = { openingComplete: true, candleFresh: true, latest: { close: 98 },
+    breakdown: true, currentPrice: 98, rangeLow: 99, ratio: 1.18 };
+assert.match(reference({ bars: [], action: breakdown }).title, /跌破支撐，放量待確認 · 圖 5\/5/);
+assert.match(reference({ bars: [], action: breakdown }).pending, /放量跌破條件尚未確認/);
+assert.match(reference({ bars: [], action: { ...breakdown, ratio: 1.5 } }).title, /^跌破支撐/);
+const referenceBase = { openingComplete: true, candleFresh: true, latest: { close: 101 }, ratio: 1 };
+assert.match(reference({ bars: [], action: { ...referenceBase, resistanceRejection: true } }).title, /圖 1\/5/);
+assert.match(reference({ bars: [{ close: 100, volume: 500 }, { close: 101, volume: 600 },
+    { close: 102, volume: 800 }].map((item, index) => ({ ...item, start: at('09:30') + index * 300000 })),
+    action: referenceBase }).title, /價漲量增 · 圖 2\/5/);
+assert.match(reference({ bars: [], action: { ...referenceBase, falseBreakout: true, rangeHigh: 101, currentPrice: 100 } }).title,
+    /上破後收回 · 圖 3\/5/);
+const pivotBars = [100, 102, 101, 103, 102, 101].map((high, index) => ({
+    start: at('09:30') + index * 300000, high, low: 98,
+    volume: index === 1 ? 1000 : index === 3 ? 500 : 600, close: 100
+}));
+assert.match(reference({ bars: pivotBars, action: { openingComplete: true, candleFresh: true,
+    latest: { close: 100 }, ratio: 1 } }).title, /頂背離線索 · 圖 4\/5/);
+assert.match(reference({ bars: [{ close: 100, volume: 500 }, { close: 101, volume: 600 },
+    { close: 102, volume: 700 }, { close: 101.5, low: 100.2, volume: 400 }]
+        .map((item, index) => ({ ...item, start: at('09:30') + index * 300000 })),
+    action: { ...referenceBase, openPrice: 100 } }).title, /上升後縮量回調 · 圖 5\/5/);
+const warmup = Array.from({ length: 20 }, (_, index) => ({
+    start: Date.parse('2026-07-24T11:00:00+08:00') + index * 300000,
+    open: 100, high: 100.2, low: 99.8, close: 100, volume: 100, average: 100
+}));
+const historicalPayload = { data: [
+    ...warmup.map(item => ({ ...item, date: new Date(item.start).toISOString() })),
+    { ...warmup[0], date: new Date(warmup[0].start).toISOString() },
+    { ...warmup[0], date: '2026-07-24T13:30:00+08:00' },
+    { ...warmup[0], date: `${day}T09:00:00+08:00` }
+] };
+assert.equal(historicalHlBars(historicalPayload, day).length, 20,
+    'EMA warmup excludes duplicates, the 13:30 bar, and current-day bars');
+const hlBar = (index, open, high, low, close) => ({
+    start: at('09:00') + index * 300000, open, high, low, close, volume: 100, average: 100
+});
+const hBars = [hlBar(0, 100.8, 102, 100.5, 101), hlBar(1, 101, 101.5, 100.2, 100.8),
+    hlBar(2, 100.8, 101.8, 100.3, 101.2), hlBar(3, 101.2, 101.4, 100.1, 100.9),
+    hlBar(4, 100.9, 101.7, 100.2, 101.3)];
+const lBars = [hlBar(0, 99.2, 99.5, 98, 99), hlBar(1, 99, 99.8, 98.2, 99.2),
+    hlBar(2, 99.2, 99.6, 98.1, 98.8), hlBar(3, 98.8, 99.9, 98.3, 99.1),
+    hlBar(4, 99.1, 99.7, 98.2, 98.7)];
+const hlLabels = bars => context.MarketData.calculateHlSignals([...warmup, ...bars]).signals
+    .filter(signal => signal.start >= at('09:00')).map(signal => signal.label).join(',');
+assert.equal(hlLabels(hBars.slice(0, 2)), '', 'unfinished recovery is not labeled');
+assert.equal(hlLabels(hBars), 'H1,H2');
+assert.equal(hlLabels(lBars), 'L1,L2');
+setHlHistory({ key: `006208:${day}`, bars: warmup, status: 'ready', attemptedAt: 0 });
+renderStructureChart(hBars, 100, { high: 102, low: 100.1 }, null, null, 101.3, true, '006208', day);
+assert.match(element('structure-chart').innerHTML, /data-hl="H1"/);
+assert.match(element('structure-chart').innerHTML, /data-hl="H2"/);
+assert.match(element('chart-evidence').textContent, /藍線為 EMA20/);
+renderStructureChart(lBars, 100, { high: 100, low: 98 }, null, null, 98.7, true, '006208', day);
+assert.match(element('structure-chart').innerHTML, /data-hl="L1"/);
+assert.match(element('structure-chart').innerHTML, /data-hl="L2"/);
+setHlHistory({ key: `006208:${day}`, bars: [], status: 'loading', attemptedAt: 0 });
+renderStructureChart(hBars.slice(0, 2), 100, { high: 102, low: 100.2 }, null, null, 100.8, true, '006208', day);
+assert.doesNotMatch(element('structure-chart').innerHTML, /data-hl=/);
+assert.match(element('chart-evidence').textContent, /正在載入前日 K/);
+setHlHistory({ key: `006208:${day}`, bars: [], status: 'unavailable', attemptedAt: 0 });
+renderStructureChart(hBars.slice(0, 2), 100, { high: 102, low: 100.2 }, null, null, 100.8, true, '006208', day);
+assert.match(element('chart-evidence').textContent, /前日 K 讀取失敗/);
+renderPriceAction(null, null, false);
 assert.equal(element('pa-second-state').textContent, 'INSUFFICIENT DATA');
-renderPriceAction({ ...pattern, secondAttempt: true }, true, 100, 100.5);
-assert.equal(element('pa-second-state').textContent, 'DEVELOPING');
-assert.equal(element('pa-reversal-state').textContent, 'NOT DETECTED');
-renderPriceAction({ ...pattern, rapidBreakBelowOpen: true }, true, 100, 100.5);
-assert.equal(element('pa-reversal-state').textContent, 'CONFIRMED');
-renderPriceAction({ ...pattern, failedReclaim: true }, true, 100, 100.5);
-assert.equal(element('pa-weak-state').textContent, 'CONFIRMED');
-renderPriceAction({ ...pattern, gradualVwapRise: true }, true, 100, 100.5);
-assert.equal(element('pa-gradual-state').textContent, 'DEVELOPING');
-assert.match(element('pa-category-evidence').innerHTML, /RISING_EXPANDING/);
+renderPriceAction(openingRule([risingFirst], 100), reference({ bars: [], action: breakdown }), true);
+assert.equal(element('pa-second-state').textContent, '等待回落');
+assert.match(element('reference-title').textContent, /圖 5\/5/);
 console.log('daytrade 30m playbook tests passed');
