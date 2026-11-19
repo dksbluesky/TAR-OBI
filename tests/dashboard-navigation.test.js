@@ -54,6 +54,7 @@ function page(file, search = '', hash = '') {
     const elements = new Map();
     const intervals = [];
     const windowEvents = {};
+    const documentEvents = {};
     let reloads = 0;
     function element(id) {
         if (!elements.has(id)) elements.set(id, {
@@ -77,7 +78,8 @@ function page(file, search = '', hash = '') {
         setTimeout, clearTimeout, setInterval: callback => { intervals.push(callback); return intervals.length; }, clearInterval() {},
         localStorage, location: { search, hash, reload() { reloads++; } }, fetch: fetchFixture,
         document: { getElementById: element, createElement: () => ({ value: '', textContent: '' }),
-            querySelectorAll: () => [], hidden: false, addEventListener() {} },
+            querySelectorAll: () => [], hidden: false,
+            addEventListener(type, callback) { documentEvents[type] = callback; } },
         addEventListener(type, callback) { windowEvents[type] = callback; }, TarObiBridge: {
             STORAGE_KEY: 'etfDca.executionBridge.v1',
             DISMISSED_KEY: 'tarObi.executionBridge.dismissedBridgeId.v1',
@@ -85,6 +87,12 @@ function page(file, search = '', hash = '') {
             getAvailableReplacement() {
                 return storedBridge && storedBridge.bridgeId !== linkedBridge?.bridgeId
                     && localStorage.getItem(this.DISMISSED_KEY) !== storedBridge.bridgeId ? storedBridge : null;
+            },
+            shouldReloadBridge(ticker) {
+                return this.getAvailableReplacement()?.ticker === ticker
+                    || (linkedBridge?.ticker === ticker
+                        && storedBridge?.bridgeId === linkedBridge.bridgeId
+                        && localStorage.getItem(this.DISMISSED_KEY) === linkedBridge.bridgeId);
             },
             readBridge() { return storedBridge; },
             disconnectBridge() {
@@ -100,7 +108,7 @@ function page(file, search = '', hash = '') {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     const scripts = [...html.matchAll(/<script>\s*([\s\S]*?)<\/script>/g)].map(match => match[1]);
     vm.runInContext(scripts.at(-1).replace(/\}\)\(\);\s*$/, 'window.dashboardTest = { aggregate }; })();'), context);
-    return { html, context, element, intervals, windowEvents,
+    return { html, context, element, intervals, windowEvents, documentEvents,
         get reloads() { return reloads; }, aggregate: context.dashboardTest?.aggregate };
 }
 function emit(target, type) {
@@ -160,11 +168,14 @@ async function until(predicate) {
     assert.match(reopenedWithMismatch.element('zone-link-status').textContent, /舊 Bridge 238\.00–243\.00 已停用/,
         'a reopened dashboard keeps the GitHub zone authoritative');
     storedBridge = { bridgeId: 'bridge-new', ticker: '006208', activeZone: { low: 203, high: 209 } };
+    reopenedWithMismatch.context.document.hidden = true;
     reopenedWithMismatch.windowEvents.storage({ key: 'etfDca.executionBridge.v1' });
-    assert.equal(reopenedWithMismatch.element('bridge-update-reload').hidden, false);
-    assert.match(reopenedWithMismatch.element('zone-link-status').textContent, /新的 006208 Bridge/);
-    emit(reopenedWithMismatch.element('bridge-update-reload'), 'click');
+    assert.equal(reopenedWithMismatch.reloads, 0, 'a hidden page waits until it is visible');
+    reopenedWithMismatch.context.document.hidden = false;
+    reopenedWithMismatch.documentEvents.visibilitychange();
     assert.equal(reopenedWithMismatch.reloads, 1);
+    reopenedWithMismatch.windowEvents.focus();
+    assert.equal(reopenedWithMismatch.reloads, 1, 'one Bridge replacement triggers only one reload');
     linkedBridge = null;
     await emit(dashboard.element('source-form'), 'submit');
     assert.match(dashboard.element('status').textContent, /設定.*Fugle API Key/);

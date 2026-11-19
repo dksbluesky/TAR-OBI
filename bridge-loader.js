@@ -394,6 +394,20 @@
         return stored && stored.bridgeId !== current?.bridgeId
             && storageGet(DISMISSED_KEY) !== stored.bridgeId ? stored : null;
     }
+    /** A visible page may reload to adopt a new Bridge for its current ticker. */
+    function shouldReloadBridge(ticker) {
+        const selected = String(ticker || '').trim().toUpperCase();
+        if (!selected) return false;
+
+        const replacement = getAvailableReplacement();
+        if (replacement?.ticker.toUpperCase() === selected) return true;
+
+        const current = getLinkedBridge();
+        const stored = readBridge();
+        return current?.ticker.toUpperCase() === selected
+            && (!stored || stored.bridgeId === current.bridgeId)
+            && storageGet(DISMISSED_KEY) === current.bridgeId;
+    }
     /**
      * Restores an authenticated server bridge into this app's local storage context.
      * @param {object} bridge Validated v1 execution bridge.
@@ -820,6 +834,7 @@
         initialize,
         getLinkedBridge,
         getAvailableReplacement,
+        shouldReloadBridge,
         linkBridge,
         refreshLinkedBridge,
         returnToEtfDca,

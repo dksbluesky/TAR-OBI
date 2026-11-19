@@ -473,10 +473,22 @@
     } finally { $('zone-sync').disabled = false; }
   });
   $('bridge-update-reload').addEventListener('click', () => location.reload());
-  window.addEventListener('focus', showZoneLinkStatus);
+  let bridgeReloading = false;
+  function updateBridgeOnResume() {
+    if (bridgeReloading || document.hidden) return;
+    if (window.TarObiBridge?.shouldReloadBridge?.($('symbol').value)) {
+      bridgeReloading = true;
+      location.reload();
+      return;
+    }
+    showZoneLinkStatus();
+  }
+  window.addEventListener('focus', updateBridgeOnResume);
+  window.addEventListener('pageshow', updateBridgeOnResume);
+  document.addEventListener('visibilitychange', updateBridgeOnResume);
   window.addEventListener('storage', event => {
     if ([window.TarObiBridge?.STORAGE_KEY, window.TarObiBridge?.DISMISSED_KEY,
-      window.TarObiRepoZone?.STORAGE_KEY].includes(event.key)) showZoneLinkStatus();
+      window.TarObiRepoZone?.STORAGE_KEY].includes(event.key)) updateBridgeOnResume();
   });
   $('settings-toggle').addEventListener('click', () => showSettings($('settings-panel').hidden));
   $('settings-close').addEventListener('click', () => showSettings(false));

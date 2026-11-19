@@ -768,11 +768,19 @@
         const executionContext = document.getElementById('execution-context');
         const restorePanel = document.getElementById('restore-linked-monitor');
         const bridgeAlert = document.getElementById('bridge-alert');
+        let bridgeReloading = false;
         const checkBridgeUpdate = () => {
+            if (!bridgeReloading && !document.hidden
+                && window.TarObiBridge?.shouldReloadBridge?.(querySettings().symbol)) {
+                bridgeReloading = true;
+                location.reload();
+                return true;
+            }
             const replacement = window.TarObiBridge?.getAvailableReplacement?.();
             document.getElementById('bridge-update-notice').classList.toggle('hidden', !replacement);
             document.getElementById('bridge-update-message').textContent = replacement
                 ? `ETF_DCA 已提供新的 ${replacement.ticker} Bridge；此頁尚未切換。` : '';
+            return false;
         };
         document.getElementById('bridge-update-reload').addEventListener('click', () => location.reload());
         const savedEntry = localStorage.getItem(ENTRY_KEY);
@@ -856,8 +864,10 @@
         checkBridgeUpdate();
         ensureRefreshTimer('unavailable');
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) { checkBridgeUpdate(); fetchData(); }
+            if (!document.hidden && !checkBridgeUpdate()) fetchData();
         });
+        window.addEventListener('focus', checkBridgeUpdate);
+        window.addEventListener('pageshow', checkBridgeUpdate);
         window.addEventListener('storage', event => {
             if (event.key === REFRESH_REQUEST_KEY && event.newValue) fetchData();
             if (event.key === window.TarObiRepoZone?.STORAGE_KEY) { renderBridgeContext(); render(); }

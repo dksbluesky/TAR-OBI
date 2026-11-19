@@ -177,8 +177,13 @@ assert.equal(oldPage.getAvailableReplacement(), null, 'a dismissed Bridge is not
 oldPageStorage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({ bridgeId: 'bridge-new' })));
 assert.equal(oldPage.getAvailableReplacement()?.bridgeId, 'bridge-new',
     'an already-open standalone page can detect a new ETF handoff');
+assert.equal(oldPage.shouldReloadBridge('006208'), true,
+    'a standalone page reloads for a new Bridge of the same ticker');
+assert.equal(oldPage.shouldReloadBridge('0050'), false,
+    'another ticker does not interrupt the current page');
 oldPageStorage.values.set('tarObi.executionBridge.dismissedBridgeId.v1', 'bridge-new');
 assert.equal(oldPage.getAvailableReplacement(), null, 'the current dismissal is still respected');
+assert.equal(oldPage.shouldReloadBridge('006208'), false);
 const linkedPageStorage = createStorage({
     'etfDca.executionBridge.v1': JSON.stringify(validBridge({ bridgeId: 'bridge-old' }))
 });
@@ -187,6 +192,14 @@ assert.equal(linkedPage.getLinkedBridge()?.bridgeId, 'bridge-old');
 linkedPageStorage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({ bridgeId: 'bridge-new' })));
 assert.equal(linkedPage.getAvailableReplacement()?.bridgeId, 'bridge-new',
     'an already-open linked page detects a replacement without silently switching');
+assert.equal(linkedPage.shouldReloadBridge('006208'), true);
+linkedPageStorage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({ bridgeId: 'bridge-other', ticker: '0050' })));
+assert.equal(linkedPage.shouldReloadBridge('006208'), false,
+    'a replacement for another ticker keeps the current page in place');
+linkedPageStorage.values.set('etfDca.executionBridge.v1', JSON.stringify(validBridge({ bridgeId: 'bridge-old' })));
+linkedPageStorage.values.set('tarObi.executionBridge.dismissedBridgeId.v1', 'bridge-old');
+assert.equal(linkedPage.shouldReloadBridge('006208'), true,
+    'a dismissed current Bridge reloads to clear the old linked context');
 assert.equal(JSON.parse(emptyStorage.getItem('etfDca.executionBridge.v1')).bridgeId, 'bridge-restored');
 
 console.log('bridge loader tests passed');
