@@ -208,9 +208,10 @@ assert.equal(openingRule([risingFirst], 100).states[1], '未出現',
 const reference = context.MarketData.analyzeReferencePattern;
 const breakdown = { openingComplete: true, candleFresh: true, latest: { close: 98 },
     breakdown: true, currentPrice: 98, rangeLow: 99, ratio: 1.18 };
-assert.match(reference({ bars: [], action: breakdown }).title, /跌破支撐，放量待確認 · 圖 5\/5/);
+assert.equal(reference({ bars: [], action: breakdown }).title, '跌破支撐');
+assert.match(reference({ bars: [], action: breakdown }).evidence, /縮量回調與趨勢延續.*OR30 下緣 99\.00.*支撐企穩與回調再續條件因此不成立/);
 assert.match(reference({ bars: [], action: breakdown }).pending, /放量跌破條件尚未確認/);
-assert.match(reference({ bars: [], action: { ...breakdown, ratio: 1.5 } }).title, /^跌破支撐/);
+assert.equal(reference({ bars: [], action: { ...breakdown, ratio: 1.5 } }).title, '跌破支撐');
 const referenceBase = { openingComplete: true, candleFresh: true, latest: { close: 101 }, ratio: 1 };
 assert.match(reference({ bars: [], action: { ...referenceBase, resistanceRejection: true } }).title, /圖 1\/5/);
 assert.match(reference({ bars: [{ close: 100, volume: 500 }, { close: 101, volume: 600 },
@@ -224,10 +225,10 @@ const pivotBars = [100, 102, 101, 103, 102, 101].map((high, index) => ({
 }));
 assert.match(reference({ bars: pivotBars, action: { openingComplete: true, candleFresh: true,
     latest: { close: 100 }, ratio: 1 } }).title, /頂背離線索 · 圖 4\/5/);
-assert.match(reference({ bars: [{ close: 100, volume: 500 }, { close: 101, volume: 600 },
+assert.equal(reference({ bars: [{ close: 100, volume: 500 }, { close: 101, volume: 600 },
     { close: 102, volume: 700 }, { close: 101.5, low: 100.2, volume: 400 }]
         .map((item, index) => ({ ...item, start: at('09:30') + index * 300000 })),
-    action: { ...referenceBase, openPrice: 100 } }).title, /上升後縮量回調 · 圖 5\/5/);
+    action: { ...referenceBase, openPrice: 100 } }).title, '上升後縮量回調');
 const warmup = Array.from({ length: 20 }, (_, index) => ({
     start: Date.parse('2026-07-24T11:00:00+08:00') + index * 300000,
     open: 100, high: 100.2, low: 99.8, close: 100, volume: 100, average: 100
@@ -273,5 +274,6 @@ renderPriceAction(null, null, false);
 assert.equal(element('pa-second-state').textContent, 'INSUFFICIENT DATA');
 renderPriceAction(openingRule([risingFirst], 100), reference({ bars: [], action: breakdown }), true);
 assert.equal(element('pa-second-state').textContent, '等待回落');
-assert.match(element('reference-title').textContent, /圖 5\/5/);
+assert.equal(element('reference-title').textContent, '跌破支撐');
+assert.match(element('reference-evidence').textContent, /縮量回調與趨勢延續.*支撐企穩與回調再續條件因此不成立/);
 console.log('daytrade 30m playbook tests passed');

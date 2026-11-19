@@ -1789,8 +1789,8 @@
         const fmt = value => Number(value).toFixed(2);
         if (action.breakdown && Number.isFinite(action.currentPrice) && action.currentPrice > 0
             && action.currentPrice < action.rangeLow) return {
-            title: `${ratio !== null && ratio >= 1.4 ? '跌破支撐' : '跌破支撐，放量待確認'} · 圖 5/5`, reference: 5,
-            evidence: `完成 K 收 ${fmt(latest.close)}、現價 ${fmt(action.currentPrice)}，均低於 OR30 下緣 ${fmt(action.rangeLow)}；${ratioText}。`,
+            title: '跌破支撐', reference: 5,
+            evidence: `對照「縮量回調與趨勢延續」中的跌破支撐情境：完成 K 收 ${fmt(latest.close)}、現價 ${fmt(action.currentPrice)}，均低於 OR30 下緣 ${fmt(action.rangeLow)}；支撐企穩與回調再續條件因此不成立；${ratioText}。`,
             pending: ratio !== null && ratio >= 1.4 ? '觀察後續是否延續或重新站回支撐。' : '圖中放量跌破條件尚未確認；觀察後續量能。'
         };
         if (action.falseBreakout && action.currentPrice <= action.rangeHigh) return { title: '上破後收回 · 圖 3/5', reference: 3,
@@ -1825,8 +1825,8 @@
             && recent[0].close < recent[1].close && recent[1].close < recent[2].close
             && recent[3].close < recent[2].close && recent[3].low >= action.openPrice
             && recent[2].volume > 0 && recent[3].volume <= recent[2].volume * 0.8) return {
-            title: '上升後縮量回調 · 圖 5/5', reference: 5,
-            evidence: `前三根收盤走高，最新收 ${fmt(recent[3].close)} 回落但未破開盤 ${fmt(action.openPrice)}；量為前根 ${(recent[3].volume / recent[2].volume).toFixed(2)} 倍。`,
+            title: '上升後縮量回調', reference: 5,
+            evidence: `對照「縮量回調與趨勢延續」中的縮量回調：前三根收盤走高，最新收 ${fmt(recent[3].close)} 回落但未破開盤 ${fmt(action.openPrice)}；量為前根 ${(recent[3].volume / recent[2].volume).toFixed(2)} 倍。`,
             pending: '尚待支撐穩定及重新放量上攻，不能稱為趨勢延續。'
         };
         const three = bars.slice(-3);
