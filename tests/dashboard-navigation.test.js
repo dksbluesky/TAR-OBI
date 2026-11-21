@@ -17,6 +17,7 @@ const localStorage = {
     setItem: (key, value) => saved.set(key, String(value))
 };
 const requests = [];
+let quoteAgeMs = 0;
 let rejectIntraday = false;
 let rejectRepo = false;
 let linkedBridge = null;
@@ -27,7 +28,7 @@ const savedPortfolio = { dca: [{ ticker: '006208', watchCriteria: {
         activeManualZone: { low: 203, high: 209 } }
 } }], direct: [], lastUpdated: '2026-11-18T08:30:00.000Z' };
 const quoteFor = symbol => ({
-    date: '2026-11-18', symbol, name: '測試標的', lastUpdated: fixedNow,
+    date: '2026-11-18', symbol, name: '測試標的', lastUpdated: fixedNow - quoteAgeMs,
     lastPrice: 101, closePrice: 101, previousClose: 100, openPrice: 100,
     avgPrice: 100.5, isOpen: true, isContinuous: true,
     bids: [{ price: 100.9, size: 500 }], asks: [{ price: 101, size: 450 }],
@@ -229,5 +230,13 @@ async function until(predicate) {
     assert.equal(reopened.element('symbol').value, '0050');
     assert.equal(reopened.element('settings-api-key').value, '', 'the stored key is not copied into the input');
     await until(() => reopened.element('price').textContent === '101.00');
+
+    quoteAgeMs = 100000;
+    saved.set('fugle_interval', '30');
+    const thirtySecondDashboard = page('index.html');
+    await until(() => thirtySecondDashboard.element('market-session').textContent === 'STALE');
+    saved.set('fugle_interval', '60');
+    const sixtySecondDashboard = page('index.html');
+    await until(() => sixtySecondDashboard.element('market-session').textContent === 'LIVE');
     console.log('dashboard settings, ticker navigation, and calculator shared-key tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

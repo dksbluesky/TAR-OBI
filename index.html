@@ -110,6 +110,8 @@
   const $ = id => document.getElementById(id);
   const API = 'https://api.fugle.tw/marketdata/v1.0/stock';
   const periods = [5, 15, 30, 60, 120];
+  const configuredInterval = Number(localStorage.getItem('fugle_interval'));
+  const refreshMs = ([10, 30, 60].includes(configuredInterval) ? configuredInterval : 30) * 1000;
   let selected = 5;
   let snapshot = null;
   let fetching = false;
@@ -335,7 +337,7 @@
     const now = Date.now();
     const quoteTime = MarketData.timestampToMs(quote?.lastUpdated || quote?.lastTrade?.time || quote?.closeTime);
     const asOf = Math.min(now, quoteTime || 0);
-    const session = MarketData.getMarketSession(quote, 30000, new Date(now));
+    const session = MarketData.getMarketSession(quote, refreshMs, new Date(now));
     const today = barsFrom(candlePayload).filter(bar => bar.date === quote.date && bar.start + 300000 <= asOf);
     const history = barsFrom(historicalPayload).filter(bar => bar.date < quote.date);
     const completedOpening = Array.from({ length: 6 }, (_, i) => today.find(bar => bar.start === Date.parse(quote.date + 'T09:00:00+08:00') + i * 300000));
@@ -539,11 +541,10 @@
   window.TarObiCloudBridge?.start({ statusElement: $('cloud-bridge-status'), onUpdated: showZoneLinkStatus });
   if (location.hash === '#settings') showSettings(true);
   if (localStorage.getItem('fugle_api_key')) void refresh();
-  const interval = Number(localStorage.getItem('fugle_interval'));
   setInterval(() => {
     const p = taipei(new Date()), minutes = Number(p.hour) * 60 + Number(p.minute);
     if (!document.hidden && minutes >= 540 && minutes < 815 && localStorage.getItem('fugle_api_key')) void refresh();
-  }, [10, 30, 60].includes(interval) ? interval * 1000 : 30000);
+  }, refreshMs);
 })();
 </script>
 </body>
