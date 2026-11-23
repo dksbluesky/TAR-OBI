@@ -234,6 +234,7 @@
         for (let index = 1; index < bars.length - 1; index++) {
             const previous = bars[index - 1], bar = bars[index], next = bars[index + 1];
             // A pivot is known only after the following 5-minute bar has completed.
+            if (bar.start - previous.start !== 300000 || next.start - bar.start !== 300000) continue;
             if (bar.high > previous.high && bar.high > next.high) highs.push(bar);
             if (bar.low < previous.low && bar.low < next.low) lows.push(bar);
         }
@@ -244,7 +245,8 @@
         return {
             high: comparison(highs, 'high', 'HH 較高高點', 'LH 較低高點', '等高'),
             low: comparison(lows, 'low', 'HL 較高低點', 'LL 較低低點', '等低'),
-            latestHigh: highs.at(-1) || null, latestLow: lows.at(-1) || null
+            latestHigh: highs.at(-1) || null, latestLow: lows.at(-1) || null,
+            previousLow: lows.at(-2) || null
         };
     }
     function intradayStructure(bars, swings, rangeHigh, rangeLow, current) {
@@ -295,7 +297,7 @@
         };
         return null;
     }
-    function reassessPostOr30(after, current, vwap, rangeHigh, rangeLow, volumeThreshold, hypothesis, structure, action, bullish, bearish, bullBrokenLow) {
+    function reassessPostOr30(after, current, vwap, rangeHigh, rangeLow, volumeThreshold, hypothesis, structure, action, bullish, bearish, bullBrokenLow, swings) {
         const latest = after.at(-1);
         if (!latest) {
             const bias = hypothesis?.bias;
@@ -366,15 +368,34 @@
             || (action.failedReclaim && current < action.openPrice)
             || action.strongSellingPullback || action.breakdownFailedRetest
             || (bullBrokenLow && !(latest.close > rangeHigh && current > rangeHigh));
-        if (supportLost || oldRisk || strongSelling) {
+        const previousLow = swings?.previousLow?.low;
+        const previousLowIndex = after.findIndex(bar => bar.start === swings?.previousLow?.start);
+        const broaderSupportHolds = supportLost && structure.level === swings?.latestLow?.low
+            && previousLowIndex >= 0 && consecutive(after.slice(previousLowIndex))
+            && Number.isFinite(previousLow)
+            && Number.isFinite(vwap) && vwap > 0
+            && latest.close > previousLow && current > previousLow
+            && latest.close > rangeHigh && current > rangeHigh
+            && latest.close > vwap && current > vwap;
+        if (oldRisk || strongSelling || (supportLost && !broaderSupportHolds)) {
             const level = supportLost ? structure.level : rangeLow;
             return { title: 'HIGH RISK / AVOID FOR NOW', pattern: supportLost ? structure.label : '目前偏多結構受損',
-                reason: (supportLost ? `新盤中支撐 ${price(level)} 已被完成K與現價跌破；暫避偏多設定，重新站回後再評估。`
+                reason: (supportLost && !broaderSupportHolds ? `新盤中支撐 ${price(level)} 已被完成K與現價跌破；較大盤中結構未確認守穩，暫避偏多設定。`
                     : strongSelling ? '最近三根完成K走低且最近兩根均量增加，偏多設定風險升高；等待新支撐形成。'
                         : 'OR30 或開盤價相關的偏多條件受損；暫避偏多設定，後續新資料可改變判斷。')
                     + ' 這不是全天不安全的預測。',
                 watch: `觀察完成K與現價能否重新站回 ${price(level)}，並形成新的盤中支撐。`, volumeEvidence };
         }
+        if (supportLost && broaderSupportHolds) return {
+            title: 'CHECK LATER', pattern: structure.label,
+            reason: `盤中支撐 ${price(structure.level)} 已被完成K與現價跌破，短線轉弱；較早確認低點 ${price(previousLow)}、OR30 高點 ${price(rangeHigh)} 與 VWAP ${price(vwap)} 仍在下方。等待重新確認，暫不把局部跌破視為整段上漲反轉。`,
+            watch: `觀察完成K與現價能否重新站回 ${price(structure.level)}；若失守 ${price(previousLow)} 或 OR30 高點 ${price(rangeHigh)}，重新評估風險。`, volumeEvidence
+        };
+        if (failedRecently) return {
+            title: 'CHECK LATER', pattern: '新盤中突破失效',
+            reason: `先前突破新盤中阻力 ${price(failedBreakout.level)} 後收回；${bullish ? '較早的 OR30 偏多條件仍有效，' : ''}先等待新的完成K確認。`,
+            watch: `等待新完成K重新站上 ${price(failedBreakout.level)} 並觀察量能。`, volumeEvidence
+        };
         if (bullish || localBreakout || heldBreakout || risingWatch || action.secondAttempt || gradualWatch) {
             const level = activeBreakout?.level ?? structure?.level ?? rangeHigh;
             const breakoutPattern = heldBreakout ? activeBreakout.retestHeld ? '盤中突破回測暫守' : '盤中突破持續站上'
@@ -388,11 +409,9 @@
                                     : '最近完成K的收盤與低點上移，現價高於 VWAP，量能未縮減；值得繼續觀察。',
                 watch: `觀察下一根完成K與現價能否續守 ${price(level)}；若跌回其下，重新評估。`, volumeEvidence };
         }
-        return { title: 'CHECK LATER', pattern: failedRecently ? '新盤中突破失效' : structure?.label || '盤中新結構待確認',
-            reason: failedRecently ? `先前突破新盤中阻力 ${price(failedBreakout.level)} 後收回，暫無持續上攻證據；可稍後再看。`
-                : '目前沒有足夠的新盤中趨勢證據，可以先離開；下次開啟或按「盤勢更新」會重新判斷。',
-            watch: failedRecently ? `等待新完成K重新站上 ${price(failedBreakout.level)} 並觀察量能。`
-                : structure?.watch || `等待完成K突破新盤中阻力，或跌破 ${price(rangeLow)}。`, volumeEvidence };
+        return { title: 'CHECK LATER', pattern: structure?.label || '盤中新結構待確認',
+            reason: '目前沒有足夠的新盤中趨勢證據，可以先離開；下次開啟或按「盤勢更新」會重新判斷。',
+            watch: structure?.watch || `等待完成K突破新盤中阻力，或跌破 ${price(rangeLow)}。`, volumeEvidence };
     }
     function clearCurrentStructure(message) {
         $('structure-pattern').textContent = message;
@@ -614,7 +633,7 @@
             Date.parse(`${today.year}-${today.month}-${today.day}T13:30:00+08:00`)) : 0;
         const intraday = valid ? intradayStructure(afterOpen, swings, rangeHigh, rangeLow, current) : null;
         const reassessment = valid ? reassessPostOr30(afterOpen, current, vwap, rangeHigh, rangeLow,
-            volumeThreshold, hypothesis, intraday, action, bullish, bearish, bullBrokenLow) : null;
+            volumeThreshold, hypothesis, intraday, action, bullish, bearish, bullBrokenLow, swings) : null;
         let title = '等待開盤資料', reason = '需有昨收、今日開盤及完成的 5 分K 才能判讀。', tone = 'text-slate-700';
         if (quoteSession !== 'live') { title = '資料非即時 / CHECK LATER'; reason = `目前行情狀態 ${quoteSession}；歷史資訊僅供參考。`; }
         else if (!bars.length) { title = '尚無已完成 5 分K'; reason = '盤前或資料尚未到達；目前不判斷方向。'; }
@@ -698,7 +717,7 @@
         const bearTargetHigh = rangeLow !== null ? rangeLow * 0.98 : null;
         if (rangeHigh !== null) {
             $('report-structure').textContent = valid
-                ? `當前結構：【${title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定暫時高風險' : bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : title === 'CONTINUE' ? '盤中值得繼續觀察，進場未確認' : '無方向／區間震盪，觀望'}】`
+                ? `當前結構：【${title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定暫時高風險' : intraday?.kind === 'support_break' ? '局部支撐失守，等待較大結構確認' : reassessment.pattern === '新盤中突破失效' ? '局部突破失效，等待重新確認' : bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : title === 'CONTINUE' ? '盤中值得繼續觀察，進場未確認' : '無方向／區間震盪，觀望'}】`
                 : '目前資料不足；以下開盤與歷史事件僅供參考';
             const gapText = gap !== null ? `${gap >= 0 ? '高於' : '低於'}昨收 ${Math.abs(gap).toFixed(2)} 元（${gapPercent >= 0 ? '+' : ''}${gapPercent.toFixed(2)}%）` : '昨收或開盤價資料不足';
             const firstText = first ? `首根高 ${price(first.high)}／低 ${price(first.low)}；首根低點${firstLowHeld ? '尚未跌破' : '已跌破'}、高點${firstHighHeld ? '尚未突破' : '已突破'}。` : '首根 5 分K 尚未完成。';
@@ -708,14 +727,19 @@
                 `開盤基調：${safeText(gapText)}。`,
                 safeText(firstText),
                 `${safeText(volumeText)} ${safeText(closeText)}`,
-                bullish || bearish ? '目前區間形成後有有效的帶量收盤突破。'
-                    : historicalBull || historicalBear ? '歷史上曾有符合量能門檻的收盤突破；目前已失效或現價與完成K未同步，等待重新判定。'
+                bullish ? intraday?.kind === 'support_break' || reassessment.pattern === '新盤中突破失效'
+                    ? '先前帶量突破仍有參考價值，近期局部轉弱，等待重新確認。'
+                    : '目前區間形成後有有效的帶量收盤突破。'
+                    : bearish ? '目前區間形成後有有效的帶量向下突破。'
+                        : historicalBull || historicalBear ? '歷史上曾有符合量能門檻的收盤突破；目前已失效或現價與完成K未同步，等待重新判定。'
                         : '開盤區間尚未出現符合條件的帶量收盤突破，依「結構沒出來就不做」先觀望。'
             ].map(item => `<li>${item}</li>`).join('');
             $('report-main-plan').textContent = !valid ? '目前沒有可執行的判定；以下策略僅供參考。'
-                : bullish ? '偏多條件已觸發；依原則等待回測確認，不追價。'
-                    : bearish ? '偏空條件已觸發；依原則等待反彈受阻確認，不追價。'
-                        : title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定風險較高；等待新的支撐與確認，暫不進場。'
+                : title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定風險較高；等待新的支撐與確認，暫不進場。'
+                    : intraday?.kind === 'support_break' || reassessment.pattern === '新盤中突破失效'
+                        ? '近期局部結構轉弱；等待完成K重新確認，進場條件另以盤中進場評估為準。'
+                        : bullish ? '偏多條件已觸發；依原則等待回測確認，不追價。'
+                            : bearish ? '偏空條件已觸發；依原則等待反彈受阻確認，不追價。'
                         : title === 'CONTINUE' ? '新盤中結構值得繼續觀察；原 OR30 突破條件尚未觸發，不把監控結論當進場訊號。'
                         : '【觀望不進場】先不預設方向，等價格帶量走出 09:00–09:30 區間。';
             const bullGapTarget = prevClose !== null && prevClose > rangeHigh ? `昨收缺口 ${price(prevClose)}` : '昨收缺口不在上方，略過缺口目標';

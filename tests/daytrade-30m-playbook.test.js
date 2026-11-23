@@ -72,19 +72,83 @@ assert.equal(confirmedSwings([
     { high: 10, low: 8 }, { high: 12, low: 9 }, { high: 11, low: 8.5 },
     { high: 13, low: 10 }, { high: 12, low: 9 }, { high: 14, low: 11 },
     { high: 13, low: 10 }
-]).high, 'HH 較高高點', 'completed bars confirm successive higher highs');
+].map((item, index) => ({ ...item, start: index * 300000 }))).high, 'HH 較高高點', 'completed bars confirm successive higher highs');
 assert.equal(confirmedSwings([
     { high: 10, low: 8 }, { high: 12, low: 9 }, { high: 11, low: 8.5 },
     { high: 13, low: 10 }, { high: 12, low: 9 }, { high: 14, low: 11 },
     { high: 13, low: 10 }
-]).low, 'HL 較高低點', 'completed bars confirm successive higher lows');
+].map((item, index) => ({ ...item, start: index * 300000 }))).low, 'HL 較高低點', 'completed bars confirm successive higher lows');
 const fallingSwings = confirmedSwings([
     { high: 10, low: 8 }, { high: 14, low: 9 }, { high: 11, low: 7.5 },
     { high: 13, low: 8 }, { high: 10, low: 7 }, { high: 12, low: 8 },
     { high: 9, low: 6.5 }
-]);
+].map((item, index) => ({ ...item, start: index * 300000 })));
 assert.equal(fallingSwings.high, 'LH 較低高點', 'completed bars confirm successive lower highs');
 assert.equal(fallingSwings.low, 'LL 較低低點', 'completed bars confirm successive lower lows');
+assert.equal(confirmedSwings([
+    { start: 0, high: 10, low: 8 },
+    { start: 300000, high: 12, low: 9 },
+    { start: 900000, high: 11, low: 10 }
+]).latestHigh, null, 'a missing adjacent candle cannot confirm a swing high');
+const localSupportBars = [
+    { start: at('12:10'), close: 103.3, high: 103.5, low: 103, volume: 200 },
+    { start: at('12:15'), close: 102.8, high: 103.1, low: 102.6, volume: 150 },
+    { start: at('12:20'), close: 102.3, high: 102.8, low: 102.1, volume: 100 }
+];
+const brokenSupport = { kind: 'support_break', level: 102.6, label: '盤中支撐失守' };
+const reassessSupport = (current, vwap, previousLow, action = {}) => reassessPostOr30(
+    localSupportBars, current, vwap, 101, 99, 500, null, brokenSupport, action,
+    true, false, false, { latestLow: { low: 102.6 },
+        previousLow: previousLow == null ? null : { start: localSupportBars[0].start, low: previousLow } }
+);
+assert.equal(reassessSupport(102.2, 100.5, 101.5).title, 'CHECK LATER',
+    'a local break with the prior low, OR30 and VWAP intact waits for confirmation');
+assert.match(reassessSupport(102.2, 100.5, 101.5).watch, /102\.60.*101\.50/);
+assert.equal(reassessSupport(100.8, 100.5, 101.5).title, 'HIGH RISK / AVOID FOR NOW',
+    'losing OR30 restores the stronger risk action');
+assert.equal(reassessSupport(102.2, 100.5, 102.25).title, 'HIGH RISK / AVOID FOR NOW',
+    'losing the earlier confirmed low restores the stronger risk action');
+assert.equal(reassessSupport(102.2, null, 101.5).title, 'HIGH RISK / AVOID FOR NOW',
+    'missing VWAP cannot confirm that the broader context holds');
+assert.equal(reassessSupport(102.2, 100.5, 101.5, { strongSellingPullback: true }).title,
+    'HIGH RISK / AVOID FOR NOW', 'an existing strong-selling rule retains priority');
+assert.equal(reassessPostOr30([
+    { start: at('12:00'), close: 103.4, high: 103.6, low: 101.5, volume: 200 },
+    ...localSupportBars
+], 102.2, 100.5, 101, 99, 500, null, brokenSupport, {}, true, false, false,
+{ latestLow: { low: 102.6 }, previousLow: { start: at('12:00'), low: 101.5 } }).title,
+'HIGH RISK / AVOID FOR NOW', 'a missing candle invalidates broader swing context');
+const failedLocalBreakout = [
+    [101.7, 102, 101.4, 200], [101.8, 102, 101.5, 200],
+    [101.8, 102, 101.5, 200], [101.9, 102, 101.5, 200],
+    [102.5, 102.8, 101.9, 700], [102.2, 102.6, 102.1, 100],
+    [101.9, 102.3, 101.6, 90]
+].map(([close, high, low, volume], index) => ({
+    start: at('11:30') + index * 300000, close, high, low, volume
+}));
+assert.equal(reassessPostOr30(failedLocalBreakout, 101.9, 100, 101, 99, 500,
+    null, null, {}, true, false, false, null).pattern, '新盤中突破失效',
+    'a recent local breakout failure is considered before an older OR30 bullish flag');
+const heldBroaderSupport = [
+    [101.8, 102.1, 101.5], [101.7, 101.9, 101.2],
+    [102, 102.3, 101.6], [102.2, 102.4, 101.8],
+    [102, 102.3, 101.7], [102.2, 102.5, 101.9],
+    [101.6, 102.3, 101.4]
+].map(([close, high, low], index) => bar(
+    ['09:30', '09:35', '09:40', '09:45', '09:50', '09:55', '10:00'][index],
+    close, low, high, 600
+));
+render({ ...quote('10:06', 101.6), avgPrice: 100.8 },
+    { data: [...opening, ...heldBroaderSupport] }, new Date(at('10:06')), '006208', at('10:06'));
+assert.equal(element('structure-title').textContent, 'CHECK LATER');
+assert.match(element('structure-reason').textContent, /盤中支撐 101\.70.*較早確認低點 101\.20/);
+assert.match(element('report-main-plan').textContent, /近期局部結構轉弱/);
+assert.doesNotMatch(element('report-main-plan').textContent, /偏多條件已觸發/);
+render({ ...quote('10:06', 101.6), avgPrice: 102.5 },
+    { data: [...opening, ...heldBroaderSupport] }, new Date(at('10:06')), '006208', at('10:06'));
+assert.equal(element('structure-title').textContent, 'HIGH RISK / AVOID FOR NOW');
+assert.match(element('report-main-plan').textContent, /目前偏多設定風險較高/);
+assert.doesNotMatch(element('report-main-plan').textContent, /偏多條件已觸發/);
 const localRange = [
     { high: 100.8, low: 99.5, close: 100.2 },
     { high: 100.7, low: 99.6, close: 100.3 },
