@@ -203,20 +203,20 @@ const reclaimQuote = { date: day, lastUpdated: at('10:20'), lastPrice: 215.1,
     previousClose: 195.55, openPrice: 215.1, avgPrice: 215.08 };
 render(reclaimQuote, { data: [...flatOpening, ...reclaimAfter] },
     new Date(at('10:20')), '006208', at('10:20'));
-assert.equal(element('structure-title').textContent, 'CONTINUE',
-    'a completed dip and stable return to a flat opening high restores monitoring');
-assert.match(element('structure-reason').textContent, /回落至 213\.50.*回到開盤價 215\.10.*量能減少/);
-assert.match(element('report-structure').textContent, /回落後重站開盤價，續觀察/);
-assert.match(element('report-main-plan').textContent, /這不是進場訊號/);
+assert.equal(element('structure-title').textContent, 'CHECK LATER',
+    'a completed dip and return to a flat opening high does not alone establish a new trend');
+assert.match(element('structure-reason').textContent, /高於昨收 19\.55 元（\+10\.00%）.*回落至 213\.50.*仍在開盤價 215\.10.*這不是轉空判斷/);
+assert.match(element('report-structure').textContent, /開高後維持高位，等待新證據/);
+assert.match(element('report-main-plan').textContent, /這不是轉空或進場訊號/);
 render({ ...reclaimQuote, lastPrice: 215.0 }, { data: [...flatOpening, ...reclaimAfter] },
     new Date(at('10:20')), '006208', at('10:20'));
 assert.equal(element('structure-title').textContent, 'CHECK LATER',
-    'the monitoring exception ends when current price falls away from the reclaimed level');
+    'the current price below the opening level does not trigger high-hold context');
 render(reclaimQuote, { data: [...flatOpening, ...reclaimAfter.slice(0, -1),
     bar('10:15', 214.9, 214.9, 215.1, 8)] },
 new Date(at('10:20')), '006208', at('10:20'));
 assert.equal(element('structure-title').textContent, 'CHECK LATER',
-    'a latest completed close below the opening level is not a stable reclaim');
+    'a latest completed close below the opening level is not a high hold');
 render({ ...reclaimQuote, lastPrice: 213.4 }, { data: [...flatOpening, ...reclaimAfter.slice(0, -1),
     bar('10:15', 213.4, 213.3, 215.1, 500)] },
 new Date(at('10:20')), '006208', at('10:20'));
