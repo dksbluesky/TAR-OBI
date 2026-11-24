@@ -222,6 +222,23 @@ render({ ...reclaimQuote, lastPrice: 213.4 }, { data: [...flatOpening, ...reclai
 new Date(at('10:20')), '006208', at('10:20'));
 assert.equal(element('structure-title').textContent, 'HIGH RISK / AVOID FOR NOW',
     'a completed breakdown still overrides earlier bullish opening context');
+const laterHighHold = [...reclaimAfter,
+    bar('10:20', 215.1, 215.1, 215.1, 32),
+    bar('10:25', 215.1, 215.1, 215.1, 8),
+    bar('10:30', 215.1, 215.1, 215.1, 8)];
+render({ ...reclaimQuote, lastUpdated: at('10:36') },
+    { data: [...flatOpening, ...laterHighHold] },
+    new Date(at('10:36')), '006208', at('10:36'));
+assert.equal(element('structure-title').textContent, 'CHECK LATER',
+    'older reclaim no longer forces continuous monitoring');
+assert.match(element('structure-reason').textContent, /高於昨收 19\.55 元（\+10\.00%）.*回落至 213\.50.*仍在開盤價 215\.10.*這不是轉空判斷/);
+assert.match(element('report-structure').textContent, /開高後維持高位，等待新證據/);
+assert.match(element('report-main-plan').textContent, /這不是轉空或進場訊號/);
+render({ ...reclaimQuote, lastUpdated: at('10:36'), lastPrice: 215.0 },
+    { data: [...flatOpening, ...laterHighHold] },
+    new Date(at('10:36')), '006208', at('10:36'));
+assert.doesNotMatch(element('structure-reason').textContent, /最新完成K與現價仍在開盤價 215\.10/,
+    'the high-hold explanation requires the current price to remain at that level');
 assert.equal(title(risingOpening, '09:30', 100.8), 'CONTINUE',
     'a directional 09:30 opening can recommend watching before any post-OR30 candle completes');
 assert.match(element('structure-reason').textContent, /尚無區間後完成K/);

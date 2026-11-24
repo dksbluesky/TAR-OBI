@@ -145,6 +145,7 @@
     const API_BASE = 'https://api.fugle.tw/marketdata/v1.0';
     const FLAT_OPENING_PATTERN = '開盤價維持，盤中新結構待確認';
     const OPENING_RECLAIM_PATTERN = '開盤價回落後重站，續觀察';
+    const OPENING_HIGH_HOLD_PATTERN = '開高後維持高位，等待新證據';
     const $ = id => document.getElementById(id);
     let fetching = false;
     let timer = null;
@@ -436,6 +437,15 @@
             reason: `${hypothesis.openingGap}；開盤區間及區間後已完成K維持 ${price(rangeHigh)}，尚無新的盤中價格方向。可稍後再看，不把價格持平解讀為走弱。`,
             watch: `觀察下一根完成K是否仍維持 ${price(rangeHigh)}，或出現新的價格變化。`, volumeEvidence
         };
+        if (hypothesis?.flatOpening && hypothesis.positiveGap
+            && after.some(bar => bar.low < rangeHigh)
+            && latest.close === rangeHigh && current === rangeHigh
+            && Number.isFinite(vwap) && vwap > 0 && current >= vwap) {
+            const pullbackLow = Math.min(...after.map(bar => bar.low));
+            return { title: 'CHECK LATER', pattern: OPENING_HIGH_HOLD_PATTERN,
+                reason: `${hypothesis.openingGap}；盤中曾回落至 ${price(pullbackLow)}，最新完成K與現價仍在開盤價 ${price(rangeHigh)}，不低於 VWAP ${price(vwap)}。近期完成K量能${volumeTrend}，尚無新的突破確認；可稍後再看，這不是轉空判斷。`,
+                watch: `觀察完成K與現價能否續守 ${price(rangeHigh)}；若跌離，留意先前低點 ${price(pullbackLow)} 並重新評估。`, volumeEvidence };
+        }
         return { title: 'CHECK LATER', pattern: structure?.label || '盤中新結構待確認',
             reason: '目前沒有足夠的新盤中趨勢證據，可以先離開；下次開啟或按「盤勢更新」會重新判斷。',
             watch: structure?.watch || `等待完成K突破新盤中阻力，或跌破 ${price(rangeLow)}。`, volumeEvidence };
@@ -744,7 +754,7 @@
         const bearTargetHigh = rangeLow !== null ? rangeLow * 0.98 : null;
         if (rangeHigh !== null) {
             $('report-structure').textContent = valid
-                ? `當前結構：【${title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定暫時高風險' : intraday?.kind === 'support_break' ? '局部支撐失守，等待較大結構確認' : reassessment.pattern === '新盤中突破失效' ? '局部突破失效，等待重新確認' : reassessment.pattern === OPENING_RECLAIM_PATTERN ? '回落後重站開盤價，續觀察' : reassessment.pattern === FLAT_OPENING_PATTERN ? '開盤價維持，尚待盤中新結構' : bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : title === 'CONTINUE' ? '盤中值得繼續觀察，進場未確認' : '無方向／區間震盪，觀望'}】`
+                ? `當前結構：【${title === 'HIGH RISK / AVOID FOR NOW' ? '目前偏多設定暫時高風險' : intraday?.kind === 'support_break' ? '局部支撐失守，等待較大結構確認' : reassessment.pattern === '新盤中突破失效' ? '局部突破失效，等待重新確認' : reassessment.pattern === OPENING_RECLAIM_PATTERN ? '回落後重站開盤價，續觀察' : reassessment.pattern === OPENING_HIGH_HOLD_PATTERN ? '開高後維持高位，等待新證據' : reassessment.pattern === FLAT_OPENING_PATTERN ? '開盤價維持，尚待盤中新結構' : bullish ? '偏多條件觸發' : bearish ? '偏空條件觸發' : title === 'CONTINUE' ? '盤中值得繼續觀察，進場未確認' : '無方向／區間震盪，觀望'}】`
                 : '目前資料不足；以下開盤與歷史事件僅供參考';
             const gapText = gap !== null ? `${gap >= 0 ? '高於' : '低於'}昨收 ${Math.abs(gap).toFixed(2)} 元（${gapPercent >= 0 ? '+' : ''}${gapPercent.toFixed(2)}%）` : '昨收或開盤價資料不足';
             const firstText = first ? `首根高 ${price(first.high)}／低 ${price(first.low)}；首根低點${firstLowHeld ? '尚未跌破' : '已跌破'}、高點${firstHighHeld ? '尚未突破' : '已突破'}。` : '首根 5 分K 尚未完成。';
@@ -769,6 +779,8 @@
                             ? '開盤後價格維持不變；等待新完成K出現價格變化，進場條件另以盤中進場評估為準。'
                         : reassessment.pattern === OPENING_RECLAIM_PATTERN
                             ? '回落後已重站開盤價，值得繼續觀察守穩與否；這不是進場訊號，進場條件另以盤中進場評估為準。'
+                        : reassessment.pattern === OPENING_HIGH_HOLD_PATTERN
+                            ? '開高後仍守開盤價；近期缺少新的突破證據，可稍後再看。這不是轉空或進場訊號，進場條件另以盤中進場評估為準。'
                         : bullish ? '偏多條件已觸發；依原則等待回測確認，不追價。'
                             : bearish ? '偏空條件已觸發；依原則等待反彈受阻確認，不追價。'
                         : title === 'CONTINUE' ? '新盤中結構值得繼續觀察；原 OR30 突破條件尚未觸發，不把監控結論當進場訊號。'
