@@ -60,7 +60,7 @@ assert.equal(completedTodayBars({ data: [...opening,
 assert.equal(title([opening[0], opening[1], opening[2], opening[3], opening[5]], '09:31'),
     '開盤區間資料不足', 'a missing opening slot cannot complete OR30');
 assert.equal(openingHypothesis(opening, 99, 100, 101, 99, 600).label,
-    '區間震盪，方向尚未確認；開盤相對昨收略有優勢',
+    '區間震盪，方向尚未確認；開盤高於昨收 1.00 元（+1.01%）',
     'a flat opening must not turn a gap into a directional trend');
 assert.match(openingHypothesis(opening, 99, 100, 101, 99, 600).counter, /後三根總量未高於前三根/);
 const risingOpening = opening.map((item, index) => ({ ...item, close: 100 + index * 0.15, high: 101.2 }));
@@ -170,8 +170,27 @@ assert.match(intradayStructure([{ high: 10, low: 7.5, close: 8 }],
     { latestHigh: { high: 13 }, latestLow: { low: 7 }, high: 'LH 較低高點', low: 'LL 較低低點' },
     14, 6, 8).detail, /LH 較低高點.*LL 較低低點/);
 assert.match(title(opening, '09:30', 100.5), /CHECK LATER/);
-assert.match(element('opening-hypothesis').textContent, /方向尚未確認；開盤相對昨收略有優勢/);
+assert.match(element('opening-hypothesis').textContent, /方向尚未確認；開盤高於昨收 1\.00 元（\+1\.01%）/);
 assert.match(element('opening-decision').textContent, /09:30 觀察決定：CHECK LATER/);
+const flatOpening = ['09:00', '09:05', '09:10', '09:15', '09:20', '09:25']
+    .map(time => bar(time, 215.1, 215.1, 215.1, 50));
+const flatHypothesis = openingHypothesis(flatOpening, 195.55, 215.1, 215.1, 215.1, 500);
+assert.equal(flatHypothesis.decision, 'CHECK LATER / 可先離開');
+assert.match(flatHypothesis.label, /高於昨收 19\.55 元（\+10\.00%）.*維持 215\.10/);
+assert.doesNotMatch(flatHypothesis.label, /區間震盪|略有優勢/);
+render({ date: day, lastUpdated: at('09:31'), lastPrice: 215.1, previousClose: 195.55,
+    openPrice: 215.1, avgPrice: 215.1 }, { data: flatOpening },
+new Date(at('09:31')), '006208', at('09:31'));
+assert.match(element('structure-reason').textContent, /高於昨收 19\.55 元（\+10\.00%）.*維持 215\.10/);
+assert.match(element('report-structure').textContent, /開盤價維持，尚待盤中新結構/);
+render({ date: day, lastUpdated: at('09:36'), lastPrice: 215.1, previousClose: 195.55,
+    openPrice: 215.1, avgPrice: 215.1 },
+{ data: [...flatOpening, bar('09:30', 215.1, 215.1, 215.1, 8)] },
+new Date(at('09:36')), '006208', at('09:36'));
+assert.equal(element('structure-title').textContent, 'CHECK LATER');
+assert.match(element('structure-reason').textContent, /高於昨收 19\.55 元（\+10\.00%）.*維持 215\.10/);
+assert.match(element('report-structure').textContent, /開盤價維持，尚待盤中新結構/);
+assert.match(element('report-main-plan').textContent, /等待新完成K出現價格變化/);
 assert.equal(title(risingOpening, '09:30', 100.8), 'CONTINUE',
     'a directional 09:30 opening can recommend watching before any post-OR30 candle completes');
 assert.match(element('structure-reason').textContent, /尚無區間後完成K/);
