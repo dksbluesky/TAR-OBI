@@ -191,6 +191,37 @@ assert.equal(element('structure-title').textContent, 'CHECK LATER');
 assert.match(element('structure-reason').textContent, /高於昨收 19\.55 元（\+10\.00%）.*維持 215\.10/);
 assert.match(element('report-structure').textContent, /開盤價維持，尚待盤中新結構/);
 assert.match(element('report-main-plan').textContent, /等待新完成K出現價格變化/);
+const reclaimAfter = [
+    ...['09:30', '09:35', '09:40', '09:45', '09:50', '09:55']
+        .map(time => bar(time, 215.1, 215.1, 215.1, 20)),
+    bar('10:00', 214.5, 213.5, 215.1, 50),
+    bar('10:05', 215.1, 214.5, 215.1, 50),
+    bar('10:10', 215.1, 215.1, 215.1, 18),
+    bar('10:15', 215.1, 215.1, 215.1, 8)
+];
+const reclaimQuote = { date: day, lastUpdated: at('10:20'), lastPrice: 215.1,
+    previousClose: 195.55, openPrice: 215.1, avgPrice: 215.08 };
+render(reclaimQuote, { data: [...flatOpening, ...reclaimAfter] },
+    new Date(at('10:20')), '006208', at('10:20'));
+assert.equal(element('structure-title').textContent, 'CONTINUE',
+    'a completed dip and stable return to a flat opening high restores monitoring');
+assert.match(element('structure-reason').textContent, /回落至 213\.50.*回到開盤價 215\.10.*量能減少/);
+assert.match(element('report-structure').textContent, /回落後重站開盤價，續觀察/);
+assert.match(element('report-main-plan').textContent, /這不是進場訊號/);
+render({ ...reclaimQuote, lastPrice: 215.0 }, { data: [...flatOpening, ...reclaimAfter] },
+    new Date(at('10:20')), '006208', at('10:20'));
+assert.equal(element('structure-title').textContent, 'CHECK LATER',
+    'the monitoring exception ends when current price falls away from the reclaimed level');
+render(reclaimQuote, { data: [...flatOpening, ...reclaimAfter.slice(0, -1),
+    bar('10:15', 214.9, 214.9, 215.1, 8)] },
+new Date(at('10:20')), '006208', at('10:20'));
+assert.equal(element('structure-title').textContent, 'CHECK LATER',
+    'a latest completed close below the opening level is not a stable reclaim');
+render({ ...reclaimQuote, lastPrice: 213.4 }, { data: [...flatOpening, ...reclaimAfter.slice(0, -1),
+    bar('10:15', 213.4, 213.3, 215.1, 500)] },
+new Date(at('10:20')), '006208', at('10:20'));
+assert.equal(element('structure-title').textContent, 'HIGH RISK / AVOID FOR NOW',
+    'a completed breakdown still overrides earlier bullish opening context');
 assert.equal(title(risingOpening, '09:30', 100.8), 'CONTINUE',
     'a directional 09:30 opening can recommend watching before any post-OR30 candle completes');
 assert.match(element('structure-reason').textContent, /尚無區間後完成K/);
