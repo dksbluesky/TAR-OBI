@@ -309,7 +309,26 @@ assert.equal(title([...opening, ...quietLate, bar('10:25', 100.8, 100.1, 100.9, 
     'a later failed intraday breakout revokes continued watching');
 assert.match(element('structure-reason').textContent, /收回/);
 assert.equal(title([...opening, ...quietLate, bar('10:30', 100.8, 100.1, 100.9, 900)],
-    '10:36', 100.8), '資料不足 / CHECK LATER', 'a missing 10:25 candle blocks trend reassessment');
+    '10:36', 100.8), '5 分K 時段不連續 / CHECK LATER',
+    'an absent 10:25 candle pauses trend reassessment without discarding observed prices');
+assert.match(element('structure-reason').textContent, /10:25 起始.*無成交還是資料遺漏.*現價 100\.80/);
+assert.match(element('intraday-evidence').textContent, /已收到.*開盤 100\.00.*現價 100\.80.*不自動補 K/);
+assert.match(element('chart-as-of').textContent, /1 個 5 分鐘時段無 K 紀錄/);
+assert.match(element('report-structure').textContent, /已觀察價格可參考，最新方向暫緩判定/);
+assert.match(element('report-evidence').innerHTML, /尚不能判定最新突破或失效/);
+const flatTwentyEightSlots = Array.from({ length: 22 }, (_, index) => {
+    const time = new Date(at('09:30') + index * 300000);
+    return bar(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' }).format(time),
+        215.1, 215.1, 215.1, 8);
+});
+const sparseTwentySix = [...flatOpening, ...flatTwentyEightSlots.filter(item =>
+    !['11:00', '11:10'].some(time => item.date.includes(`T${time}:`)))];
+render({ date: day, lastUpdated: at('11:23'), lastPrice: 215.1, previousClose: 195.55,
+    openPrice: 215.1, avgPrice: 215.08 }, { data: sparseTwentySix },
+new Date(at('11:23')), '006208', at('11:23'));
+assert.equal(element('structure-title').textContent, '5 分K 時段不連續 / CHECK LATER');
+assert.match(element('chart-as-of').textContent, /已收到 26 根.*2 個 5 分鐘時段無 K 紀錄/);
+assert.match(element('structure-reason').textContent, /11:00、11:10 起始.*現價 215\.10/);
 const openingRule = context.MarketData.analyzeOpeningRules;
 const sample = (time, close, low, high, volume, average) => ({
     start: at(time), close, low, high, volume, average
