@@ -386,8 +386,19 @@
         if (presentation.action === 'DO_NOT_ENTER' || presentation.zoneInvalid) rows.push(['Current Price', priceValue]);
         setFinalActionDetails(rows);
     }
-    function renderShadowRr(shadow, tick, intradayCandles) {
+    function renderShadowRr(shadow, tick, intradayCandles, shadowContext) {
         const value = number => Number.isFinite(number) ? formatPrice(number, tick) : 'Unavailable';
+        const broadContext = shadowContext?.dailyContext;
+        const broadInvalidation = Number.isFinite(shadow.etfBroadInvalidation)
+            ? value(shadow.etfBroadInvalidation)
+            : broadContext?.reason === 'Insufficient completed candles'
+                ? '無適用價位：已完成日K不足，無法確認日線結構'
+                : ({
+                    bearish: '無適用價位：日線偏空，沒有上漲結構失效價',
+                    range: '無適用價位：日線盤整，尚無確認的上漲結構',
+                    unclear: '無適用價位：尚未確認日線上漲結構',
+                    unavailable: '日線結構資料未提供'
+                })[broadContext?.context] || '未收到 ETF_DCA 日線結構狀態；請更新 Entry Watch';
         const todayCount = shadow.asOf
             ? window.TarObiShadowRr.completedFiveMinuteBars(null, intradayCandles, shadow.asOf).length
             : null;
@@ -403,7 +414,7 @@
             [askIsLive ? 'Current Ask 1 / 即時賣一' : shadow.proposedEntry > 0 ? 'Last known Ask 1 — stale / 最後賣一（非即時）' : 'Ask 1 unavailable / 賣一無資料', value(shadow.proposedEntry)],
             ['T1 / 第一可信阻力', shadow.target1 ? value(shadow.target1.price) : 'Unavailable'],
             ['T2 / 下一可信阻力', shadow.target2 ? value(shadow.target2.price) : 'Unavailable'],
-            ['ETF Broad Invalidation / ETF 廣義失效價', value(shadow.etfBroadInvalidation)],
+            ['ETF Broad Invalidation / ETF 廣義失效價', broadInvalidation],
             ['Manual / Trailing Invalidation / 人工或移動停損', value(shadow.manualOrTrailingInvalidation)],
             [askIsLive ? 'Available Upside / 可用上漲空間' : 'Upside from last known Ask 1 / 前次賣一上漲空間', Number.isFinite(shadow.availableUpsidePct) ? `${shadow.availableUpsidePct.toFixed(2)}%` : 'Unavailable'],
             ['Resistance Evidence / 阻力證據', shadow.resistanceConfidence],
@@ -650,7 +661,7 @@
             etfBroadInvalidation: shadowContext?.etfBroadInvalidation,
             manualOrTrailingInvalidation: shadowContext?.manualOrTrailingInvalidation ?? linkedBridge?.invalidationLevel ?? null
         });
-        renderShadowRr(shadowRr, tick, candleData);
+        renderShadowRr(shadowRr, tick, candleData, shadowContext);
         return {
             complete: Boolean(quoteData && metrics && timestamp),
             ticker: settings.symbol,
