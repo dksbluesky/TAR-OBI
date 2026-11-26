@@ -70,8 +70,8 @@ assert.equal(crossedSession.candleQuality.status, 'OK');
 assert.equal(crossedSession.completedFiveMinuteBars, 59, 'total includes prior and current sessions');
 assert.equal(rr.completedFiveMinuteBars(null, { data: nextSession }, crossedSession.asOf).length, 5,
     'today count uses the same completed-candle cutoff without prior history');
-assert.equal(crossedSession.evidence.find(level => level.price === 102)?.rejectionCount, 0,
-    'a next-session gap is not an intraday rejection');
+assert.equal(crossedSession.evidence.find(level => level.price === 102), undefined,
+    'a pivot without two following candles in the same session is not evidence');
 
 const noEntry = rr.assess({ ...base, proposedEntry: null });
 assert.equal(noEntry.completedFiveMinuteBars, bars.length, 'coverage is independent of entry availability');
@@ -87,9 +87,31 @@ assert.equal(duplicate.candleQuality.status, 'GAP_OR_DUPLICATE');
 assert.deepEqual(duplicate.candleQuality.duplicateTimestamps, [bars[4].date]);
 assert.equal(duplicate.rrAssessment, 'R&R UNAVAILABLE — candle coverage issue');
 assert.equal(duplicate.grossRr, null);
+assert.equal(duplicate.target1?.price, result.target1?.price,
+    'a duplicate blocks its local pivot window but does not erase independent resistance evidence');
 const gap = rr.assess({ ...base, intradayCandles: { data: bars.filter((_, i) => i !== 4) } });
 assert.equal(gap.candleQuality.status, 'GAP_OR_DUPLICATE');
 assert.deepEqual(gap.candleQuality.missingCandles, [bars[4].date]);
+assert.equal(gap.target1?.price, result.target1?.price,
+    'a missing candle does not erase credible resistance from other continuous windows');
+assert.equal(gap.grossRr, null, 'incomplete overall coverage still blocks the broad-risk estimate');
+
+const sparsePivotStart = Date.parse('2026-10-13T09:00:00+08:00');
+const sparsePivot = [0, 1, 3, 4, 5, 6, 7].map((slot, index) => ({
+    date: new Date(sparsePivotStart + slot * 300000).toISOString(),
+    high: [100, 101, 110, 101, 100, 100, 100][index], low: 99, close: 100
+}));
+const sparsePivotResult = rr.assess({ ...base,
+    asOf: new Date(sparsePivotStart + 8 * 300000).toISOString(),
+    historicalCandles: { data: [] }, intradayCandles: { data: sparsePivot },
+    dailyResistance: { levels: [{ price: 111, date: '2026-10-12', repeatedPivotCount: 2 }] }
+});
+assert.equal(sparsePivotResult.target1?.price, 111,
+    'an independent repeated daily resistance can remain available despite a five-minute gap');
+assert.ok(!sparsePivotResult.evidence.some(level => level.price === 110),
+    'a high spanning a missing candle is not treated as an intraday pivot');
+assert.equal(sparsePivotResult.grossRr, null,
+    'reference target availability does not waive the full-coverage R&R safeguard');
 
 const previous = [-0.3, -0.2, -0.1].map((offset, i) => ({
     date: new Date(Date.parse('2026-10-08T13:10:00+08:00') + i * 300000).toISOString(),
@@ -99,6 +121,8 @@ const boundary = rr.assess({ ...base, historicalCandles: { data: previous },
     intradayCandles: { data: bars }, proposedEntry: 100.55 });
 assert.equal(boundary.entryStructuralStop, null, 'prior session must not confirm current setup stop');
 assert.equal(boundary.rrAssessment, 'R&R UNAVAILABLE — candle coverage issue');
+assert.equal(boundary.target1?.price, result.target1?.price,
+    'a historical day with missing candles does not suppress current-day verified resistance');
 
 const closing = Array.from({ length: 53 }, (_, i) => ({
     date: new Date(start + i * 300000).toISOString(), high: 101, low: 100, close: 100.5

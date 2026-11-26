@@ -85,9 +85,15 @@
             askDifferencePct: buy > 0 && askValid && executableAsk > 0 ? (executableAsk - buy) / buy * 100 : null };
     }
 
-    function pivots(bars, field, span = 2) {
+    const continuousWindow = (bars, invalidStarts) => bars.every((bar, index) =>
+        !invalidStarts.has(bar.start) && (index === 0 ||
+            (bar.start - bars[index - 1].start === 5 * 60000
+                && taipeiDate(bar.start) === taipeiDate(bars[index - 1].start))));
+
+    function pivots(bars, field, span = 2, invalidStarts = new Set()) {
         const found = [];
         for (let i = span; i < bars.length - span; i++) {
+            if (!continuousWindow(bars.slice(i - span, i + span + 1), invalidStarts)) continue;
             const price = bars[i][field];
             const left = bars.slice(i - span, i), right = bars.slice(i + 1, i + span + 1);
             const isPivot = field === 'high'
@@ -126,20 +132,19 @@
             duplicateTimestamps: collection.duplicateTimestamps,
             missingCandles: collection.missingCandles
         };
-        if (result.candleQuality.status !== 'OK') {
-            result.rrAssessment = 'R&R UNAVAILABLE — candle coverage issue';
-            return result;
-        }
+        const invalidStarts = new Set(collection.duplicateTimestamps.map(value => Date.parse(value)));
         if (!(entry > 0) || !(tick > 0)) return result;
         if (bars.length < 7) { result.evidence.push('Insufficient completed 5-minute candles'); return result; }
 
         const cutoff = Date.parse(asOf);
         const recentDays = [...new Set(bars.map(bar => taipeiDate(bar.start)))].slice(-10);
-        const recent = bars.filter(bar => recentDays.includes(taipeiDate(bar.start)));
+        const recent = bars.filter(bar => recentDays.includes(taipeiDate(bar.start))
+            && !invalidStarts.has(bar.start));
         const range = median(recent.map(bar => bar.high - bar.low)) || tick;
         const tolerance = Math.max(2 * tick, range * 0.5);
         const rejectionMove = Math.max(2 * tick, range);
-        const highs = pivots(bars, 'high').filter(point => recentDays.includes(taipeiDate(Date.parse(point.date))));
+        const highs = pivots(bars, 'high', 2, invalidStarts)
+            .filter(point => recentDays.includes(taipeiDate(Date.parse(point.date))));
         const daily = Array.isArray(input.dailyResistance?.levels) ? input.dailyResistance.levels : [];
         const dailyHighs = daily.filter(point => {
             const date = String(point.date || '').slice(0, 10);
@@ -158,15 +163,21 @@
             const touches = highs.filter(point => Math.abs(point.price - group.price) <= tolerance);
             const rejections = touches.map(point => {
                 const pivotDay = taipeiDate(Date.parse(point.date));
-                const following = bars.slice(point.index + 1, point.index + 5)
-                    .filter(bar => taipeiDate(bar.start) === pivotDay);
+                const following = [];
+                for (let offset = 1; offset <= 4; offset++) {
+                    const bar = bars[point.index + offset];
+                    if (!bar || bar.start !== bars[point.index].start + offset * 5 * 60000
+                        || taipeiDate(bar.start) !== pivotDay || invalidStarts.has(bar.start)) break;
+                    following.push(bar);
+                }
                 const reaction = following.find(bar => group.price - bar.low >= rejectionMove);
                 return reaction ? { pivotPrice: point.price, pivotAt: point.date,
                     reactionLow: reaction.low, reactionAt: reaction.date } : null;
             }).filter(Boolean);
             const dailyRepeated = group.members.some(point => point.source === 'DAILY_PIVOT' && point.repeatedPivotCount >= 2);
             const lastTwo = bars.slice(-2);
-            const broken = lastTwo.length === 2 && entry > group.price + tolerance
+            const broken = lastTwo.length === 2 && continuousWindow(lastTwo, invalidStarts)
+                && entry > group.price + tolerance
                 && lastTwo.every(bar => bar.close > group.price + tolerance);
             return {
                 price: group.price, kind: broken ? 'BROKEN_RESISTANCE'
@@ -187,11 +198,17 @@
             !selected.includes(level) && (level.kind === 'BROKEN_RESISTANCE'
                 || level.price >= entry - range * 2))].slice(0, 8);
         if (!result.target1) {
-            result.rrAssessment = result.resistanceConfidence === 'PROVISIONAL_RESISTANCE'
+            result.rrAssessment = result.candleQuality.status !== 'OK'
+                ? 'R&R UNAVAILABLE — candle coverage issue'
+                : result.resistanceConfidence === 'PROVISIONAL_RESISTANCE'
                 ? 'TARGET UNCERTAIN — execution result unchanged' : 'R&R UNAVAILABLE';
             return result;
         }
         result.availableUpsidePct = (result.target1.price - entry) / entry * 100;
+        if (result.candleQuality.status !== 'OK') {
+            result.rrAssessment = 'R&R UNAVAILABLE — candle coverage issue';
+            return result;
+        }
         // Option A is a shadow estimate using the ETF's broader invalidation,
         // not an entry-specific structural stop or the manual/trailing level.
         if (!(broadInvalidation > 0) || !(broadInvalidation < entry)) {
